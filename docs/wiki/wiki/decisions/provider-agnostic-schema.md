@@ -17,6 +17,7 @@ files: [src/config.ts, src/jev.ts]
 ---
 
 
+
 # Provider-agnostic Jev client schema
 
 **Status.** accepted

@@ -14,8 +14,10 @@ claims:
     evidence: [raw/sessions/2026-09-19-session-2026-09-19-1813.md, src/structure.ts]
     corroborations: 2
     last_confirmed: 2026-09-19
+    last_checked: 2026-09-19
 files: [src/structure.ts]
 ---
+
 
 
 # Structure coverage check

@@ -13,8 +13,10 @@ claims:
     support: 0.95
     evidence: [raw/sessions/2026-09-19-session-2026-09-19-1730.md]
     reviewed: 2026-09-19
+    last_checked: 2026-09-19
 files: [src/pipeline/adjudicate.ts]
 ---
+
 
 
 # Adjudication policy computed in code

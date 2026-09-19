@@ -19,6 +19,7 @@ files: [src/wiki/layout.ts]
 
 
 
+
 # Wiki layout derives from a single root
 
 **Statement.** The `raw/` and `wiki/` directories always derive from `wikiRoot` via a single `resolveLayout` call. Runtime state (ledger, review queue, session log) is placed under `stateRoot`, which may be an absolute path or relative to `wikiRoot`.

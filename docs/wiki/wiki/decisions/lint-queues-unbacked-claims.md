@@ -13,6 +13,7 @@ claims:
     support: 0.8
     evidence: ""
     reviewed: 2026-09-19
+    last_checked: 2026-09-19
   - 0: s
     1: r
     2: c
@@ -26,6 +27,7 @@ claims:
     10: s
 files: [src/lint.ts]
 ---
+
 
 
 

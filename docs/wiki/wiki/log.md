@@ -213,3 +213,11 @@
 - Raw: raw/sessions/2026-09-19-session-2026-09-19-1922.md
 - Filed 1 · reinforced 0 · review 0 · rejected 2
 
+## [2026-09-19] sync | 7 claim(s) checked
+- Baseline: a627568 → 0484128
+- Changed files: 59
+
+## [2026-09-19] capture | 5 insights (settled)
+- Raw: raw/sessions/2026-09-19-session-2026-09-19-1923.md
+- Filed 0 · reinforced 2 · review 0 · rejected 3
+

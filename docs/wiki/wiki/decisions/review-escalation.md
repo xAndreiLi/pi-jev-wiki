@@ -2,7 +2,7 @@
 title: Agent-managed review with user escalation for critical items
 type: decision
 topic: decisions
-summary: Review work is agent-managed. The user is only escalated for critical items such as security, breaking API changes, or data loss.
+summary: "Review work is agent-managed. The user is only escalated for critical items such as security, breaking API changes, or data loss."
 tags: [review, escalation, workflow]
 updated: 2026-09-19
 sources: [raw/jev-wiki-architecture-notes/2026-09-19-jev-wiki-architecture-notes.md, raw/sessions/2026-09-19-session-2026-09-19-1734.md]
@@ -12,8 +12,10 @@ claims:
     status: verified
     support: 0.99
     evidence: [raw/jev-wiki-architecture-notes/2026-09-19-jev-wiki-architecture-notes.md]
+    last_checked: 2026-09-19
 files: [src/extension.ts, src/review.ts]
 ---
+
 
 # Agent-managed review with user escalation for critical items
 

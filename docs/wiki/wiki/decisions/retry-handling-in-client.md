@@ -13,6 +13,7 @@ claims:
     support: 0.58
     evidence: ""
     reviewed: 2026-09-19
+    last_checked: 2026-09-19
   - 0: r
     1: a
     2: w
@@ -65,6 +66,7 @@ claims:
     49: d
 files: [src/lint.ts]
 ---
+
 
 
 # Retry Handling in Client
