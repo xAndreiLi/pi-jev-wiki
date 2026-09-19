@@ -1,11 +1,14 @@
-# jev-wiki
+# pi-jev-wiki
 
-[![npm version](https://img.shields.io/npm/v/jev-wiki.svg)](https://www.npmjs.com/package/jev-wiki)
-[![license](https://img.shields.io/npm/l/jev-wiki.svg)](LICENSE)
+[![npm version](https://img.shields.io/npm/v/pi-jev-wiki.svg)](https://www.npmjs.com/package/pi-jev-wiki)
+[![license](https://img.shields.io/npm/l/pi-jev-wiki.svg)](LICENSE)
 
 A pi package that gives coding agents a maintained **mental model of a project**: module
 responsibilities, boundaries, data flow, invariants, decisions, and change impact — stored as a
 markdown wiki and maintained with **Jev** (TypeSafe's calibrated decision model).
+
+The npm package is **`pi-jev-wiki`** (matching the repository); the extension, tools, and config
+files keep the `jev-wiki` name.
 
 Jev decides what is grounded, derivable, durable, and where it belongs. The agent writes. Code
 owns every threshold.
@@ -40,8 +43,8 @@ The wiki is **never injected** into sessions. The table of contents is available
 
 ```bash
 pi install /path/to/jev-wiki        # local folder
-pi install npm:jev-wiki             # once published
-pi install git:github.com/<owner>/jev-wiki@v0.2.0
+pi install npm:pi-jev-wiki             # once published
+pi install git:github.com/xAndreiLi/pi-jev-wiki@v0.2.0
 ```
 
 For development, load it directly:

@@ -4,7 +4,7 @@
 
 1. Create an npm account and log in locally: `npm login`, or create an automation token and add it
    to the GitHub repository as the `NPM_TOKEN` secret (used by `.github/workflows/publish.yml`).
-2. Confirm the package name is available: `npm view jev-wiki version` (an E404 means it is free).
+2. Confirm the package name is available: `npm view pi-jev-wiki version` (an E404 means it is free).
 3. Confirm `repository`, `homepage`, and `bugs` in `package.json` point at the real repository.
 
 ## Release checklist
@@ -18,7 +18,7 @@
 5. Smoke-test the packed artifact:
    ```bash
    tmp=$(mktemp -d) && npm pack --pack-destination "$tmp"
-   mkdir -p "$tmp/pkg" && tar -xzf "$tmp"/jev-wiki-*.tgz -C "$tmp/pkg"
+   mkdir -p "$tmp/pkg" && tar -xzf "$tmp"/pi-jev-wiki-*.tgz -C "$tmp/pkg"
    pi -e "$tmp/pkg/package" -p "Call wiki_status and report the provider and wiki root."
    ```
 6. Publish: `npm publish` (unscoped, public by default), or push the tag and let
@@ -33,5 +33,5 @@
 
 ## After publishing
 
-- Verify the gallery entry: `pi install npm:jev-wiki`, then `pi -e npm:jev-wiki` for a throwaway run.
+- Verify the gallery entry: `pi install npm:pi-jev-wiki`, then `pi -e npm:pi-jev-wiki` for a throwaway run.
 - Confirm the published README renders and the pi manifest (`extensions`, `skills`) resolves.
