@@ -183,3 +183,22 @@
 - Raw: raw/sessions/2026-09-19-session-2026-09-19-1815.md
 - Filed 1 · reinforced 0 · review 0 · rejected 3
 
+## [2026-09-19] lint | 0 added, 0 broken links, 0 unbacked claims
+- Pages: 17
+- TOC updated: 0 · missing files: 0
+- Orphans: 0 · raw backlog: 0
+- Contradiction checks: 1 · duplicate candidates: 1
+
+## [2026-09-19] finalize | Added claim c3 about confidence thresholds and review gates to guided-writing.md per accepted dispute mu8y439j-30d879.
+- Updated: decisions/guided-writing.md
+
+## [2026-09-19] capture | 3 insights (tool)
+- Raw: raw/sessions/2026-09-19-session-2026-09-19-1904.md
+- Filed 0 · reinforced 0 · review 1 · rejected 2
+
+## [2026-09-19] finalize | wiki_insights (guided) produced 0 file/reinforce claims; 2 rejected (derivable/unsupported) and 1 held for review below threshold. No new pages to finalize.
+
+## [2026-09-19] capture | 5 insights (settled)
+- Raw: raw/sessions/2026-09-19-session-2026-09-19-1904.md
+- Filed 2 · reinforced 0 · review 1 · rejected 2
+

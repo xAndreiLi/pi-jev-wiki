@@ -17,6 +17,11 @@ claims:
     status: verified
     support: 0.95
     evidence: [skills/llm-wiki/SKILL.md, research/karpathy-llm-wiki-gist.md]
+  - id: c3
+    text: "The wiki uses an explicit confidence threshold and review queue for accepting insights; not all insights survive review, even when a user explicitly requests capture."
+    status: verified
+    support: 0.90
+    evidence: [docs/wiki/wiki/decisions/guided-writing.md]
 files: []
 ---
 
@@ -43,6 +48,7 @@ files: []
 - Jev adjudicates groundedness, derivability, and placement.
 - The agent composes the actual page text, following templates and frontmatter rules.
 - Enforcement is handled by the extension code, not by agent prompting alone.
+- An explicit confidence threshold and review gate control acceptance; not all submitted insights survive review, even when the user explicitly requests capture.
 
 ## Consequences
 
