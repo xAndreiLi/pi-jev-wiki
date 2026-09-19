@@ -1054,7 +1054,7 @@ export default function (pi: ExtensionAPI) {
 				}
 				const rel = relative(layout.wikiDir, absolute).split("\\").join("/");
 				if (rel.startsWith("..")) {
-					refused.push(`${page} (outside the wiki)");
+					refused.push(`${page} (outside the wiki)`);
 					continue;
 				}
 				await removeFileIfExists(absolute);
