@@ -1,9 +1,18 @@
 {
   "name": "jev-wiki",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Project mental-model wiki for pi, maintained by agent insights and Jev decisions",
   "type": "module",
   "license": "MIT",
+  "engines": {
+    "node": ">=20"
+  },
+  "files": [
+    "src",
+    "skills",
+    "README.md",
+    "LICENSE"
+  ],
   "keywords": [
     "pi-package",
     "pi",
@@ -25,7 +34,8 @@
     "test:paging": "jiti scripts/paging-test.ts",
     "test:scale": "jiti scripts/scale-test.ts",
     "test:unit": "jiti scripts/unit-test.ts",
-    "test:all": "tsc --noEmit && jiti scripts/unit-test.ts && jiti scripts/scale-test.ts"
+    "test:all": "tsc --noEmit && jiti scripts/unit-test.ts && jiti scripts/scale-test.ts",
+    "prepublishOnly": "npm run typecheck && npm run test:unit"
   },
   "peerDependencies": {
     "@earendil-works/pi-ai": "*",

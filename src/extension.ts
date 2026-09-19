@@ -65,13 +65,20 @@ function runtimeFor(ctx: ExtensionContext): Runtime {
 	return { loaded, layout: resolveLayout(ctx.cwd, loaded.config.wikiRoot, loaded.config.stateRoot) };
 }
 
-function requireClient(loaded: LoadedConfig): JevClient {
-	if (!loaded.apiKey) {
-		throw new Error(
-			`No Jev API key. Put it in ${loaded.envFilePath} as JEV_TOKEN=... (or set apiKey in ${loaded.projectConfigPath}).`,
-		);
+async function requireClient(loaded: LoadedConfig, ctx: ExtensionContext): Promise<JevClient> {
+	if (loaded.apiKey) return createJevClient(loaded.config, loaded.apiKey);
+	if (loaded.config.provider === "openrouter") {
+		const key = await ctx.modelRegistry.getApiKeyForProvider("openrouter").catch(() => undefined);
+		if (key) return createJevClient(loaded.config, key);
 	}
-	return createJevClient(loaded.config, loaded.apiKey);
+	throw new Error(
+		[
+			"No Jev API key configured.",
+			`- TypeSafe: put TYPESAFE_API_KEY=... (or JEV_TOKEN=...) in ${loaded.envFilePath}`,
+			`- OpenRouter: put OPENROUTER_API_KEY=... in ${loaded.envFilePath}, set provider to "openrouter", or sign in with /login openrouter`,
+			"- Ask the agent to run wiki_setup action=guide provider=typesafe|openrouter for exact steps, then wiki_setup action=test",
+		].join("\n"),
+	);
 }
 
 /** Optional cross-project vault: resolved against the pi agent dir when relative. */
@@ -302,7 +309,7 @@ async function ingestSource(
 	input: { text: string; title: string; topic: string; source?: string },
 ): Promise<{ brief: string; details: Record<string, unknown>; rawPath: string; duplicateOf?: string }> {
 	const { loaded, layout } = runtime;
-	const client = requireClient(loaded);
+	const client = await requireClient(loaded, ctx);
 	const config = loaded.config;
 
 	await ensureLayout(layout);
@@ -986,7 +993,7 @@ export default function (pi: ExtensionAPI) {
 		async execute(_id, params, _signal, onUpdate, ctx) {
 			const runtime = runtimeFor(ctx);
 			const { loaded, layout } = runtime;
-			const client = requireClient(loaded);
+			const client = await requireClient(loaded, ctx);
 			await ensureLayout(layout);
 			if (params.insights.length === 0) {
 				return { content: [{ type: "text", text: "No insights submitted." }], details: { count: 0 } };
@@ -1065,7 +1072,7 @@ export default function (pi: ExtensionAPI) {
 		}),
 		async execute(_id, params, signal, onUpdate, ctx) {
 			const { loaded, layout } = runtimeFor(ctx);
-			const client = requireClient(loaded);
+			const client = await requireClient(loaded, ctx);
 			onUpdate?.({ content: [{ type: "text", text: "Checking code changes since the last wiki sync…" }], details: {} });
 			const report = await syncWiki(layout, client, loaded.config, ctx.cwd, {
 				baseline: params.baseline,
@@ -1205,7 +1212,7 @@ export default function (pi: ExtensionAPI) {
 		}),
 		async execute(_id, params, signal, onUpdate, ctx) {
 			const { loaded, layout } = runtimeFor(ctx);
-			const client = requireClient(loaded);
+			const client = await requireClient(loaded, ctx);
 			onUpdate?.({ content: [{ type: "text", text: "Linting the wiki…" }], details: {} });
 			const report = await lintWiki(layout, client, loaded.config, {
 				autoFix: params.autoFix,
@@ -1319,6 +1326,123 @@ export default function (pi: ExtensionAPI) {
 			const loaded = loadConfig(ctx.cwd);
 			const report = await runDoctor(loaded);
 			return { content: [{ type: "text", text: renderDoctor(report) }], details: report };
+		},
+	});
+
+	pi.registerTool({
+		name: "wiki_setup",
+		label: "Configure Jev API Key",
+		description:
+			"Check or configure the Jev API key: status, guide (exact steps for TypeSafe or OpenRouter), test (one tiny live call), or write-env (write the key into the project .env after verifying it is gitignored). The key value is never echoed.",
+		promptSnippet: "Check or configure the Jev API key (TypeSafe or OpenRouter)",
+		promptGuidelines: [
+			"Use wiki_setup when no Jev key is configured, when the user asks how to connect TypeSafe or OpenRouter, or when Jev calls fail with authentication errors.",
+			"Never echo the key value back to the user; wiki_setup reports only where the key came from.",
+		],
+		parameters: Type.Object({
+			action: StringEnum(["status", "guide", "test", "write-env"] as const),
+			provider: Type.Optional(StringEnum(["typesafe", "openrouter", "aimlapi"] as const, { description: "Defaults to the configured provider" })),
+			apiKey: Type.Optional(Type.String({ description: "Only used by write-env; never echoed" })),
+		}),
+		async execute(_id, params, _signal, _onUpdate, ctx) {
+			const loaded = loadConfig(ctx.cwd);
+			const provider = params.provider ?? loaded.config.provider;
+
+			if (params.action === "status") {
+				const piKey =
+					!loaded.apiKey && provider === "openrouter"
+						? await ctx.modelRegistry.getApiKeyForProvider("openrouter").catch(() => undefined)
+						: undefined;
+				const source = loaded.apiKey
+					? `found via environment/.env (${loaded.envFilePath})`
+					: piKey
+						? "found via pi's OpenRouter login"
+						: "missing";
+				const text = [
+					"# Jev key status",
+					`- provider: ${loaded.config.provider}`,
+					`- endpoint: ${loaded.config.baseUrl}`,
+					`- model: ${loaded.config.model}`,
+					`- key: ${source}`,
+					`- env file: ${loaded.envFilePath}${existsSync(loaded.envFilePath) ? " (present)" : " (missing)"}`,
+					loaded.apiKey || piKey ? "" : "- next: wiki_setup action=guide provider=typesafe|openrouter",
+				]
+					.filter(Boolean)
+					.join("\n");
+				return { content: [{ type: "text", text }], details: { provider: loaded.config.provider, keySource: source } };
+			}
+
+			if (params.action === "guide") {
+				const guide =
+					provider === "openrouter"
+						? [
+							"## OpenRouter (Decisions API)",
+							"1. Create a key at https://openrouter.ai/keys.",
+							`2. Add it to the project .env (gitignored): OPENROUTER_API_KEY=...`,
+							'3. Set { "provider": "openrouter", "model": "~typesafe/jev-latest" } in .pi/jev-wiki.json or ~/.pi/agent/jev-wiki.json. The endpoint preset is https://openrouter.ai/api/alpha/decisions.',
+							"4. Alternative: sign in with /login openrouter; the plugin uses pi's credential when provider is openrouter.",
+							"5. Run wiki_setup action=test.",
+							"Notes: 32k advertised context; pin with model typesafe/jev-1.13 if needed.",
+						].join("\n")
+						: [
+							"## TypeSafe (official API, recommended)",
+							"1. Get a token from https://typesafe.ai (early access).",
+							`2. Add it to the project .env (gitignored): TYPESAFE_API_KEY=... (JEV_TOKEN also works).`,
+							'3. Or write { "provider": "typesafe", "apiKey": "$TYPESAFE_API_KEY" } to .pi/jev-wiki.json or ~/.pi/agent/jev-wiki.json.',
+							"4. Run wiki_setup action=test.",
+							"Notes: 64k context (32k state + longest question), $0.042/Mtok input, output free.",
+						].join("\n");
+				return { content: [{ type: "text", text: guide }], details: { provider } };
+			}
+
+			if (params.action === "write-env") {
+				if (!params.apiKey) throw new Error("wiki_setup write-env needs `apiKey`.");
+				const varName = provider === "openrouter" ? "OPENROUTER_API_KEY" : provider === "aimlapi" ? "AIMLAPI_API_KEY" : "TYPESAFE_API_KEY";
+				if (await isGitRepo(ctx.cwd)) {
+					const ignored = await git(ctx.cwd, ["check-ignore", "-q", loaded.envFilePath]);
+					if (ignored.code !== 0) {
+						throw new Error(`${loaded.envFilePath} is not gitignored. Add it to .gitignore before writing a key.`);
+					}
+				}
+				const existing = existsSync(loaded.envFilePath) ? await readFile(loaded.envFilePath, "utf8") : "";
+				const pattern = new RegExp(`^\\s*${varName}\\s*=`);
+				const lines = existing.split(/\r?\n/).filter((line) => line.trim() && !pattern.test(line));
+				lines.push(`${varName}=${params.apiKey}`);
+				await writeTextAtomic(loaded.envFilePath, `${lines.join("\n")}\n`);
+				return {
+					content: [{ type: "text", text: `Wrote ${varName} to ${loaded.envFilePath} (value not echoed). Run wiki_setup action=test to verify.` }],
+					details: { varName, path: loaded.envFilePath },
+				};
+			}
+
+			const started = Date.now();
+			try {
+				const client = await requireClient(loaded, ctx);
+				const response = await client.systemOne(
+					{ probe: "connectivity test" },
+					{ ok: noul("This is a connectivity test. The correct answer is yes.") },
+					{ signal: ctx.signal, timeoutMs: 20_000 },
+				);
+				return {
+					content: [
+						{
+							type: "text",
+							text: `Jev reachable in ${Date.now() - started}ms · model ${response.model} · tokens ${response.usage.input_tokens}/${response.usage.output_tokens}`,
+						},
+					],
+					details: { model: response.model, usage: response.usage },
+				};
+			} catch (error) {
+				return {
+					content: [
+						{
+							type: "text",
+							text: `Jev test failed: ${(error as Error).message}\n\nRun wiki_setup action=guide provider=${provider} for setup steps.`,
+						},
+					],
+					details: { error: String((error as Error).message) },
+				};
+			}
 		},
 	});
 
@@ -1440,7 +1564,7 @@ export default function (pi: ExtensionAPI) {
 				layout: resolveLayout(ctx.cwd, loaded.config.wikiRoot, loaded.config.stateRoot),
 			};
 			await ensureLayout(runtime.layout);
-			const client = requireClient(loaded);
+			const client = await requireClient(loaded, ctx);
 
 			// Cheap Jev pre-screen: only pay for extraction when the session likely holds durable knowledge.
 			const screen = await client.systemOne(

@@ -152,12 +152,17 @@ export function loadConfig(cwd: string, overrides?: Partial<JevWikiConfig>): Loa
 	};
 
 	const configured = resolveEnvValue(merged.apiKey, env);
-	const apiKey =
-		configured ??
-		process.env.TYPESAFE_API_KEY ??
-		process.env.OPENROUTER_API_KEY ??
-		env.TYPESAFE_API_KEY ??
-		env.JEV_TOKEN;
+	const providerVars: Record<string, string[]> = {
+		typesafe: ["TYPESAFE_API_KEY", "JEV_TOKEN"],
+		openrouter: ["OPENROUTER_API_KEY", "JEV_TOKEN", "TYPESAFE_API_KEY"],
+		aimlapi: ["AIMLAPI_API_KEY", "JEV_TOKEN"],
+	};
+	const candidates = providerVars[merged.provider] ?? ["JEV_TOKEN", "TYPESAFE_API_KEY", "OPENROUTER_API_KEY"];
+	let apiKey = configured;
+	for (const name of candidates) {
+		apiKey ??= process.env[name] ?? env[name];
+	}
+	apiKey ??= env.OPENROUTER_API_KEY ?? process.env.OPENROUTER_API_KEY;
 
 	return { cwd, agentDir, projectConfigPath, globalConfigPath, envFilePath, env, config: resolved, apiKey };
 }

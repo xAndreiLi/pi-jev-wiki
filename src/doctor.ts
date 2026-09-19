@@ -70,7 +70,11 @@ export async function runDoctor(loaded: LoadedConfig): Promise<DoctorReport> {
 	checks.push(
 		loaded.apiKey
 			? check("api key", "ok", `configured (${loaded.apiKey.slice(0, 5)}…, ${loaded.envFilePath})`)
-			: check("api key", "fail", `missing; expected JEV_TOKEN in ${loaded.envFilePath} or apiKey in config`),
+			: check(
+					"api key",
+					"fail",
+					`missing; run wiki_setup action=guide provider=typesafe|openrouter — or add TYPESAFE_API_KEY / OPENROUTER_API_KEY / JEV_TOKEN to ${loaded.envFilePath}`,
+				),
 	);
 	checks.push(
 		existsSync(loaded.envFilePath)

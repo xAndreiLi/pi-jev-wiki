@@ -10,6 +10,19 @@ the system: how it is structured, why, and what a change touches. It is not a co
 Jev (a calibrated decision model) judges whether claims are grounded, derivable, durable, and
 where they belong; you do the writing.
 
+## Setup (when no key is configured)
+
+If Jev calls fail with an authentication error, or the user asks how to connect a provider:
+
+1. `wiki_setup action=status` — shows the provider, endpoint, and where the key came from (never the value).
+2. `wiki_setup action=guide provider=typesafe|openrouter` — exact env var, file, and config steps.
+3. Ask the user for the key, then either have them add it to the project `.env` or write it with
+   `wiki_setup action=write-env provider=... apiKey=...` (this checks that `.env` is gitignored first).
+4. `wiki_setup action=test` — one tiny live call to verify connectivity and auth.
+
+Never print the key value. TypeSafe uses `TYPESAFE_API_KEY` (`JEV_TOKEN` also works); OpenRouter
+uses `OPENROUTER_API_KEY` with provider `openrouter`, or pi's own `/login openrouter` credential.
+
 ## The quality bar
 
 File only what the repository cannot answer cheaply:
