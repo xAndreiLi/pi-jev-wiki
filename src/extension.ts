@@ -30,7 +30,7 @@ import {
 	resolveReview,
 } from "./review.ts";
 import { readSyncState, syncWiki } from "./sync.ts";
-import { createJevClient, type JevClient } from "./jev.ts";
+import { createJevClient, noul, type JevClient } from "./jev.ts";
 import { adjudicateClaim, chooseTarget, decideClaim, type CandidateClaim, type CandidatePage } from "./pipeline/adjudicate.ts";
 import { resolveWriterMode, writeAcceptedPages, type WriterClaim } from "./pipeline/write.ts";
 import { extractClaims, quoteIsPresent } from "./pipeline/extract.ts";
@@ -1368,18 +1368,45 @@ export default function (pi: ExtensionAPI) {
 		autoCaptureInFlight = true;
 		try {
 			const transcript = sessionTextFromEntries(branch);
-			const insights = await extractInsights(ctx, transcript);
-			if (insights.length === 0) {
-				lastAutoCaptureAt = Date.now();
-				lastAutoCaptureMessageCount = messageCount;
-				return { accepted: 0, brief: "No durable insights found." };
-			}
 			const runtime: Runtime = {
 				loaded,
 				layout: resolveLayout(ctx.cwd, loaded.config.wikiRoot, loaded.config.stateRoot),
 			};
 			await ensureLayout(runtime.layout);
 			const client = requireClient(loaded);
+
+			// Cheap Jev pre-screen: only pay for extraction when the session likely holds durable knowledge.
+			const screen = await client.systemOne(
+				{ session_excerpt: transcript.slice(-6000) },
+				{
+					worth_capturing: noul(
+						"This session contains a durable decision, invariant, architecture insight, or user-stated policy worth capturing in the project wiki.",
+						{ true: "Contains durable, non-derivable knowledge", false: "Only transient work, implementation detail, or nothing durable" },
+					),
+				},
+				{ signal: ctx.signal },
+			);
+			const worth = screen.answers.worth_capturing?.type === "noul" ? screen.answers.worth_capturing.noul : 0;
+			await appendLedger(runtime.layout, {
+				actor: "jev",
+				op: "capture.screen",
+				subject: source,
+				verdict: { worth_capturing: worth },
+				action: worth >= 0.6 ? "extract" : "skip",
+				usage: { input_tokens: screen.usage.input_tokens, output_tokens: screen.usage.output_tokens },
+			});
+			if (worth < 0.6) {
+				lastAutoCaptureAt = Date.now();
+				lastAutoCaptureMessageCount = messageCount;
+				return { accepted: 0, brief: `Pre-screen skipped extraction (worth capturing ${worth.toFixed(2)}).` };
+			}
+
+			const insights = await extractInsights(ctx, transcript);
+			if (insights.length === 0) {
+				lastAutoCaptureAt = Date.now();
+				lastAutoCaptureMessageCount = messageCount;
+				return { accepted: 0, brief: "No durable insights found." };
+			}
 			const result = await processInsights(runtime, ctx, client, insights, { source, mode: loaded.config.writer.mode });
 			lastAutoCaptureAt = Date.now();
 			lastAutoCaptureMessageCount = messageCount;

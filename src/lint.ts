@@ -7,7 +7,7 @@ import { existsSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { dirname, join, relative, resolve } from "node:path";
 import type { ResolvedConfig } from "./config.ts";
-import { choice, isChoice, type JevClient } from "./jev.ts";
+import { choice, isChoice, noul, type JevClient } from "./jev.ts";
 import { appendLedger, readLedger } from "./ledger.ts";
 import { enqueueReview } from "./review.ts";
 import { extractMarkdownLinks, isExternalLink, linkTarget } from "./wiki/links.ts";
@@ -29,6 +29,15 @@ export interface Contradiction {
 	confidence: number;
 }
 
+export interface DuplicateCandidate {
+	pageA: string;
+	textA: string;
+	pageB: string;
+	textB: string;
+	similarity: number;
+	same: number;
+}
+
 export interface LintReport {
 	pages: number;
 	toc: { added: string[]; missingFiles: string[]; updatedFixed: string[] };
@@ -37,6 +46,7 @@ export interface LintReport {
 	rawBacklog: string[];
 	unbackedClaims: UnbackedClaim[];
 	contradictions: Contradiction[];
+	duplicates: DuplicateCandidate[];
 	fixed: string[];
 	usage: { input_tokens: number; output_tokens: number };
 }
@@ -90,6 +100,7 @@ export async function lintWiki(
 		rawBacklog: [],
 		unbackedClaims: [],
 		contradictions: [],
+		duplicates: [],
 		fixed: [],
 		usage,
 	};
@@ -147,7 +158,12 @@ export async function lintWiki(
 		}
 	}
 	for (const page of pages) {
-		if ((inbound.get(page.rel) ?? 0) === 0) report.orphans.push(page.rel);
+		if ((inbound.get(page.rel) ?? 0) === 0) {
+			const updated = String(page.data.updated ?? "");
+			const cutoff = new Date(Date.now() - config.lint.orphanMinAgeDays * 86_400_000).toISOString().slice(0, 10);
+			if (updated && updated >= cutoff) continue; // young pages are expected to be unlinked
+			report.orphans.push(page.rel);
+		}
 	}
 
 	// --- Raw backlog ----------------------------------------------------------
@@ -305,13 +321,73 @@ export async function lintWiki(
 			await writePage(abs, page.data, page.body);
 		}
 		if (markedPages.size > 0) report.fixed.push(`disputes: ${markedPages.size} page(s)`);
+
+		// --- Duplicate consolidation candidates ---------------------------------
+		const duplicatePairs: Array<{ a: (typeof claims)[number]; b: (typeof claims)[number]; similarity: number }> = [];
+		for (let i = 0; i < claims.length; i++) {
+			for (let j = i + 1; j < claims.length; j++) {
+				if (claims[i].page === claims[j].page) continue;
+				const left = tokenSet(String(claims[i].claim.text));
+				const right = tokenSet(String(claims[j].claim.text));
+				if (left.size === 0 || right.size === 0) continue;
+				let shared = 0;
+				for (const token of left) if (right.has(token)) shared++;
+				const similarity = shared / Math.min(left.size, right.size);
+				if (similarity >= config.lint.duplicateSimilarity) duplicatePairs.push({ a: claims[i], b: claims[j], similarity });
+			}
+		}
+		for (const pair of duplicatePairs.slice(0, 6)) {
+			const response = await client.systemOne(
+				{
+					claim_a: { page: pair.a.page, text: pair.a.claim.text },
+					claim_b: { page: pair.b.page, text: pair.b.claim.text },
+				},
+				{
+					merge: noul("These two wiki claims state the same knowledge and should be consolidated into one.", {
+						true: "Same knowledge; consolidating loses nothing",
+						false: "Different enough that both should stay",
+					}),
+				},
+				{ signal: options?.signal },
+			);
+			usage.input_tokens += response.usage.input_tokens;
+			usage.output_tokens += response.usage.output_tokens;
+			const same = response.answers.merge && response.answers.merge.type === "noul" ? response.answers.merge.noul : 0;
+			report.duplicates.push({
+				pageA: pair.a.page,
+				textA: String(pair.a.claim.text),
+				pageB: pair.b.page,
+				textB: String(pair.b.claim.text),
+				similarity: Number(pair.similarity.toFixed(2)),
+				same,
+			});
+			await appendLedger(layout, {
+				actor: "jev",
+				op: "lint.duplicate",
+				subject: `${pair.a.page} vs ${pair.b.page}`,
+				verdict: { similarity: pair.similarity, same },
+				action: same >= 0.8 ? "consolidate" : "keep",
+				usage: { input_tokens: response.usage.input_tokens, output_tokens: response.usage.output_tokens },
+			});
+			if (same >= 0.8 && autoFix) {
+				await enqueueReview(layout, {
+					kind: "claim_review",
+					claimText: String(pair.a.claim.text),
+					page: pair.a.page,
+					claimId: typeof pair.a.claim.id === "string" ? pair.a.claim.id : undefined,
+					criticality: 0.5,
+					reason: `possible duplicate of ${pair.b.page} (${same.toFixed(2)}): ${String(pair.b.claim.text).slice(0, 80)}`,
+					verdicts: { similarity: pair.similarity, same },
+				});
+			}
+		}
 	}
 
 	await appendLog(layout, "lint", `${report.toc.added.length} added, ${report.brokenLinks.length} broken links, ${report.unbackedClaims.length} unbacked claims`, [
 		`Pages: ${report.pages}`,
 		`TOC updated: ${report.toc.updatedFixed.length} · missing files: ${report.toc.missingFiles.length}`,
 		`Orphans: ${report.orphans.length} · raw backlog: ${report.rawBacklog.length}`,
-		`Contradiction checks: ${report.contradictions.length}`,
+		`Contradiction checks: ${report.contradictions.length} · duplicate candidates: ${report.duplicates.length}`,
 	]);
 	await appendLedger(layout, {
 		actor: "code",
@@ -324,6 +400,7 @@ export async function lintWiki(
 			rawBacklog: report.rawBacklog.length,
 			unbackedClaims: report.unbackedClaims.length,
 			contradictions: report.contradictions.filter((entry) => entry.relation === "contradicts").length,
+			duplicates: report.duplicates.filter((entry) => entry.same >= 0.8).length,
 		},
 	});
 	return report;

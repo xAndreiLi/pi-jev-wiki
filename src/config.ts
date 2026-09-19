@@ -45,6 +45,7 @@ export interface JevWikiConfig {
 	};
 	weights: { grounded: number; importance: number; nonDerivable: number; authority: number };
 	toc: { maxTokens: number };
+	lint: { orphanMinAgeDays: number; duplicateSimilarity: number };
 	gitCommit: boolean;
 	capture: { onCompact: boolean; onSettle: boolean };
 	search: { engine: "index" | "bm25" | "qmd"; qmdCollection?: string };
@@ -67,6 +68,7 @@ export const DEFAULT_CONFIG: JevWikiConfig = {
 	thresholds: { autoAccept: 0.8, minSupport: 0.7, minDerivable: 0.5, minNovelty: 0.6, minImportance: 1 },
 	weights: { grounded: 0.45, importance: 0.25, nonDerivable: 0.2, authority: 0.1 },
 	toc: { maxTokens: 3000 },
+	lint: { orphanMinAgeDays: 7, duplicateSimilarity: 0.72 },
 	gitCommit: false,
 	capture: { onCompact: false, onSettle: false },
 	search: { engine: "index" },
