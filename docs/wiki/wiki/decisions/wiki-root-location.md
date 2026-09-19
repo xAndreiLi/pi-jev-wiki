@@ -8,12 +8,15 @@ updated: 2026-09-19
 sources: [raw/sessions/2026-09-19-session-2026-09-19-1722.md]
 claims:
   - id: c1
-    text: "The wiki root defaults to docs/wiki so knowledge lives next to the code it describes."
+    text: The wiki root defaults to docs/wiki so knowledge lives next to the code it describes.
     status: user-stated
-    support: 0.40
+    support: 0.4
     evidence: [raw/sessions/2026-09-19-session-2026-09-19-1722.md]
+    reviewed: 2026-09-19
 files: []
 ---
+
+
 
 # Wiki root defaults to docs/wiki
 

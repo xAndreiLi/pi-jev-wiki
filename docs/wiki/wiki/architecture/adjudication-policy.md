@@ -2,7 +2,7 @@
 title: Adjudication policy computed in code
 type: architecture/layer
 topic: architecture
-summary: Thresholds and composite scores are computed in code, making Jev verdicts advisory and policy changes model-free.
+summary: "Thresholds and composite scores are computed in code, making Jev verdicts advisory and policy changes model-free."
 tags: [adjudication, thresholds, policy, jev]
 updated: 2026-09-19
 sources: [raw/sessions/2026-09-19-session-2026-09-19-1730.md]
@@ -12,8 +12,10 @@ claims:
     status: verified
     support: 0.95
     evidence: [raw/sessions/2026-09-19-session-2026-09-19-1730.md]
+    reviewed: 2026-09-19
 files: [src/pipeline/adjudicate.ts]
 ---
+
 
 # Adjudication policy computed in code
 

@@ -12,11 +12,6 @@ claims:
     status: verified
     support: 0.99
     evidence: [raw/jev-wiki-architecture-notes/2026-09-19-jev-wiki-architecture-notes.md]
-  - id: c2
-    text: "Critical review items are only escalated when criticality meets the configured threshold; in headless runs they are deferred rather than auto-applied."
-    status: verified
-    support: 0.9
-    evidence: [raw/sessions/2026-09-19-session-2026-09-19-1734.md]
 files: [src/extension.ts, src/review.ts]
 ---
 
