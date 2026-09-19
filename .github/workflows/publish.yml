@@ -3,6 +3,7 @@ name: Publish
 on:
   push:
     tags: ["v*"]
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -19,6 +20,15 @@ jobs:
           registry-url: https://registry.npmjs.org
           cache: npm
       - run: npm ci
+      - name: Check NPM_TOKEN
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          if [ -z "${NODE_AUTH_TOKEN}" ]; then
+            echo "::error::NPM_TOKEN secret is missing. Create an npm Automation token, or a granular access token with 'Bypass 2FA' and read/write on All packages, then add it as the NPM_TOKEN repository secret."
+            exit 1
+          fi
+          npm whoami
       - run: npm run typecheck
       - run: npm run test:unit
       - run: npm run test:scale

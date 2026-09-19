@@ -2,10 +2,17 @@
 
 ## One-time setup
 
-1. Create an npm account and log in locally: `npm login`, or create an automation token and add it
-   to the GitHub repository as the `NPM_TOKEN` secret (used by `.github/workflows/publish.yml`).
-2. Confirm the package name is available: `npm view pi-jev-wiki version` (an E404 means it is free).
-3. Confirm `repository`, `homepage`, and `bugs` in `package.json` point at the real repository.
+1. Create a token that can publish **without a one-time password**. On the npm website:
+   - **Classic → Automation** token (simplest), or
+   - **Granular access token** with **Bypass 2FA** enabled, **Read and write** on packages, and
+     **All packages** selected. A granular token scoped to one package cannot create a *new*
+     package, so “All packages” is required for the first publish.
+
+   A *Publish* token will fail in CI with `EOTP`, because GitHub Actions has no authenticator.
+2. Add the token to the GitHub repository as the `NPM_TOKEN` secret
+   (Settings → Secrets and variables → Actions → New repository secret).
+3. Confirm the package name is available: `npm view pi-jev-wiki version` (an E404 means it is free).
+4. Confirm `repository`, `homepage`, and `bugs` in `package.json` point at the real repository.
 
 ## Release checklist
 
@@ -21,10 +28,10 @@
    mkdir -p "$tmp/pkg" && tar -xzf "$tmp"/pi-jev-wiki-*.tgz -C "$tmp/pkg"
    pi -e "$tmp/pkg/package" -p "Call wiki_status and report the provider and wiki root."
    ```
-6. Publish: `npm publish` (unscoped, public by default), or push the tag and let
-   `.github/workflows/publish.yml` run `npm publish --provenance`.
-7. Push the version commit and tag: `git push && git push --tags`.
-8. Create a GitHub release from the tag with the changelog section.
+6. Publish: push a version tag (`git tag vX.Y.Z && git push origin vX.Y.Z`) to run
+   `.github/workflows/publish.yml` (tests + `npm publish --provenance`), or run that workflow
+   manually from the Actions tab (`workflow_dispatch`) to publish the version in `package.json`.
+7. Create a GitHub release from the tag with the changelog section.
 
 ## What never ships
 
