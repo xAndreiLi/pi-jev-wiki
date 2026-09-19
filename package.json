@@ -1,0 +1,39 @@
+{
+  "name": "jev-wiki",
+  "version": "0.1.0",
+  "description": "Project mental-model wiki for pi, maintained by agent insights and Jev decisions",
+  "type": "module",
+  "license": "MIT",
+  "keywords": [
+    "pi-package",
+    "pi",
+    "wiki",
+    "jev",
+    "knowledge-base"
+  ],
+  "pi": {
+    "extensions": [
+      "./src/extension.ts"
+    ],
+    "skills": [
+      "./skills"
+    ]
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "smoke": "jiti scripts/smoke.ts"
+  },
+  "peerDependencies": {
+    "@earendil-works/pi-ai": "*",
+    "@earendil-works/pi-coding-agent": "*",
+    "typebox": "*"
+  },
+  "devDependencies": {
+    "@earendil-works/pi-ai": "0.85.1",
+    "@earendil-works/pi-coding-agent": "0.85.1",
+    "@types/node": "^26.6.2",
+    "jiti": "^2.7.0",
+    "typebox": "^1.3.34",
+    "typescript": "^5.5.4"
+  }
+}
