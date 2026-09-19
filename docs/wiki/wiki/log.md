@@ -54,3 +54,9 @@
 - Updated: decisions/review-resolution-by-code.md
 - Updated: decisions/review-escalation.md
 
+## [2026-09-19] capture | 3 insights
+- Raw: raw/sessions/2026-09-19-session-2026-09-19-1737.md
+- Filed 0 · reinforced 0 · review 0 · rejected 3
+
+## [2026-09-19] finalize | Insights session: 3 submitted, 0 accepted, 3 rejected (all derivable from code). No pages written per guided-mode instruction to only write accepted claims.
+

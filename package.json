@@ -21,7 +21,8 @@
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "smoke": "jiti scripts/smoke.ts"
+    "smoke": "jiti scripts/smoke.ts",
+    "test:paging": "jiti scripts/paging-test.ts"
   },
   "peerDependencies": {
     "@earendil-works/pi-ai": "*",

@@ -7,7 +7,7 @@
  * places, and keeps the TOC/log current.
  */
 import { existsSync } from "node:fs";
-import { readFile, writeFile } from "node:fs/promises";
+import { readFile } from "node:fs/promises";
 import { basename, dirname, isAbsolute, join, relative, resolve } from "node:path";
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { StringEnum } from "@earendil-works/pi-ai";
@@ -15,6 +15,8 @@ import { Type } from "typebox";
 import { loadConfig, type LoadedConfig, type JevWikiConfig } from "./config.ts";
 import { git, headCommit, isGitRepo } from "./git.ts";
 import { appendLedger, readLedger, summarizeLedger } from "./ledger.ts";
+import { lintWiki } from "./lint.ts";
+import { readMetrics, recordMetric, summarizeMetrics } from "./metrics.ts";
 import {
 	applyReviewResolution,
 	enqueueReview,
@@ -40,6 +42,7 @@ import {
 	writeTextAtomic,
 	type WikiLayout,
 } from "./wiki/layout.ts";
+import { extractMarkdownLinks } from "./wiki/links.ts";
 import {
 	appendLog,
 	entryFromPage,
@@ -462,6 +465,7 @@ export default function (pi: ExtensionAPI) {
 			const entries = await readIndex(layout);
 			const ledger = await readLedger(layout);
 			const summary = summarizeLedger(ledger);
+			const metrics = summarizeMetrics(await readMetrics(layout));
 			const recent = await readRecentLog(layout, 5);
 			const text = [
 				`# jev-wiki status`,
@@ -473,6 +477,7 @@ export default function (pi: ExtensionAPI) {
 				`- API key: ${loaded.apiKey ? "configured" : `MISSING (${loaded.envFilePath})`}`,
 				`- Writer mode: ${loaded.config.writer.mode} · review: ${loaded.config.review.mode}`,
 				`- Review queue: ${await openReviewCount(layout)} open`,
+				`- Consultations: ${metrics.consultations} (${metrics.searches} searches, ${metrics.pagesReturned.size} pages surfaced)`,
 				`- Ledger: ${summary.total} decisions (${JSON.stringify(summary.byActor)})`,
 				`- Jev tokens: ${summary.jevTokensIn} in / ${summary.jevTokensOut} out${summary.jevCost ? ` · $${summary.jevCost.toFixed(6)}` : ""}`,
 				"",
@@ -515,6 +520,10 @@ export default function (pi: ExtensionAPI) {
 				};
 			}
 			const maxChars = loaded.config.toc.maxTokens * 4;
+			await recordMetric(layout, {
+				op: "toc",
+				detail: { topic: params.topic, tag: params.tag, query: params.query, filtered: filtered.length },
+			});
 			return {
 				content: [{ type: "text", text: truncate(renderIndex(filtered), maxChars) }],
 				details: { entries: entries.length, filtered: filtered.length },
@@ -570,7 +579,9 @@ export default function (pi: ExtensionAPI) {
 					return [`### ${rel} (score ${score})`, ...hits.map((line) => `> ${line.trim().slice(0, 300)}`)].join("\n");
 				})
 				.join("\n\n");
-			return { content: [{ type: "text", text }], details: { matches: top.length, pages: top.map(({ file }) => relative(layout.wikiDir, file).split("\\").join("/")) } };
+			const pages = top.map(({ file }) => relative(layout.wikiDir, file).split("\\").join("/"));
+			await recordMetric(layout, { op: "ask", query: params.query, pages });
+			return { content: [{ type: "text", text }], details: { matches: top.length, pages } };
 		},
 	});
 
@@ -968,6 +979,55 @@ export default function (pi: ExtensionAPI) {
 		},
 	});
 
+	pi.registerTool({
+		name: "wiki_lint",
+		label: "Lint the Wiki",
+		description:
+			"Health-check the wiki: TOC reconciliation, broken links, orphans, raw backlog, claims with no accepted ledger entry, and Jev contradiction checks on code-selected claim pairs. Safe issues are auto-fixed; judgment issues are reported and queued.",
+		promptSnippet: "Health-check the wiki and auto-fix safe issues",
+		promptGuidelines: [
+			"Run wiki_lint periodically or when the user asks about wiki health; then work reported judgment issues with wiki_review.",
+		],
+		parameters: Type.Object({
+			autoFix: Type.Optional(Type.Boolean({ description: "Apply safe fixes (TOC entries, dispute marking); default true" })),
+			contradictions: Type.Optional(Type.Boolean({ description: "Run Jev contradiction checks; default true" })),
+		}),
+		async execute(_id, params, signal, onUpdate, ctx) {
+			const { loaded, layout } = runtimeFor(ctx);
+			const client = requireClient(loaded);
+			onUpdate?.({ content: [{ type: "text", text: "Linting the wiki…" }], details: {} });
+			const report = await lintWiki(layout, client, loaded.config, {
+				autoFix: params.autoFix,
+				checkContradictions: params.contradictions,
+				signal: ctx.signal,
+			});
+			const contradicting = report.contradictions.filter((entry) => entry.relation === "contradicts").length;
+			const lines = [
+				`## Wiki lint — ${report.pages} page(s)`,
+				"",
+				`- TOC: ${report.toc.added.length} added · ${report.toc.updatedFixed.length} refreshed · ${report.toc.missingFiles.length} entries point to missing files`,
+				`- Broken links: ${report.brokenLinks.length}`,
+				`- Orphans: ${report.orphans.length}${report.orphans.length ? ` (${report.orphans.slice(0, 5).join(", ")}${report.orphans.length > 5 ? "…" : ""})` : ""}`,
+				`- Raw backlog: ${report.rawBacklog.length}`,
+				`- Unbacked claims (not in the accepted ledger): ${report.unbackedClaims.length}`,
+				`- Contradictions: ${contradicting} of ${report.contradictions.length} checked pairs`,
+			];
+			if (report.unbackedClaims.length > 0) {
+				lines.push(
+					"",
+					"### Unbacked claims",
+					...report.unbackedClaims.slice(0, 10).map((claim) => `- \`${claim.page}\`${claim.claimId ? `#${claim.claimId}` : ""}: ${claim.text.slice(0, 100)}`),
+				);
+			}
+			if (report.brokenLinks.length > 0) {
+				lines.push("", "### Broken links", ...report.brokenLinks.slice(0, 10).map((link) => `- ${link}`));
+			}
+			if (report.fixed.length > 0) lines.push("", `Auto-fixed: ${report.fixed.join("; ")}`);
+			lines.push("", "Judgment items were queued for wiki_review where applicable.");
+			return { content: [{ type: "text", text: lines.join("\n") }], details: report };
+		},
+	});
+
 	// Commands -----------------------------------------------------------------
 
 	pi.registerCommand("wiki:status", {
@@ -1025,6 +1085,16 @@ export default function (pi: ExtensionAPI) {
 		},
 	});
 
+	pi.registerCommand("wiki:lint", {
+		description: "Health-check the wiki and auto-fix safe issues",
+		handler: async (_args, ctx) => {
+			if (!ctx.hasUI) return;
+			pi.sendUserMessage(
+				"Lint the project wiki: call wiki_lint, report the findings, then work any queued judgment items with wiki_review (read the referenced pages first).",
+			);
+		},
+	});
+
 	pi.on("session_start", async (_event, ctx) => {
 		const loaded = loadConfig(ctx.cwd);
 		if (!loaded.apiKey) {
@@ -1059,12 +1129,4 @@ async function resolvePagePath(layout: WikiLayout, cwd: string, page: string): P
 		if (existsSync(candidate)) return candidate;
 	}
 	return undefined;
-}
-
-function extractMarkdownLinks(markdown: string): string[] {
-	const links: string[] = [];
-	for (const match of markdown.matchAll(/\[[^\]]*\]\(([^)]+)\)/g)) {
-		links.push(match[1].trim());
-	}
-	return links;
 }

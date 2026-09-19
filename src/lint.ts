@@ -1,0 +1,289 @@
+/**
+ * Wiki lint: deterministic health checks (TOC, links, orphans, raw backlog,
+ * claims with no accepted ledger entry) plus Jev contradiction checks on
+ * code-selected candidate claim pairs.
+ */
+import { existsSync } from "node:fs";
+import { readFile } from "node:fs/promises";
+import { dirname, join, relative, resolve } from "node:path";
+import type { ResolvedConfig } from "./config.ts";
+import { choice, isChoice, type JevClient } from "./jev.ts";
+import { appendLedger, readLedger } from "./ledger.ts";
+import { enqueueReview } from "./review.ts";
+import { extractMarkdownLinks, isExternalLink, linkTarget } from "./wiki/links.ts";
+import { listMarkdownFiles, readPage, todayISO, writePage, type WikiLayout } from "./wiki/layout.ts";
+import { appendLog, entryFromPage, readIndex, upsertEntries, writeIndex, type TocEntry } from "./wiki/toc.ts";
+
+export interface UnbackedClaim {
+	page: string;
+	claimId?: string;
+	text: string;
+}
+
+export interface Contradiction {
+	pageA: string;
+	textA: string;
+	pageB: string;
+	textB: string;
+	relation: string;
+	confidence: number;
+}
+
+export interface LintReport {
+	pages: number;
+	toc: { added: string[]; missingFiles: string[]; updatedFixed: string[] };
+	brokenLinks: string[];
+	orphans: string[];
+	rawBacklog: string[];
+	unbackedClaims: UnbackedClaim[];
+	contradictions: Contradiction[];
+	fixed: string[];
+	usage: { input_tokens: number; output_tokens: number };
+}
+
+export interface LintOptions {
+	autoFix?: boolean;
+	checkContradictions?: boolean;
+	maxContradictionPairs?: number;
+	signal?: AbortSignal;
+}
+
+interface PageRecord {
+	rel: string;
+	abs: string;
+	data: Record<string, unknown>;
+	body: string;
+	text: string;
+}
+
+function normalize(text: string): string {
+	return text.toLowerCase().replace(/\s+/g, " ").trim();
+}
+
+function isActiveClaim(claim: Record<string, unknown>): boolean {
+	const status = String(claim.status ?? "verified");
+	return status !== "superseded" && status !== "rejected";
+}
+
+export async function lintWiki(
+	layout: WikiLayout,
+	client: JevClient,
+	config: ResolvedConfig,
+	options?: LintOptions,
+): Promise<LintReport> {
+	const autoFix = options?.autoFix ?? true;
+	const usage = { input_tokens: 0, output_tokens: 0 };
+	const report: LintReport = {
+		pages: 0,
+		toc: { added: [], missingFiles: [], updatedFixed: [] },
+		brokenLinks: [],
+		orphans: [],
+		rawBacklog: [],
+		unbackedClaims: [],
+		contradictions: [],
+		fixed: [],
+		usage,
+	};
+
+	const files = await listMarkdownFiles(layout.wikiDir);
+	const pages: PageRecord[] = [];
+	for (const abs of files) {
+		const rel = relative(layout.wikiDir, abs).split("\\").join("/");
+		if (rel === "index.md" || rel === "log.md") continue;
+		try {
+			const page = await readPage(abs);
+			const text = await readFile(abs, "utf8");
+			pages.push({ rel, abs, data: page.data, body: page.body, text });
+		} catch {
+			/* skip unreadable */
+		}
+	}
+	report.pages = pages.length;
+
+	// --- TOC reconciliation ---------------------------------------------------
+	const entries = await readIndex(layout);
+	const byPath = new Map(entries.map((entry) => [entry.path, entry]));
+	const updates: TocEntry[] = [];
+	for (const page of pages) {
+		const entry = byPath.get(page.rel);
+		const fresh = entryFromPage(page.rel, page.data);
+		if (!entry) {
+			report.toc.added.push(page.rel);
+			updates.push(fresh);
+		} else if (entry.updated !== fresh.updated || entry.summary !== fresh.summary) {
+			report.toc.updatedFixed.push(page.rel);
+			updates.push(fresh);
+		}
+	}
+	for (const entry of entries) {
+		if (!pages.some((page) => page.rel === entry.path)) report.toc.missingFiles.push(entry.path);
+	}
+	if (autoFix && updates.length > 0) {
+		await writeIndex(layout, upsertEntries(entries, updates));
+		report.fixed.push(`toc: ${updates.length} entries`);
+	}
+
+	// --- Links and orphans ----------------------------------------------------
+	const inbound = new Map<string, number>();
+	for (const page of pages) {
+		for (const link of extractMarkdownLinks(page.text)) {
+			if (isExternalLink(link)) continue;
+			const target = resolve(dirname(page.abs), linkTarget(link));
+			if (!existsSync(target)) {
+				report.brokenLinks.push(`${page.rel} → ${link}`);
+				continue;
+			}
+			const targetRel = relative(layout.wikiDir, target).split("\\").join("/");
+			inbound.set(targetRel, (inbound.get(targetRel) ?? 0) + 1);
+		}
+	}
+	for (const page of pages) {
+		if ((inbound.get(page.rel) ?? 0) === 0) report.orphans.push(page.rel);
+	}
+
+	// --- Raw backlog ----------------------------------------------------------
+	const rawFiles = existsSync(layout.rawDir) ? await listMarkdownFiles(layout.rawDir) : [];
+	for (const raw of rawFiles) {
+		const name = raw.split(/[\\/]/).pop() ?? raw;
+		if (!pages.some((page) => page.text.includes(name))) report.rawBacklog.push(relative(layout.root, raw).split("\\").join("/"));
+	}
+
+	// --- Unbacked claims (no accepted ledger entry) ----------------------------
+	const ledger = await readLedger(layout);
+	const accepted = ledger
+		.filter((entry) => entry.actor === "code" && ["file", "reinforce", "file_user_stated"].includes(String(entry.action)) && entry.subject)
+		.map((entry) => normalize(String(entry.subject)));
+	for (const page of pages) {
+		const claims = Array.isArray(page.data.claims) ? (page.data.claims as Record<string, unknown>[]) : [];
+		for (const claim of claims) {
+			if (typeof claim.text !== "string" || !isActiveClaim(claim)) continue;
+			const needle = normalize(claim.text);
+			const backed = accepted.some((subject) => {
+				const head = needle.slice(0, 100);
+				return subject === head || subject.startsWith(head) || head.startsWith(subject);
+			});
+			if (!backed) {
+				report.unbackedClaims.push({
+					page: page.rel,
+					claimId: typeof claim.id === "string" ? claim.id : undefined,
+					text: claim.text,
+				});
+			}
+		}
+	}
+
+	// --- Contradiction checks --------------------------------------------------
+	if (options?.checkContradictions !== false) {
+		const claims: Array<{ page: string; pageRef: PageRecord; claim: Record<string, unknown>; files: string[] }> = [];
+		for (const page of pages) {
+			const pageFiles = Array.isArray(page.data.files) ? page.data.files.map(String) : [];
+			const rawClaims = Array.isArray(page.data.claims) ? (page.data.claims as Record<string, unknown>[]) : [];
+			for (const claim of rawClaims) {
+				if (typeof claim.text !== "string" || !isActiveClaim(claim)) continue;
+				const claimFiles = Array.isArray(claim.files) ? claim.files.map(String) : pageFiles;
+				claims.push({ page: page.rel, pageRef: page, claim, files: claimFiles });
+			}
+		}
+
+		const pairs: Array<{ a: (typeof claims)[number]; b: (typeof claims)[number] }> = [];
+		for (let i = 0; i < claims.length; i++) {
+			for (let j = i + 1; j < claims.length; j++) {
+				if (claims[i].page === claims[j].page) continue;
+				const shared = claims[i].files.some((file) => claims[j].files.includes(file));
+				if (shared) pairs.push({ a: claims[i], b: claims[j] });
+			}
+		}
+
+		const limit = options?.maxContradictionPairs ?? 8;
+		const markedPages = new Set<string>();
+		for (const pair of pairs.slice(0, limit)) {
+			const response = await client.systemOne(
+				{
+					claim_a: { page: pair.a.page, text: pair.a.claim.text },
+					claim_b: { page: pair.b.page, text: pair.b.claim.text },
+				},
+				{
+					relation: choice("How do these two wiki claims relate?", {
+						consistent: "They agree and can both be true",
+						contradicts: "They cannot both be true",
+						supersedes_a: "Claim A replaces claim B with newer or better information",
+						supersedes_b: "Claim B replaces claim A with newer or better information",
+						independent: "They are about different things",
+					}),
+				},
+				{ signal: options?.signal },
+			);
+			usage.input_tokens += response.usage.input_tokens;
+			usage.output_tokens += response.usage.output_tokens;
+			const answer = response.answers.relation;
+			const relation = isChoice(answer) ? answer.choice : "independent";
+			const confidence = isChoice(answer) ? answer.confidence : 0;
+			const contradicts = relation === "contradicts";
+			report.contradictions.push({
+				pageA: pair.a.page,
+				textA: String(pair.a.claim.text),
+				pageB: pair.b.page,
+				textB: String(pair.b.claim.text),
+				relation,
+				confidence,
+			});
+			await appendLedger(layout, {
+				actor: "jev",
+				op: "lint.contradiction",
+				subject: `${pair.a.page} vs ${pair.b.page}`,
+				verdict: { relation, confidence },
+				action: contradicts && confidence >= config.thresholds.autoAccept ? "dispute" : "report",
+				usage: { input_tokens: response.usage.input_tokens, output_tokens: response.usage.output_tokens },
+			});
+			if (contradicts && confidence >= config.thresholds.autoAccept && autoFix) {
+				for (const side of [pair.a, pair.b]) {
+					const claimsList = Array.isArray(side.pageRef.data.claims)
+						? (side.pageRef.data.claims as Record<string, unknown>[])
+						: [];
+					const index = claimsList.findIndex((claim) => claim.text === side.claim.text);
+					if (index >= 0) {
+						claimsList[index].status = "disputed";
+						side.pageRef.data.claims = claimsList;
+						side.pageRef.data.updated = todayISO();
+						markedPages.add(side.pageRef.abs);
+					}
+					await enqueueReview(layout, {
+						kind: "dispute",
+						claimText: String(side.claim.text),
+						page: side.page,
+						claimId: typeof side.claim.id === "string" ? side.claim.id : undefined,
+						criticality: Math.max(0.7, confidence),
+						reason: `lint: contradicts ${side === pair.a ? pair.b.page : pair.a.page}`,
+						verdicts: { relation, confidence },
+					});
+				}
+			}
+		}
+		for (const abs of markedPages) {
+			const page = await readPage(abs);
+			await writePage(abs, page.data, page.body);
+		}
+		if (markedPages.size > 0) report.fixed.push(`disputes: ${markedPages.size} page(s)`);
+	}
+
+	await appendLog(layout, "lint", `${report.toc.added.length} added, ${report.brokenLinks.length} broken links, ${report.unbackedClaims.length} unbacked claims`, [
+		`Pages: ${report.pages}`,
+		`TOC updated: ${report.toc.updatedFixed.length} · missing files: ${report.toc.missingFiles.length}`,
+		`Orphans: ${report.orphans.length} · raw backlog: ${report.rawBacklog.length}`,
+		`Contradiction checks: ${report.contradictions.length}`,
+	]);
+	await appendLedger(layout, {
+		actor: "code",
+		op: "wiki.lint",
+		action: "report",
+		verdict: {
+			tocAdded: report.toc.added.length,
+			brokenLinks: report.brokenLinks.length,
+			orphans: report.orphans.length,
+			rawBacklog: report.rawBacklog.length,
+			unbackedClaims: report.unbackedClaims.length,
+			contradictions: report.contradictions.filter((entry) => entry.relation === "contradicts").length,
+		},
+	});
+	return report;
+}
