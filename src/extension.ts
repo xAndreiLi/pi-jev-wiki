@@ -17,6 +17,7 @@ import { git, headCommit, isGitRepo } from "./git.ts";
 import { appendLedger, readLedger, summarizeLedger } from "./ledger.ts";
 import { lintWiki } from "./lint.ts";
 import { readMetrics, recordMetric, summarizeMetrics } from "./metrics.ts";
+import { withWikiLock } from "./wiki/lock.ts";
 import { applyReinforcement, applySupersession, bestCandidatePage } from "./provenance.ts";
 import { redact } from "./redact.ts";
 import { appendSessionLog, promoteRecurring } from "./sessionlog.ts";
@@ -50,7 +51,18 @@ import {
 	type WikiLayout,
 } from "./wiki/layout.ts";
 import { extractMarkdownLinks } from "./wiki/links.ts";
-import { appendLog, entryFromPage, parseIndex, readIndex, readRecentLog, renderIndex, upsertEntries, writeIndex, type TocEntry } from "./wiki/toc.ts";
+import {
+	appendLog,
+	entryFromPage,
+	parseIndex,
+	readIndex,
+	readRecentLog,
+	renderIndex,
+	updateIndex,
+	upsertEntries,
+	writeIndex,
+	type TocEntry,
+} from "./wiki/toc.ts";
 import { createSearchEngine } from "./wiki/search.ts";
 
 interface Runtime {
@@ -314,13 +326,13 @@ async function ingestSource(
 	}
 	const safeText = redaction.text;
 	const hash = await sha256Hex(safeText);
-	const rawIndex = await readRawIndex(layout);
-	if (rawIndex[hash]) {
+	const duplicateOf = await withWikiLock(layout, async () => (await readRawIndex(layout))[hash]);
+	if (duplicateOf) {
 		return {
-			brief: `Source already ingested (sha256 ${hash.slice(0, 12)}…): \`${rawIndex[hash]}\`. Nothing to do.`,
-			details: { duplicateOf: rawIndex[hash], hash },
-			rawPath: rawIndex[hash],
-			duplicateOf: rawIndex[hash],
+			brief: `Source already ingested (sha256 ${hash.slice(0, 12)}…): \`${duplicateOf}\`. Nothing to do.`,
+			details: { duplicateOf, hash },
+			rawPath: duplicateOf,
+			duplicateOf,
 		};
 	}
 
@@ -337,8 +349,11 @@ async function ingestSource(
 		},
 		safeText,
 	);
-	rawIndex[hash] = relative(layout.root, rawPath).split("\\").join("/");
-	await writeRawIndex(layout, rawIndex);
+	await withWikiLock(layout, async () => {
+		const index = await readRawIndex(layout);
+		index[hash] = relative(layout.root, rawPath).split("\\").join("/");
+		await writeRawIndex(layout, index);
+	});
 
 	const { result: extraction, sourceTruncated } = await extractClaims(ctx, safeText, { title: input.title });
 	const candidates = await collectCandidatePages(layout);
@@ -992,7 +1007,6 @@ export default function (pi: ExtensionAPI) {
 		}),
 		async execute(_id, params, _signal, _onUpdate, ctx) {
 			const { layout } = runtimeFor(ctx);
-			const entries = await readIndex(layout);
 			const updates: TocEntry[] = [];
 			const broken: string[] = [];
 			for (const page of params.pages) {
@@ -1014,7 +1028,7 @@ export default function (pi: ExtensionAPI) {
 					if (!existsSync(target)) broken.push(`${rel} → ${link}`);
 				}
 			}
-			await writeIndex(layout, upsertEntries(entries, updates));
+			await updateIndex(layout, (current) => upsertEntries(current, updates));
 			await appendLog(layout, "finalize", params.note ?? `${updates.length} page(s)`, updates.map((entry) => `Updated: ${entry.path}`));
 			await removeFileIfExists(join(layout.stateDir, "pending-capture.md"));
 			await appendLedger(layout, {
@@ -1253,11 +1267,7 @@ export default function (pi: ExtensionAPI) {
 				await removeFileIfExists(absolute);
 				removed.push(rel);
 			}
-			const entries = await readIndex(layout);
-			await writeIndex(
-				layout,
-				entries.filter((entry) => !removed.includes(entry.path)),
-			);
+			await updateIndex(layout, (entries) => entries.filter((entry) => !removed.includes(entry.path)));
 			await appendLog(layout, "remove", `${removed.length} page(s)`, [
 				`Reason: ${params.reason}`,
 				...removed.map((page) => `Removed: ${page}`),

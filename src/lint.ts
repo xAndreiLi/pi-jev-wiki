@@ -12,7 +12,7 @@ import { appendLedger, readLedger } from "./ledger.ts";
 import { enqueueReview } from "./review.ts";
 import { extractMarkdownLinks, isExternalLink, linkTarget } from "./wiki/links.ts";
 import { listMarkdownFiles, readPage, todayISO, writePage, type WikiLayout } from "./wiki/layout.ts";
-import { appendLog, entryFromPage, readIndex, upsertEntries, writeIndex, type TocEntry } from "./wiki/toc.ts";
+import { appendLog, entryFromPage, readIndex, updateIndex, upsertEntries, writeIndex, type TocEntry } from "./wiki/toc.ts";
 
 export interface UnbackedClaim {
 	page: string;
@@ -139,7 +139,7 @@ export async function lintWiki(
 		if (!pages.some((page) => page.rel === entry.path)) report.toc.missingFiles.push(entry.path);
 	}
 	if (autoFix && updates.length > 0) {
-		await writeIndex(layout, upsertEntries(entries, updates));
+		await updateIndex(layout, (current) => upsertEntries(current, updates));
 		report.fixed.push(`toc: ${updates.length} entries`);
 	}
 

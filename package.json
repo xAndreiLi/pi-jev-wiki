@@ -23,7 +23,9 @@
     "typecheck": "tsc --noEmit",
     "smoke": "jiti scripts/smoke.ts",
     "test:paging": "jiti scripts/paging-test.ts",
-    "test:scale": "jiti scripts/scale-test.ts"
+    "test:scale": "jiti scripts/scale-test.ts",
+    "test:unit": "jiti scripts/unit-test.ts",
+    "test:all": "tsc --noEmit && jiti scripts/unit-test.ts && jiti scripts/scale-test.ts"
   },
   "peerDependencies": {
     "@earendil-works/pi-ai": "*",

@@ -13,6 +13,7 @@ import { existsSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { todayISO, writeTextAtomic, type WikiLayout } from "./layout.ts";
+import { withWikiLock } from "./lock.ts";
 
 export interface TocEntry {
 	path: string;
@@ -98,6 +99,19 @@ export async function writeIndex(layout: WikiLayout, entries: TocEntry[]): Promi
 	await writeTextAtomic(join(layout.wikiDir, "index.md"), renderIndex(entries));
 }
 
+/** Atomic read-modify-write of the index under the wiki lock. */
+export async function updateIndex(
+	layout: WikiLayout,
+	mutator: (entries: TocEntry[]) => TocEntry[] | Promise<TocEntry[]>,
+): Promise<TocEntry[]> {
+	return withWikiLock(layout, async () => {
+		const entries = await readIndex(layout);
+		const next = await mutator(entries);
+		await writeIndex(layout, next);
+		return next;
+	});
+}
+
 export function entryFromPage(relPath: string, data: Record<string, unknown>): TocEntry {
 	return {
 		path: relPath.split("\\").join("/"),
@@ -113,12 +127,14 @@ export async function appendLog(layout: WikiLayout, op: string, title: string, d
 	const path = join(layout.wikiDir, "log.md");
 	const header = `## [${todayISO()}] ${op} | ${title}`;
 	const block = [header, ...details.map((line) => `- ${line}`), ""].join("\n");
-	if (existsSync(path)) {
-		const existing = await readFile(path, "utf8");
-		await writeTextAtomic(path, `${existing.replace(/\s+$/, "")}\n\n${block}\n`);
-	} else {
-		await writeTextAtomic(path, `# Wiki Log\n\n${block}\n`);
-	}
+	await withWikiLock(layout, async () => {
+		if (existsSync(path)) {
+			const existing = await readFile(path, "utf8");
+			await writeTextAtomic(path, `${existing.replace(/\s+$/, "")}\n\n${block}\n`);
+		} else {
+			await writeTextAtomic(path, `# Wiki Log\n\n${block}\n`);
+		}
+	});
 }
 
 export async function readRecentLog(layout: WikiLayout, limit = 5): Promise<string[]> {

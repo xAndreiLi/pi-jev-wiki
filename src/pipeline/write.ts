@@ -14,7 +14,7 @@ import { checkLiterals } from "../grounding.ts";
 import { redact } from "../redact.ts";
 import { appendLedger } from "../ledger.ts";
 import { readPage, todayISO, writePage, writeTextAtomic, type WikiLayout } from "../wiki/layout.ts";
-import { appendLog, entryFromPage, readIndex, upsertEntries, writeIndex } from "../wiki/toc.ts";
+import { appendLog, entryFromPage, updateIndex, upsertEntries, type TocEntry } from "../wiki/toc.ts";
 
 export interface WriterClaim {
 	text: string;
@@ -48,8 +48,11 @@ export interface WriterResult {
 export function resolveWriterMode(requested: WriterMode, claims: WriterClaim[], config: ResolvedConfig): WriterMode {
 	const worst = claims.reduce((max, claim) => Math.max(max, claim.criticality), 0);
 	let mode = requested;
-	if (mode === "auto" && worst >= config.review.escalateCriticality) mode = "draft";
-	if (mode === "draft" && worst >= config.review.escalateCriticality) mode = "guided";
+	if (worst >= config.review.escalateCriticality) {
+		if (mode === "auto") mode = "draft";
+		else if (mode === "draft") mode = "guided";
+	}
+	if (worst >= 0.95) mode = "guided";
 	return mode;
 }
 
@@ -234,13 +237,12 @@ export async function writeAcceptedPages(
 	}
 
 	if (written.length > 0) {
-		const entries = await readIndex(layout);
-		const updates = [];
+		const updates: TocEntry[] = [];
 		for (const rel of written) {
 			const page = await readPage(join(layout.wikiDir, rel));
 			updates.push(entryFromPage(rel, page.data));
 		}
-		await writeIndex(layout, upsertEntries(entries, updates));
+		await updateIndex(layout, (entries) => upsertEntries(entries, updates));
 		await appendLog(layout, "write", `${written.length} page(s) (${mode})`, written.map((rel) => `Written: ${rel}`));
 	}
 	if (drafted.length > 0) {

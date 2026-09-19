@@ -167,7 +167,11 @@ if (!loaded.apiKey) {
 	const userDecision = decideClaim(userStated.verdicts, loaded.config);
 	console.log(`  user-stated -> trust=${userStated.verdicts.trustTier} grounded=${userStated.verdicts.grounded.toFixed(2)} action=${userDecision.action}`);
 	check("user-stated decisions use the lower trust tier instead of being rejected", () => {
-		assert.notEqual(userDecision.action, "reject_unsupported");
+		// Live Jev scores vary slightly at the durable/importance boundary; both filing and queuing are acceptable non-rejections.
+		assert.ok(
+			["file_user_stated", "review"].includes(userDecision.action),
+			`expected file_user_stated or review, got ${userDecision.action} (durable=${userStated.verdicts.durable.toFixed(2)}, importance=${userStated.verdicts.importance.toFixed(2)})`,
+		);
 	});
 
 	console.log(`\nJev usage: ${client.totals.input_tokens} in / ${client.totals.output_tokens} out${client.totals.cost ? ` · $${client.totals.cost.toFixed(6)}` : ""}`);

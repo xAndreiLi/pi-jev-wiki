@@ -8,6 +8,7 @@ import { existsSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { readPage, todayISO, writePage, writeTextAtomic, type WikiLayout } from "./wiki/layout.ts";
+import { withWikiLock } from "./wiki/lock.ts";
 
 export type ReviewKind = "claim_review" | "needs_recheck" | "dispute";
 export type ReviewStatus = "open" | "resolved" | "deferred";
@@ -62,19 +63,21 @@ export async function enqueueReview(
 	layout: WikiLayout,
 	item: Omit<ReviewItem, "id" | "ts" | "status">,
 ): Promise<ReviewItem | undefined> {
-	const items = await readReviews(layout);
-	const duplicate = items.find(
-		(existing) =>
-			existing.status === "open" &&
-			existing.kind === item.kind &&
-			existing.page === item.page &&
-			existing.claimText === item.claimText,
-	);
-	if (duplicate) return undefined;
-	const record: ReviewItem = { id: newId(), ts: new Date().toISOString(), status: "open", ...item };
-	items.push(record);
-	await writeReviews(layout, items);
-	return record;
+	return withWikiLock(layout, async () => {
+		const items = await readReviews(layout);
+		const duplicate = items.find(
+			(existing) =>
+				existing.status === "open" &&
+				existing.kind === item.kind &&
+				existing.page === item.page &&
+				existing.claimText === item.claimText,
+		);
+		if (duplicate) return undefined;
+		const record: ReviewItem = { id: newId(), ts: new Date().toISOString(), status: "open", ...item };
+		items.push(record);
+		await writeReviews(layout, items);
+		return record;
+	});
 }
 
 export async function listOpenReviews(layout: WikiLayout, limit = 20): Promise<ReviewItem[]> {
@@ -92,15 +95,17 @@ export async function resolveReview(
 	resolution: ReviewResolution,
 	note?: string,
 ): Promise<ReviewItem | undefined> {
-	const items = await readReviews(layout);
-	const item = items.find((candidate) => candidate.id === id);
-	if (!item) return undefined;
-	item.status = resolution === "defer" ? "deferred" : "resolved";
-	item.resolution = resolution;
-	item.note = note;
-	item.resolvedAt = new Date().toISOString();
-	await writeReviews(layout, items);
-	return item;
+	return withWikiLock(layout, async () => {
+		const items = await readReviews(layout);
+		const item = items.find((candidate) => candidate.id === id);
+		if (!item) return undefined;
+		item.status = resolution === "defer" ? "deferred" : "resolved";
+		item.resolution = resolution;
+		item.note = note;
+		item.resolvedAt = new Date().toISOString();
+		await writeReviews(layout, items);
+		return item;
+	});
 }
 
 /**

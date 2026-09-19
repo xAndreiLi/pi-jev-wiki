@@ -16,7 +16,7 @@ export interface RedactionResult {
 
 const PATTERNS: Array<{ type: string; regex: RegExp; replacement: string }> = [
 	{ type: "private_key", regex: /-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]*?-----END [A-Z ]*PRIVATE KEY-----/g, replacement: "[REDACTED_PRIVATE_KEY]" },
-	{ type: "openai_key", regex: /\bsk-[A-Za-z0-9_-]{20,}\b/g, replacement: "[REDACTED_OPENAI_KEY]" },
+	{ type: "openai_key", regex: /\bsk-(?!or-v1-|ant-)[A-Za-z0-9_-]{20,}\b/g, replacement: "[REDACTED_OPENAI_KEY]" },
 	{ type: "openrouter_key", regex: /\bsk-or-v1-[A-Za-z0-9]{20,}\b/g, replacement: "[REDACTED_OPENROUTER_KEY]" },
 	{ type: "anthropic_key", regex: /\bsk-ant-[A-Za-z0-9_-]{20,}\b/g, replacement: "[REDACTED_ANTHROPIC_KEY]" },
 	{ type: "github_token", regex: /\bgh[pousr]_[A-Za-z0-9]{20,}\b/g, replacement: "[REDACTED_GITHUB_TOKEN]" },
