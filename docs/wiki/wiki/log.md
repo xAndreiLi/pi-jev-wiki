@@ -28,3 +28,12 @@
 ## [2026-09-19] finalize | Added decision page for wiki root defaulting to docs/wiki.
 - Updated: decisions/wiki-root-location.md
 
+## [2026-09-19] capture | 3 insights
+- Raw: raw/sessions/2026-09-19-session-2026-09-19-1730.md
+- Filed 0 · reinforced 0 · review 0 · rejected 3
+
+## [2026-09-19] finalize | Captured three verified insights: (1) adjudication thresholds are code-computed, not model-driven; (2) all wiki paths derive from a single resolveLayout root; (3) provider switching is configuration-only thanks to a shared System One schema.
+- Updated: architecture/adjudication-policy.md
+- Updated: invariants/wiki-layout-atomic-root.md
+- Updated: decisions/provider-agnostic-schema.md
+

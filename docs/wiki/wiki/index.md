@@ -6,6 +6,7 @@
 
 | Page | Type | Tags | Summary | Updated |
 |------|------|------|---------|---------|
+| [Adjudication policy computed in code](architecture/adjudication-policy.md) | architecture/layer | adjudication thresholds policy jev | Thresholds and composite scores are computed in code, making Jev verdicts advisory and policy changes model-free. | 2026-09-19 |
 | [Capture flow](architecture/flow-capture.md) | architecture/flow | capture insights workflow | At the end of work, the agent composes an insight list with evidence pointers; Jev filters and places each insight, and the agent writes the resulting updates. | 2026-09-19 |
 | [pi extension module](architecture/module-pi-extension.md) | architecture/module | pi-extension architecture wiki | Owns staging, Jev adjudication, placement, and TOC/log bookkeeping for the project wiki. | 2026-09-19 |
 
@@ -15,6 +16,7 @@
 |------|------|------|---------|---------|
 | [Agent-managed review with user escalation for critical items](decisions/review-escalation.md) | decision | review escalation workflow | Review work is agent-managed. The user is only escalated for critical items such as security, breaking API changes, or data loss. | 2026-09-19 |
 | [Guided writing as default mode](decisions/guided-writing.md) | decision | workflow writing policy | Jev decides placement, the agent writes the content, and code enforces policy. | 2026-09-19 |
+| [Provider-agnostic Jev client schema](decisions/provider-agnostic-schema.md) | decision | jev provider typesafe openrouter aimlapi configuration | Provider switching between TypeSafe, OpenRouter, and AI/ML API is configuration only, because every provider accepts the same System One request schema. | 2026-09-19 |
 | [Scope boundary — exclude derivable knowledge](decisions/scope-boundary.md) | decision | scope policy wiki | jev-wiki deliberately excludes anything a developer could re-derive from the repository in under a minute. | 2026-09-19 |
 | [Wiki root defaults to docs/wiki](decisions/wiki-root-location.md) | decision | location workspace root | The wiki root defaults to docs/wiki so knowledge lives next to the code it describes. | 2026-09-19 |
 
@@ -26,3 +28,4 @@
 | [Jev returns typed decisions, never text](invariants/jev-typed-decisions.md) | invariant | jev types api | The Jev decision model must return typed decisions (noul, choice, score) rather than free-form text. | 2026-09-19 |
 | [Load-bearing claims require verbatim evidence](invariants/claim-evidence.md) | invariant | claims evidence quality | Every load-bearing claim must point at verbatim evidence in a raw source or a file/commit/test. | 2026-09-19 |
 | [Raw sources are immutable](invariants/raw-immutable.md) | invariant | raw immutability evidence | Raw sources under raw/ are immutable; the wiki only ever reads them. | 2026-09-19 |
+| [Wiki layout derives from a single root](invariants/wiki-layout-atomic-root.md) | invariant | filesystem layout atomic paths | All wiki paths derive from one resolveLayout call, so changing wikiRoot atomically relocates raw sources, pages, and runtime state. | 2026-09-19 |
