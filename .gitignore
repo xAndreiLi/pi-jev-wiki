@@ -7,3 +7,4 @@ dist/
 # runtime state; the decision ledger is committed as the audit trail
 **/.jev-wiki/*
 !**/.jev-wiki/decisions.jsonl
+*.log

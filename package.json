@@ -14,7 +14,7 @@
     "url": "https://github.com/xAndreiLi/pi-jev-wiki/issues"
   },
   "engines": {
-    "node": ">=20"
+    "node": ">=22"
   },
   "files": [
     "src",
