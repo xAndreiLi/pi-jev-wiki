@@ -18,6 +18,7 @@ import { appendLedger, readLedger, summarizeLedger } from "./ledger.ts";
 import { lintWiki } from "./lint.ts";
 import { readMetrics, recordMetric, summarizeMetrics } from "./metrics.ts";
 import { applyReinforcement, applySupersession, bestCandidatePage } from "./provenance.ts";
+import { redact } from "./redact.ts";
 import { appendSessionLog, promoteRecurring } from "./sessionlog.ts";
 import { renderStructure, scanStructure } from "./structure.ts";
 import { extractInsights, sessionTextFromEntries } from "./pipeline/capture.ts";
@@ -111,7 +112,7 @@ async function buildInsightEvidence(
 			parts.push(`${item.kind}: ${item.ref}${item.quote ? `\nquote: "${item.quote}"` : ""}`);
 		}
 	}
-	return { evidenceText: parts.join("\n\n") || "(no evidence attached)", files };
+	return { evidenceText: redact(parts.join("\n\n") || "(no evidence attached)").text, files };
 }
 
 /** Line excerpts around terms from the claim, so Jev sees the relevant code, not the whole file. */
@@ -301,7 +302,18 @@ async function ingestSource(
 	const config = loaded.config;
 
 	await ensureLayout(layout);
-	const hash = await sha256Hex(input.text);
+	const redaction = redact(input.text);
+	if (redaction.findings.length > 0) {
+		await appendLedger(layout, {
+			actor: "code",
+			op: "ingest.redact",
+			subject: input.title.slice(0, 80),
+			action: "redacted",
+			verdict: redaction.findings,
+		});
+	}
+	const safeText = redaction.text;
+	const hash = await sha256Hex(safeText);
 	const rawIndex = await readRawIndex(layout);
 	if (rawIndex[hash]) {
 		return {
@@ -323,18 +335,18 @@ async function ingestSource(
 			collected: todayISO(),
 			sha256: hash,
 		},
-		input.text,
+		safeText,
 	);
 	rawIndex[hash] = relative(layout.root, rawPath).split("\\").join("/");
 	await writeRawIndex(layout, rawIndex);
 
-	const { result: extraction, sourceTruncated } = await extractClaims(ctx, input.text, { title: input.title });
+	const { result: extraction, sourceTruncated } = await extractClaims(ctx, safeText, { title: input.title });
 	const candidates = await collectCandidatePages(layout);
 	const candidateClaims = await collectCandidateClaims(layout);
 	const topics = await existingTopics(layout);
 
 	const perClaim = await mapLimitLocal(extraction.claims, 4, async (claim) => {
-		const evidenceText = claim.quote ?? input.text.slice(0, 6000);
+		const evidenceText = claim.quote ?? safeText.slice(0, 6000);
 		const adjudication = await adjudicateClaim(
 			client,
 			{ text: claim.text, kind: claim.kind, quote: claim.quote, files: claim.files, evidenceText },
@@ -636,9 +648,9 @@ async function processInsights(
 			type: "raw-source",
 			source: "session",
 			collected: todayISO(stamp),
-			sha256: await sha256Hex(rawBody),
+			sha256: await sha256Hex(redact(rawBody).text),
 		},
-		rawBody,
+		redact(rawBody).text,
 	);
 	const rawPathRel = relative(layout.root, rawPath).split("\\").join("/");
 
@@ -671,6 +683,16 @@ async function processInsights(
 		},
 		options.mode ?? config.writer.mode,
 	);
+	for (const item of writeResult.flagged) {
+		await enqueueReview(layout, {
+			kind: "claim_review",
+			claimText: `Auto-written page ${item.page} contains literals not present in evidence: ${item.missing.join(", ")}`,
+			page: item.page,
+			criticality: 0.6,
+			reason: "writer grounding check failed",
+			verdicts: { missing: item.missing },
+		});
+	}
 
 	await appendLog(layout, "capture", `${reports.length} insights (${options.source})`, [
 		`Raw: ${rawPathRel}`,
@@ -863,6 +885,7 @@ export default function (pi: ExtensionAPI) {
 				}
 			}
 			if (!text.trim()) throw new Error("wiki_ingest needs `path` or `text`.");
+			if (text.length > 2_000_000) throw new Error("Source is larger than the 2MB ingest cap; split it or trim it first.");
 			title = title ?? "Untitled source";
 			const topic = params.topic ?? slugify(title.split(/\s+/).slice(0, 3).join("-"), 30);
 			onUpdate?.({ content: [{ type: "text", text: `Staging "${title}"…` }], details: {} });
@@ -892,6 +915,16 @@ export default function (pi: ExtensionAPI) {
 					{ title, topic, sourcePath: rawPathRel, claims: writerClaims },
 					requestedMode,
 				);
+				for (const item of writeResult.flagged) {
+					await enqueueReview(runtime.layout, {
+						kind: "claim_review",
+						claimText: `Auto-written page ${item.page} contains literals not present in evidence: ${item.missing.join(", ")}`,
+						page: item.page,
+						criticality: 0.6,
+						reason: "writer grounding check failed",
+						verdicts: { missing: item.missing },
+					});
+				}
 				if (writeResult.written.length > 0) brief += `\n\nWritten automatically (${writeResult.mode}): ${writeResult.written.join(", ")}`;
 				if (writeResult.drafted.length > 0) brief += `\n\nDrafts written (${writeResult.mode}): ${writeResult.drafted.join(", ")}`;
 				(result.details as Record<string, unknown>).writer = writeResult;
@@ -968,8 +1001,12 @@ export default function (pi: ExtensionAPI) {
 					broken.push(`${page} (missing)`);
 					continue;
 				}
-				const parsed = await readPage(absolute);
 				const rel = relative(layout.wikiDir, absolute).split("\\").join("/");
+				if (rel.startsWith("..")) {
+					broken.push(`${page} (outside the wiki)`);
+					continue;
+				}
+				const parsed = await readPage(absolute);
 				updates.push(entryFromPage(rel, parsed.data));
 				for (const link of extractMarkdownLinks(parsed.body)) {
 					if (/^[a-z]+:/i.test(link) || link.startsWith("#")) continue;

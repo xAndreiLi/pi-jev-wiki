@@ -10,6 +10,8 @@ import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
 import type { ResolvedConfig, WriterMode } from "../config.ts";
+import { checkLiterals } from "../grounding.ts";
+import { redact } from "../redact.ts";
 import { appendLedger } from "../ledger.ts";
 import { readPage, todayISO, writePage, writeTextAtomic, type WikiLayout } from "../wiki/layout.ts";
 import { appendLog, entryFromPage, readIndex, upsertEntries, writeIndex } from "../wiki/toc.ts";
@@ -39,6 +41,7 @@ export interface WriterResult {
 	written: string[];
 	drafted: string[];
 	groups: number;
+	flagged: Array<{ page: string; missing: string[] }>;
 	usage: { input_tokens: number; output_tokens: number };
 }
 
@@ -154,14 +157,16 @@ export async function writeAcceptedPages(
 ): Promise<WriterResult> {
 	const mode = resolveWriterMode(requestedMode, plan.claims, config);
 	const usage = { input_tokens: 0, output_tokens: 0 };
+	const flagged: Array<{ page: string; missing: string[] }> = [];
 	if (mode === "guided" || plan.claims.length === 0) {
-		return { mode, written: [], drafted: [], groups: 0, usage };
+		return { mode, written: [], drafted: [], groups: 0, flagged, usage };
 	}
 
 	const groups = groupClaims(plan);
-	const sourceExcerpt = plan.sourcePath && existsSync(join(layout.root, plan.sourcePath))
-		? (await readFile(join(layout.root, plan.sourcePath), "utf8")).slice(0, 12_000)
-		: "";
+	const sourceExcerpt =
+		plan.sourcePath && existsSync(join(layout.root, plan.sourcePath))
+			? redact((await readFile(join(layout.root, plan.sourcePath), "utf8")).slice(0, 12_000)).text
+			: "";
 
 	const written: string[] = [];
 	const drafted: string[] = [];
@@ -187,6 +192,16 @@ export async function writeAcceptedPages(
 			support: Number(claim.grounded.toFixed(2)),
 			evidence: claim.evidence.length > 0 ? claim.evidence : plan.sourcePath ? [plan.sourcePath] : [],
 		}));
+		const evidenceForCheck = [
+			group.claims.map((claim) => claim.text).join("\n"),
+			group.claims.flatMap((claim) => claim.evidence).join("\n"),
+			sourceExcerpt,
+		].join("\n");
+		const grounding = checkLiterals(result.body, evidenceForCheck);
+		if (grounding.missing.length > 0) {
+			flagged.push({ page: finalRel, missing: grounding.missing.slice(0, 5) });
+		}
+
 		const data: Record<string, unknown> = {
 			title: result.title ?? existing?.data.title ?? plan.title,
 			type: group.pageType,
@@ -197,6 +212,7 @@ export async function writeAcceptedPages(
 			sources: [...new Set([...(Array.isArray(existing?.data.sources) ? existing!.data.sources.map(String) : []), ...(plan.sourcePath ? [plan.sourcePath] : [])])],
 			files: [...new Set([...(Array.isArray(existing?.data.files) ? existing!.data.files.map(String) : []), ...group.claims.flatMap((claim) => claim.files)])],
 			claims: [...(Array.isArray(existing?.data.claims) ? (existing!.data.claims as unknown[]) : []), ...claimRecords],
+			...(grounding.missing.length > 0 ? { needs_review: true } : {}),
 		};
 
 		if (mode === "draft") {
@@ -213,7 +229,7 @@ export async function writeAcceptedPages(
 			subject: finalRel,
 			action: mode,
 			reason: `${group.claims.length} accepted claim(s)`,
-			verdict: { mode, claims: group.claims.length, grounded: group.claims.map((claim) => claim.grounded) },
+			verdict: { mode, claims: group.claims.length, grounded: group.claims.map((claim) => claim.grounded), ungroundedLiterals: grounding.missing },
 		});
 	}
 
@@ -231,7 +247,7 @@ export async function writeAcceptedPages(
 		await writeTextAtomic(join(draftDir, "manifest.json"), `${JSON.stringify({ created: stamp, plan: plan.title, pages: drafted }, null, "\t")}\n`);
 		await appendLog(layout, "draft", `${drafted.length} page(s)`, drafted.map((rel) => `Draft: ${rel}`));
 	}
-	return { mode, written, drafted, groups: groups.length, usage };
+	return { mode, written, drafted, groups: groups.length, flagged, usage };
 }
 
 function slugPart(text: string): string {

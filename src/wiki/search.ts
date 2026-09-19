@@ -5,7 +5,7 @@
  *   qmd    — optional adapter to the qmd CLI (hybrid BM25 + vectors + rerank)
  */
 import { existsSync } from "node:fs";
-import { readFile } from "node:fs/promises";
+import { readFile, stat } from "node:fs/promises";
 import { relative } from "node:path";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
@@ -93,15 +93,31 @@ function excerptFor(doc: Doc, queryTokens: Set<string>): string {
 		.join("\n");
 }
 
+async function directoryFingerprint(layout: WikiLayout): Promise<string> {
+	const files = await listMarkdownFiles(layout.wikiDir);
+	let newest = 0;
+	for (const file of files) {
+		const info = await stat(file).catch(() => undefined);
+		if (info && info.mtimeMs > newest) newest = info.mtimeMs;
+	}
+	return `${files.length}:${Math.round(newest)}`;
+}
+
 /** BM25 with field boosts: title x3, summary/tags x2, body x1. */
 class Bm25Index {
 	private docs: Doc[] = [];
 	private df = new Map<string, number>();
 	private avgLength = 1;
 	private built = 0;
+	private fingerprint = "";
+	private checkedAt = 0;
 
 	async ensure(layout: WikiLayout): Promise<void> {
-		if (this.built > 0) return;
+		const now = Date.now();
+		if (this.built > 0 && now - this.checkedAt < 2000) return;
+		const fingerprint = await directoryFingerprint(layout);
+		this.checkedAt = now;
+		if (this.built > 0 && fingerprint === this.fingerprint) return;
 		this.docs = await loadDocs(layout);
 		this.df = new Map();
 		let total = 0;
@@ -111,6 +127,7 @@ class Bm25Index {
 			total += doc.length;
 		}
 		this.avgLength = this.docs.length > 0 ? total / this.docs.length : 1;
+		this.fingerprint = fingerprint;
 		this.built = Date.now();
 	}
 

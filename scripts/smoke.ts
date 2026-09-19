@@ -4,7 +4,9 @@
  */
 import assert from "node:assert/strict";
 import { loadConfig, parseEnvFile } from "../src/config.ts";
+import { checkLiterals } from "../src/grounding.ts";
 import { createJevClient } from "../src/jev.ts";
+import { redact } from "../src/redact.ts";
 import { adjudicateClaim, chooseTarget, decideClaim } from "../src/pipeline/adjudicate.ts";
 import { parseFrontmatter, serializeFrontmatter } from "../src/wiki/frontmatter.ts";
 import { parseIndex, renderIndex } from "../src/wiki/toc.ts";
@@ -58,6 +60,21 @@ check("render then parse preserves entries", () => {
 	];
 	const parsed = parseIndex(renderIndex(entries));
 	assert.deepEqual(parsed, entries);
+});
+
+console.log("\nredaction and writer grounding");
+check("redacts secrets and emails", () => {
+	const { text, findings } = redact(
+		'Use sk-abcdefghijklmnopqrstuvwxyz0123456789 and mail ops@example.com with Authorization: Bearer abcdefghijklmnopqrstuvwxyz012345',
+	);
+	assert.ok(findings.length >= 2, `expected findings, got ${JSON.stringify(findings)}`);
+	assert.ok(!text.includes("ops@example.com"));
+	assert.ok(!text.includes("sk-abcdefghijklmnopqrstuvwxyz0123456789"));
+});
+check("flags invented literals but keeps evidenced ones", () => {
+	const evidence = "The retry budget is 500 requests and the timeout is 30s.";
+	const { missing } = checkLiterals("Retry budget is 500; timeout 30s; observed latency 99ms.", evidence);
+	assert.deepEqual(missing, ["99ms"]);
 });
 
 console.log("\nconfig");
