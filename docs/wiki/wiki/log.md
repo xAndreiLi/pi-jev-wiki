@@ -202,3 +202,14 @@
 - Raw: raw/sessions/2026-09-19-session-2026-09-19-1904.md
 - Filed 2 · reinforced 0 · review 1 · rejected 2
 
+## [2026-09-19] capture | 2 insights (tool)
+- Raw: raw/sessions/2026-09-19-session-2026-09-19-1921.md
+- Filed 1 · reinforced 0 · review 0 · rejected 1
+
+## [2026-09-19] finalize | Add architecture/table-of-contents.md capturing the TOC hierarchy decision (index.md vs toc.md) from HARDENING.md evidence.
+- Updated: architecture/table-of-contents.md
+
+## [2026-09-19] capture | 3 insights (settled)
+- Raw: raw/sessions/2026-09-19-session-2026-09-19-1922.md
+- Filed 1 · reinforced 0 · review 0 · rejected 2
+
