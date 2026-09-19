@@ -199,6 +199,16 @@ export async function lintWiki(
 					claimId: typeof claim.id === "string" ? claim.id : undefined,
 					text: claim.text,
 				});
+				if (autoFix) {
+					await enqueueReview(layout, {
+						kind: "claim_review",
+						claimText: claim.text,
+						page: page.rel,
+						claimId: typeof claim.id === "string" ? claim.id : undefined,
+						criticality: 0.45,
+						reason: "lint: no accepted ledger entry backs this claim",
+					});
+				}
 			}
 		}
 	}

@@ -123,8 +123,10 @@ export async function applyReviewResolution(
 	if (index === -1) return `claim not found on ${item.page}`;
 	const claim = claims[index];
 	if (resolution === "accept") {
-		claim.status = "verified";
-		claim.support = Math.max(Number(claim.support ?? 0), 0.8);
+		if (claim.status !== "user-stated") {
+			claim.status = "verified";
+			claim.support = Math.max(Number(claim.support ?? 0), 0.8);
+		}
 	} else if (resolution === "reject") {
 		claim.status = "rejected";
 	} else if (resolution === "supersede") {

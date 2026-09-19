@@ -66,3 +66,9 @@
 - Orphans: 7 · raw backlog: 2
 - Contradiction checks: 2
 
+## [2026-09-19] lint | 0 added, 0 broken links, 5 unbacked claims
+- Pages: 15
+- TOC updated: 0 · missing files: 0
+- Orphans: 7 · raw backlog: 0
+- Contradiction checks: 2
+
