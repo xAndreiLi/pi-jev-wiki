@@ -4,7 +4,7 @@
 import { createHash } from "node:crypto";
 import { existsSync } from "node:fs";
 import { mkdir, readFile, readdir, rename, rm, writeFile } from "node:fs/promises";
-import { dirname, join, relative, resolve } from "node:path";
+import { dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { withFileMutationQueue } from "@earendil-works/pi-coding-agent";
 import { parseFrontmatter, serializeFrontmatter, type Frontmatter } from "./frontmatter.ts";
 
@@ -18,9 +18,9 @@ export interface WikiLayout {
 	sessionLogPath: string;
 }
 
-export function resolveLayout(cwd: string, wikiRoot: string): WikiLayout {
+export function resolveLayout(cwd: string, wikiRoot: string, stateRoot = ".jev-wiki"): WikiLayout {
 	const root = resolve(cwd, wikiRoot);
-	const stateDir = join(root, ".jev-wiki");
+	const stateDir = isAbsolute(stateRoot) ? stateRoot : join(root, stateRoot);
 	return {
 		root,
 		rawDir: join(root, "raw"),

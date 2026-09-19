@@ -30,6 +30,7 @@ export interface JevWikiConfig {
 	apiKey?: string;
 	envFile: string;
 	wikiRoot: string;
+	stateRoot: string;
 	writer: { mode: WriterMode; model?: string | null };
 	routing: { shardSize: number; minFit: number; newPageConfidence: number };
 	review: { mode: ReviewMode; escalateCriticality: number; maxPerSession: number };
@@ -57,6 +58,7 @@ export const DEFAULT_CONFIG: JevWikiConfig = {
 	provider: "typesafe",
 	envFile: ".env",
 	wikiRoot: "docs/wiki",
+	stateRoot: ".jev-wiki",
 	writer: { mode: "guided", model: null },
 	routing: { shardSize: 250, minFit: 0.6, newPageConfidence: 0.7 },
 	review: { mode: "agent", escalateCriticality: 0.85, maxPerSession: 10 },

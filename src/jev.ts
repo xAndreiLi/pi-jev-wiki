@@ -58,6 +58,14 @@ export interface JevClientOptions {
 	userAgent?: string;
 }
 
+/**
+ * Returns the number of retry attempts left, or null when the response is final.
+ * 402 (no credits) is intentionally non-retryable: retrying cannot fix billing.
+ */
+function retryableStatus(status: number): boolean {
+	return status === 429 || status === 529 || status >= 500;
+}
+
 export class JevError extends Error {
 	readonly status: number;
 	readonly body: unknown;
@@ -163,7 +171,7 @@ export class JevClient {
 				return payload;
 			}
 
-			const retryable = response.status === 429 || response.status === 529 || response.status >= 500;
+			const retryable = retryableStatus(response.status);
 			const text = await response.text().catch(() => "");
 			let parsed: unknown = text;
 			try {

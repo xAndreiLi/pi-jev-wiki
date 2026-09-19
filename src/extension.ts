@@ -59,7 +59,7 @@ interface Runtime {
 
 function runtimeFor(ctx: ExtensionContext): Runtime {
 	const loaded = loadConfig(ctx.cwd);
-	return { loaded, layout: resolveLayout(ctx.cwd, loaded.config.wikiRoot) };
+	return { loaded, layout: resolveLayout(ctx.cwd, loaded.config.wikiRoot, loaded.config.stateRoot) };
 }
 
 function requireClient(loaded: LoadedConfig): JevClient {
@@ -980,7 +980,7 @@ export default function (pi: ExtensionAPI) {
 		}
 		try {
 			if (loaded.config.sync.onSessionStart !== "check") return;
-			const layout = resolveLayout(ctx.cwd, loaded.config.wikiRoot);
+			const layout = resolveLayout(ctx.cwd, loaded.config.wikiRoot, loaded.config.stateRoot);
 			if (!existsSync(layout.stateDir) || !(await isGitRepo(ctx.cwd))) return;
 			const state = await readSyncState(layout);
 			const head = await headCommit(ctx.cwd);
