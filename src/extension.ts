@@ -13,7 +13,7 @@ import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-a
 import { StringEnum } from "@earendil-works/pi-ai";
 import { Type } from "typebox";
 import { loadConfig, type LoadedConfig, type JevWikiConfig } from "./config.ts";
-import { headCommit, isGitRepo } from "./git.ts";
+import { git, headCommit, isGitRepo } from "./git.ts";
 import { appendLedger, readLedger, summarizeLedger } from "./ledger.ts";
 import {
 	applyReviewResolution,
@@ -74,6 +74,62 @@ function requireClient(loaded: LoadedConfig): JevClient {
 function truncate(text: string, maxChars: number): string {
 	if (text.length <= maxChars) return text;
 	return `${text.slice(0, maxChars)}\n\n[... truncated ...]`;
+}
+
+/** Build Jev-readable evidence for an insight: file excerpts, commit messages, quotes. */
+async function buildInsightEvidence(
+	insight: { text: string; evidence?: Array<{ kind: string; ref: string; quote?: string }> },
+	cwd: string,
+): Promise<{ evidenceText: string; files: string[] }> {
+	const files: string[] = [];
+	const parts: string[] = [];
+	for (const item of insight.evidence ?? []) {
+		if (item.kind === "file") {
+			files.push(item.ref);
+			const absolute = isAbsolute(item.ref) ? item.ref : resolve(cwd, item.ref);
+			if (existsSync(absolute)) {
+				const content = await readFile(absolute, "utf8");
+				parts.push(`file: ${item.ref}\n${excerptAroundTerms(content, insight.text, 3500)}`);
+			} else {
+				parts.push(`file: ${item.ref} (not found)`);
+			}
+		} else if (item.kind === "commit") {
+			const detail = await git(cwd, ["show", "--no-color", "--stat", "--format=%s%n%b", item.ref, "--"]);
+			parts.push(`commit: ${item.ref}\n${truncate(detail.stdout || "(commit not found)", 2000)}`);
+		} else if (item.kind === "user") {
+			parts.push(`user statement: "${item.quote ?? item.ref}"`);
+		} else if (item.kind === "source") {
+			parts.push(`source: ${item.ref}${item.quote ? `\nquote: "${item.quote}"` : ""}`);
+		} else {
+			parts.push(`${item.kind}: ${item.ref}${item.quote ? `\nquote: "${item.quote}"` : ""}`);
+		}
+	}
+	return { evidenceText: parts.join("\n\n") || "(no evidence attached)", files };
+}
+
+/** Line excerpts around terms from the claim, so Jev sees the relevant code, not the whole file. */
+function excerptAroundTerms(content: string, claimText: string, maxChars: number): string {
+	const lines = content.split(/\r?\n/);
+	const terms = [...new Set(claimText.toLowerCase().split(/[^a-z0-9_]+/).filter((token) => token.length > 3))].slice(0, 12);
+	if (terms.length === 0 || lines.length <= 60) return truncate(content, maxChars);
+	const scored = lines
+		.map((line, index) => ({ index, score: terms.reduce((sum, term) => sum + (line.toLowerCase().includes(term) ? 1 : 0), 0) }))
+		.filter((entry) => entry.score > 0)
+		.sort((a, b) => b.score - a.score)
+		.slice(0, 10);
+	if (scored.length === 0) return truncate(content, maxChars);
+	const chosen = new Set<number>();
+	for (const { index } of scored) {
+		for (let i = Math.max(0, index - 4); i <= Math.min(lines.length - 1, index + 4); i++) chosen.add(i);
+	}
+	const out: string[] = [];
+	let last = -1;
+	for (const index of [...chosen].sort((a, b) => a - b)) {
+		if (last !== -1 && index > last + 1) out.push("  ...");
+		out.push(`${String(index + 1).padStart(4)}| ${lines[index]}`);
+		last = index;
+	}
+	return truncate(out.join("\n"), maxChars);
 }
 
 // ---------------------------------------------------------------------------
@@ -214,10 +270,11 @@ function renderBrief(title: string, reports: ClaimReport[], extras: string[] = [
 	if (extras.length > 0) lines.push(...extras, "");
 	lines.push(
 		"### Next steps (guided mode)",
-		"1. Write or merge pages per the llm-wiki skill, citing the raw source.",
-		"2. Include YAML frontmatter (title, type, topic, summary, tags, updated, claims with status/support/evidence).",
-		"3. Set page-level `files: [...]` (or per-claim `files`) for claims about code, so `wiki_sync` can detect when the code changes.",
-		"4. Call `wiki_finalize` with the touched page paths.",
+		"1. Write or merge **only the claims listed under File/Reinforce above**. Rejected claims must not be written, even if the user asked for them — report the rejection and its reason instead.",
+		"2. Follow the llm-wiki skill; cite the raw source in each page.",
+		"3. Include YAML frontmatter (title, type, topic, summary, tags, updated, claims with status/support/evidence).",
+		"4. Set page-level `files: [...]` (or per-claim `files`) for claims about code, so `wiki_sync` can detect when the code changes.",
+		"5. Call `wiki_finalize` with the touched page paths.",
 	);
 	return lines.join("\n");
 }
@@ -521,7 +578,7 @@ export default function (pi: ExtensionAPI) {
 		name: "wiki_ingest",
 		label: "Ingest into Wiki",
 		description:
-			"Ingest a document into the project wiki: stores the immutable raw source, extracts claims, has Jev verify groundedness/derivability/durability and choose placement, and returns a brief. Pages are written by you (guided mode) and finalized with wiki_finalize.",
+			"Ingest a document into the project wiki: stores the immutable raw source, extracts claims, has Jev verify groundedness/derivability/durability and choose placement, and returns a brief. Write or merge only the accepted claims (guided mode), then finalize with wiki_finalize.",
 		promptSnippet: "Ingest a document into the project wiki (Jev-verified brief)",
 		promptGuidelines: [
 			"Use wiki_ingest when the user asks to add a document, URL content, or notes to the wiki.",
@@ -559,7 +616,7 @@ export default function (pi: ExtensionAPI) {
 		name: "wiki_insights",
 		label: "Capture Agent Insights",
 		description:
-			"Submit a list of key insights from the current work session. Jev filters them (derivable/durable/sensitive), relates them to existing knowledge, and chooses placement into existing pages or new ones. Returns a brief; you then write/merge pages and call wiki_finalize.",
+			"Submit a list of key insights from the current work session. Jev filters them (derivable/durable/sensitive), relates them to existing knowledge, and chooses placement into existing pages or new ones. Returns a brief; write or merge only the accepted claims, then call wiki_finalize.",
 		promptSnippet: "Capture durable project insights from this session into the wiki",
 		promptGuidelines: [
 			"Use wiki_insights at the end of substantive work to capture durable, non-derivable knowledge (decisions, invariants, architecture, gotchas) with evidence pointers.",
@@ -605,13 +662,8 @@ export default function (pi: ExtensionAPI) {
 			onUpdate?.({ content: [{ type: "text", text: `Adjudicating ${params.insights.length} insights…` }], details: {} });
 
 			const perInsight = await mapLimitLocal(params.insights, 4, async (insight) => {
-				const evidenceLines: string[] = [];
-				const files: string[] = [];
-				for (const evidence of insight.evidence ?? []) {
-					evidenceLines.push(`${evidence.kind}: ${evidence.ref}${evidence.quote ? `\nquote: "${evidence.quote}"` : ""}`);
-					if (evidence.kind === "file") files.push(evidence.ref);
-				}
-				const evidenceText = evidenceLines.join("\n") || "(no evidence attached)";
+				const { evidenceText, files } = await buildInsightEvidence(insight, ctx.cwd);
+				const evidenceLines = evidenceText.split("\n\n").slice(0, 8);
 				const adjudication = await adjudicateClaim(
 					client,
 					{ text: insight.text, kind: insight.kind ?? "fact", files, evidenceText },

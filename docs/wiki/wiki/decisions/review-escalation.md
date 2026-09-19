@@ -5,14 +5,19 @@ topic: decisions
 summary: Review work is agent-managed. The user is only escalated for critical items such as security, breaking API changes, or data loss.
 tags: [review, escalation, workflow]
 updated: 2026-09-19
-sources: [raw/jev-wiki-architecture-notes/2026-09-19-jev-wiki-architecture-notes.md]
+sources: [raw/jev-wiki-architecture-notes/2026-09-19-jev-wiki-architecture-notes.md, raw/sessions/2026-09-19-session-2026-09-19-1734.md]
 claims:
   - id: c1
     text: "Review work is agent-managed. The user is only escalated for critical items such as security, breaking API changes, or data loss."
     status: verified
     support: 0.99
     evidence: [raw/jev-wiki-architecture-notes/2026-09-19-jev-wiki-architecture-notes.md]
-files: []
+  - id: c2
+    text: "Critical review items are only escalated when criticality meets the configured threshold; in headless runs they are deferred rather than auto-applied."
+    status: verified
+    support: 0.9
+    evidence: [raw/sessions/2026-09-19-session-2026-09-19-1734.md]
+files: [src/extension.ts, src/review.ts]
 ---
 
 # Agent-managed review with user escalation for critical items
@@ -42,6 +47,14 @@ files: []
 - Low-friction maintenance.
 - Requires clear criteria for "critical" to avoid alert fatigue.
 
+## Headless mode behavior
+
+- Criticality is compared against `review.escalateCriticality` in config (`src/extension.ts`).
+- When the runtime has no UI (`!ctx.hasUI`), critical items are automatically deferred instead of being applied.
+- This prevents a headless agent from silently resolving high-stakes claims without user confirmation.
+
 ## Evidence
 
 - `docs/notes/jev-wiki-overview.md` — decisions section.
+- `src/extension.ts` — `wiki_review` tool implementation.
+- `src/review.ts` — `resolveReview` and `applyReviewResolution`.

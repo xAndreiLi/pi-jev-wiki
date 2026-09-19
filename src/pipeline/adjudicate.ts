@@ -409,5 +409,8 @@ export function decideClaim(verdicts: ClaimVerdicts, config: ResolvedConfig): Cl
 	if (verdicts.trustTier === "user_stated" && verdicts.durable >= 0.5 && verdicts.importance >= thresholds.minImportance) {
 		return { action: "file_user_stated", score, reasons: [...reasons, "user-stated trust tier (lower confidence)"] };
 	}
+	if (verdicts.trustTier === "verified_in_repo" && verdicts.durable >= 0.5 && verdicts.importance >= thresholds.minImportance) {
+		return { action: "file", score, reasons: [...reasons, "repo-verified evidence"] };
+	}
 	return { action: "reject_unsupported", score, reasons: [...reasons, "not grounded in evidence"] };
 }

@@ -8,6 +8,7 @@
 |------|------|------|---------|---------|
 | [Adjudication policy computed in code](architecture/adjudication-policy.md) | architecture/layer | adjudication thresholds policy jev | Thresholds and composite scores are computed in code, making Jev verdicts advisory and policy changes model-free. | 2026-09-19 |
 | [Capture flow](architecture/flow-capture.md) | architecture/flow | capture insights workflow | At the end of work, the agent composes an insight list with evidence pointers; Jev filters and places each insight, and the agent writes the resulting updates. | 2026-09-19 |
+| [Change-driven invalidation is O(diff)](architecture/layer-sync-invalidation.md) | architecture/layer | sync performance invalidation claims | wiki_sync intersects changed paths with file-linked claims before any model call, so commits that touch nothing linked cost nothing. | 2026-09-19 |
 | [pi extension module](architecture/module-pi-extension.md) | architecture/module | pi-extension architecture wiki | Owns staging, Jev adjudication, placement, and TOC/log bookkeeping for the project wiki. | 2026-09-19 |
 
 ## decisions
@@ -17,6 +18,7 @@
 | [Agent-managed review with user escalation for critical items](decisions/review-escalation.md) | decision | review escalation workflow | Review work is agent-managed. The user is only escalated for critical items such as security, breaking API changes, or data loss. | 2026-09-19 |
 | [Guided writing as default mode](decisions/guided-writing.md) | decision | workflow writing policy | Jev decides placement, the agent writes the content, and code enforces policy. | 2026-09-19 |
 | [Provider-agnostic Jev client schema](decisions/provider-agnostic-schema.md) | decision | jev provider typesafe openrouter aimlapi configuration | Provider switching between TypeSafe, OpenRouter, and AI/ML API is configuration only, because every provider accepts the same System One request schema. | 2026-09-19 |
+| [Review resolutions applied by code](decisions/review-resolution-by-code.md) | decision | review resolution frontmatter determinism | The agent picks a resolution, but frontmatter is rewritten deterministically by applyReviewResolution, not by the model. | 2026-09-19 |
 | [Scope boundary — exclude derivable knowledge](decisions/scope-boundary.md) | decision | scope policy wiki | jev-wiki deliberately excludes anything a developer could re-derive from the repository in under a minute. | 2026-09-19 |
 | [Wiki root defaults to docs/wiki](decisions/wiki-root-location.md) | decision | location workspace root | The wiki root defaults to docs/wiki so knowledge lives next to the code it describes. | 2026-09-19 |
 

@@ -49,11 +49,18 @@ term is unclear; before answering "how does X work here?".
 
 ## Operating the wiki
 
+### Respect the verdicts
+
+Jev's adjudication is binding: write only claims the brief marks **File** or **Reinforce**.
+Rejected claims are **not** written to the wiki — even when the user explicitly asks for that
+content. Report what was rejected and why, so the user can supply better evidence or a stronger
+artifact. Never hand-write a rejected claim into a page.
+
 ### Ingest a document (research channel)
 
 1. `wiki_ingest` with `path` (or `text`) — it stores the raw source, extracts claims, and returns
    a Jev-verified brief.
-2. Write or merge the recommended pages (guided mode: you write).
+2. Write or merge the **accepted** pages (guided mode: you write).
 3. `wiki_finalize` with every touched page.
 
 ### Capture session insights (work channel)
@@ -61,8 +68,9 @@ term is unclear; before answering "how does X work here?".
 1. Compose atomic insights with evidence pointers (files, commits, tests, user statements).
    No transient state, no code snippets, nothing derivable from the repo.
 2. `wiki_insights` with the list — Jev filters (derivable/durable/sensitive), relates them to
-   existing knowledge, and chooses placement.
-3. Write or merge the recommended pages, then `wiki_finalize`.
+   existing knowledge, and chooses placement. Include file/commit evidence: file evidence is read
+   and excerpted for Jev, which grounds the decision.
+3. Write or merge the **accepted** pages, then `wiki_finalize`.
 
 ## Page format
 
