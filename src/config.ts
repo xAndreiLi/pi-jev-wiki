@@ -30,6 +30,7 @@ export interface JevWikiConfig {
 	apiKey?: string;
 	envFile: string;
 	wikiRoot: string;
+	globalWikiRoot?: string;
 	stateRoot: string;
 	writer: { mode: WriterMode; model?: string | null };
 	routing: { shardSize: number; minFit: number; newPageConfidence: number };
@@ -46,7 +47,7 @@ export interface JevWikiConfig {
 	toc: { maxTokens: number };
 	gitCommit: boolean;
 	capture: { onCompact: boolean; onSettle: boolean };
-	search: { engine: "index" | "bm25" | "qmd" };
+	search: { engine: "index" | "bm25" | "qmd"; qmdCollection?: string };
 }
 
 export interface ResolvedConfig extends Omit<JevWikiConfig, "baseUrl" | "model"> {

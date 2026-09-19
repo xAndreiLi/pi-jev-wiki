@@ -49,17 +49,8 @@ import {
 	type WikiLayout,
 } from "./wiki/layout.ts";
 import { extractMarkdownLinks } from "./wiki/links.ts";
-import {
-	appendLog,
-	entryFromPage,
-	parseIndex,
-	readIndex,
-	readRecentLog,
-	renderIndex,
-	upsertEntries,
-	writeIndex,
-	type TocEntry,
-} from "./wiki/toc.ts";
+import { appendLog, entryFromPage, parseIndex, readIndex, readRecentLog, renderIndex, upsertEntries, writeIndex, type TocEntry } from "./wiki/toc.ts";
+import { createSearchEngine } from "./wiki/search.ts";
 
 interface Runtime {
 	loaded: LoadedConfig;
@@ -78,6 +69,13 @@ function requireClient(loaded: LoadedConfig): JevClient {
 		);
 	}
 	return createJevClient(loaded.config, loaded.apiKey);
+}
+
+/** Optional cross-project vault: resolved against the pi agent dir when relative. */
+function globalLayoutFor(loaded: LoadedConfig): WikiLayout | undefined {
+	if (!loaded.config.globalWikiRoot) return undefined;
+	const root = isAbsolute(loaded.config.globalWikiRoot) ? loaded.config.globalWikiRoot : join(loaded.agentDir, loaded.config.globalWikiRoot);
+	return resolveLayout(root, ".", loaded.config.stateRoot);
 }
 
 function truncate(text: string, maxChars: number): string {
@@ -812,43 +810,25 @@ export default function (pi: ExtensionAPI) {
 			limit: Type.Optional(Type.Number({ description: "Max pages to return (default 5)" })),
 		}),
 		async execute(_id, params, _signal, _onUpdate, ctx) {
-			const { layout } = runtimeFor(ctx);
-			const files = await listMarkdownFiles(layout.wikiDir);
-			const tokens = params.query
-				.toLowerCase()
-				.split(/[^a-z0-9_]+/)
-				.filter((token) => token.length > 2);
-			const scored: Array<{ file: string; score: number; hits: string[] }> = [];
-			for (const file of files) {
-				if (file.endsWith("index.md") || file.endsWith("log.md")) continue;
-				const text = await readFile(file, "utf8");
-				const lower = text.toLowerCase();
-				let score = 0;
-				for (const token of tokens) {
-					const matches = lower.split(token).length - 1;
-					score += Math.min(matches, 8);
-				}
-				if (score === 0) continue;
-				const hits = text
-					.split(/\r?\n/)
-					.filter((line) => tokens.some((token) => line.toLowerCase().includes(token)))
-					.slice(0, 4);
-				scored.push({ file, score, hits });
+			const { loaded, layout } = runtimeFor(ctx);
+			const engine = createSearchEngine(loaded.config, layout, globalLayoutFor(loaded));
+			const limit = Math.max(1, Math.min(params.limit ?? 5, 10));
+			const results = await engine.search({ query: params.query, limit });
+			if (results.length === 0) {
+				return {
+					content: [{ type: "text", text: `No wiki pages match (engine: ${engine.name}). The wiki may not cover this yet.` }],
+					details: { matches: 0, engine: engine.name },
+				};
 			}
-			scored.sort((a, b) => b.score - a.score);
-			const top = scored.slice(0, Math.max(1, Math.min(params.limit ?? 5, 10)));
-			if (top.length === 0) {
-				return { content: [{ type: "text", text: "No wiki pages match. The wiki may not cover this yet." }], details: { matches: 0 } };
-			}
-			const text = top
-				.map(({ file, score, hits }) => {
-					const rel = relative(layout.wikiDir, file).split("\\").join("/");
-					return [`### ${rel} (score ${score})`, ...hits.map((line) => `> ${line.trim().slice(0, 300)}`)].join("\n");
+			const text = results
+				.map((result) => {
+					const scope = result.source === "global" ? " [global vault]" : "";
+					return [`### ${result.path}${scope} (score ${result.score})`, result.excerpt].join("\n");
 				})
 				.join("\n\n");
-			const pages = top.map(({ file }) => relative(layout.wikiDir, file).split("\\").join("/"));
-			await recordMetric(layout, { op: "ask", query: params.query, pages });
-			return { content: [{ type: "text", text }], details: { matches: top.length, pages } };
+			const pages = results.map((result) => result.path);
+			await recordMetric(layout, { op: "ask", query: params.query, pages, detail: { engine: engine.name } });
+			return { content: [{ type: "text", text }], details: { matches: results.length, pages, engine: engine.name } };
 		},
 	});
 
