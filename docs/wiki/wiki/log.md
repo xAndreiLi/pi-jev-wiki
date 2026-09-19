@@ -172,3 +172,14 @@
 - Raw: raw/sessions/2026-09-19-session-2026-09-19-1812.md
 - Filed 0 · reinforced 0 · review 0 · rejected 2
 
+## [2026-09-19] capture | 3 insights (tool)
+- Raw: raw/sessions/2026-09-19-session-2026-09-19-1813.md
+- Filed 0 · reinforced 0 · review 1 · rejected 2
+
+## [2026-09-19] finalize | Added architecture page for structure coverage check after accepting review item mu8y2nex-207165. Two other insights were rejected as derivable from code.
+- Updated: architecture/structure-coverage.md
+
+## [2026-09-19] capture | 4 insights (settled)
+- Raw: raw/sessions/2026-09-19-session-2026-09-19-1815.md
+- Filed 1 · reinforced 0 · review 0 · rejected 3
+
