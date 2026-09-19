@@ -11,7 +11,7 @@ import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import type { ResolvedConfig } from "../config.ts";
 import { listMarkdownFiles, type WikiLayout } from "./layout.ts";
-import { readIndex, type TocEntry } from "./toc.ts";
+import { readIndex, isWikiMetaFile, type TocEntry } from "./toc.ts";
 
 const run = promisify(execFile);
 
@@ -61,7 +61,7 @@ async function loadDocs(layout: WikiLayout): Promise<Doc[]> {
 	const docs: Doc[] = [];
 	for (const file of files) {
 		const rel = relative(layout.wikiDir, file).split("\\").join("/");
-		if (rel === "index.md" || rel === "log.md") continue;
+		if (isWikiMetaFile(rel)) continue;
 		try {
 			const raw = await readFile(file, "utf8");
 			const entry = byPath.get(rel);

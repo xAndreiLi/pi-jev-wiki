@@ -12,7 +12,7 @@ import { appendLedger, readLedger } from "./ledger.ts";
 import { enqueueReview } from "./review.ts";
 import { extractMarkdownLinks, isExternalLink, linkTarget } from "./wiki/links.ts";
 import { listMarkdownFiles, readPage, todayISO, writePage, type WikiLayout } from "./wiki/layout.ts";
-import { appendLog, entryFromPage, readIndex, updateIndex, upsertEntries, writeIndex, type TocEntry } from "./wiki/toc.ts";
+import { appendLog, entryFromPage, isWikiMetaFile, readIndex, updateIndex, upsertEntries, writeIndex, type TocEntry } from "./wiki/toc.ts";
 
 export interface UnbackedClaim {
 	page: string;
@@ -109,7 +109,7 @@ export async function lintWiki(
 	const pages: PageRecord[] = [];
 	for (const abs of files) {
 		const rel = relative(layout.wikiDir, abs).split("\\").join("/");
-		if (rel === "index.md" || rel === "log.md") continue;
+		if (isWikiMetaFile(rel)) continue;
 		try {
 			const page = await readPage(abs);
 			const text = await readFile(abs, "utf8");

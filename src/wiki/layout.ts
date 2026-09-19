@@ -110,7 +110,7 @@ export async function listMarkdownFiles(dir: string): Promise<string[]> {
 		for (const entry of entries) {
 			const full = join(current, entry.name);
 			if (entry.isDirectory()) {
-				if (entry.name === ".jev-wiki" || entry.name === "raw") continue;
+				if (entry.name === ".jev-wiki" || entry.name === "raw" || entry.name === "toc") continue;
 				await walk(full);
 			} else if (entry.isFile() && entry.name.endsWith(".md")) {
 				out.push(full);

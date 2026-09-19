@@ -6,7 +6,7 @@
  * Run: npm run test:scale
  */
 import assert from "node:assert/strict";
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, readdir, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { loadConfig } from "../src/config.ts";
@@ -67,6 +67,12 @@ for (let index = 0; index < PAGES; index++) {
 	entries.push(entryFromPage(rel, { title, type: topic, summary, tags: [topic], updated: "2026-09-19" }));
 }
 await writeIndex(layout, upsertEntries(await readIndex(layout), entries));
+
+const compactToc = await readFile(join(layout.wikiDir, "toc.md"), "utf8");
+const topicFiles = await readdir(join(layout.wikiDir, "toc"));
+console.log(`toc: compact ${compactToc.length} chars, ${topicFiles.length} topic tables`);
+assert.ok(compactToc.length < 4000, `compact toc should stay small, got ${compactToc.length} chars`);
+assert.equal(topicFiles.length, TOPICS.length, "expected one table per topic");
 
 const engine = new Bm25SearchEngine(layout);
 const queries = [

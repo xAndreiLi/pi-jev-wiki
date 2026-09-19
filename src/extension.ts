@@ -17,6 +17,7 @@ import { git, headCommit, isGitRepo } from "./git.ts";
 import { appendLedger, readLedger, summarizeLedger } from "./ledger.ts";
 import { lintWiki } from "./lint.ts";
 import { readMetrics, recordMetric, summarizeMetrics } from "./metrics.ts";
+import { renderDoctor, runDoctor } from "./doctor.ts";
 import { withWikiLock } from "./wiki/lock.ts";
 import { applyReinforcement, applySupersession, bestCandidatePage } from "./provenance.ts";
 import { redact } from "./redact.ts";
@@ -51,18 +52,7 @@ import {
 	type WikiLayout,
 } from "./wiki/layout.ts";
 import { extractMarkdownLinks } from "./wiki/links.ts";
-import {
-	appendLog,
-	entryFromPage,
-	parseIndex,
-	readIndex,
-	readRecentLog,
-	renderIndex,
-	updateIndex,
-	upsertEntries,
-	writeIndex,
-	type TocEntry,
-} from "./wiki/toc.ts";
+import { appendLog, entryFromPage, isWikiMetaFile, parseIndex, readIndex, readRecentLog, renderCompactToc, renderIndex, topicSlug, updateIndex, upsertEntries, writeIndex, type TocEntry } from "./wiki/toc.ts";
 import { createSearchEngine } from "./wiki/search.ts";
 
 interface Runtime {
@@ -182,7 +172,9 @@ async function collectCandidatePages(layout: WikiLayout): Promise<CandidatePage[
 }
 
 async function collectCandidateClaims(layout: WikiLayout): Promise<CandidateClaim[]> {
-	const files = (await listMarkdownFiles(layout.wikiDir)).filter((file) => !file.endsWith("index.md") && !file.endsWith("log.md"));
+	const files = (await listMarkdownFiles(layout.wikiDir)).filter(
+		(file) => !isWikiMetaFile(relative(layout.wikiDir, file).split("\\").join("/")),
+	);
 	const claims: CandidateClaim[] = [];
 	for (const file of files.slice(0, 200)) {
 		try {
@@ -826,9 +818,20 @@ export default function (pi: ExtensionAPI) {
 				op: "toc",
 				detail: { topic: params.topic, tag: params.tag, query: params.query, filtered: filtered.length },
 			});
+			if (params.topic && !params.tag && !params.query) {
+				const topicPath = join(layout.wikiDir, "toc", `${topicSlug(params.topic)}.md`);
+				if (existsSync(topicPath)) {
+					return {
+						content: [{ type: "text", text: truncate(await readFile(topicPath, "utf8"), maxChars) }],
+						details: { entries: entries.length, filtered: filtered.length, topic: params.topic },
+					};
+				}
+			}
+			const compact = filtered.length > 60 && !params.tag && !params.query;
+			const body = compact ? renderCompactToc(filtered) : renderIndex(filtered);
 			return {
-				content: [{ type: "text", text: truncate(renderIndex(filtered), maxChars) }],
-				details: { entries: entries.length, filtered: filtered.length },
+				content: [{ type: "text", text: truncate(body, maxChars) }],
+				details: { entries: entries.length, filtered: filtered.length, compact },
 			};
 		},
 	});
@@ -1299,6 +1302,23 @@ export default function (pi: ExtensionAPI) {
 			const { layout } = runtimeFor(ctx);
 			const report = await scanStructure(ctx.cwd, layout);
 			return { content: [{ type: "text", text: renderStructure(report) }], details: report };
+		},
+	});
+
+	pi.registerTool({
+		name: "wiki_doctor",
+		label: "Wiki Doctor",
+		description:
+			"Cheap deterministic health checks: config values, endpoint, API key, .env gitignore, layout, lock, ledger, review queue, git/sync state, and search engine availability. No model calls.",
+		promptSnippet: "Run wiki health checks",
+		promptGuidelines: [
+			"Use wiki_doctor when the wiki behaves unexpectedly, before maintenance, or when starting in a new project.",
+		],
+		parameters: Type.Object({}),
+		async execute(_id, _params, _signal, _onUpdate, ctx) {
+			const loaded = loadConfig(ctx.cwd);
+			const report = await runDoctor(loaded);
+			return { content: [{ type: "text", text: renderDoctor(report) }], details: report };
 		},
 	});
 
