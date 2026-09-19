@@ -1,5 +1,8 @@
 # jev-wiki
 
+[![npm version](https://img.shields.io/npm/v/jev-wiki.svg)](https://www.npmjs.com/package/jev-wiki)
+[![license](https://img.shields.io/npm/l/jev-wiki.svg)](LICENSE)
+
 A pi package that gives coding agents a maintained **mental model of a project**: module
 responsibilities, boundaries, data flow, invariants, decisions, and change impact — stored as a
 markdown wiki and maintained with **Jev** (TypeSafe's calibrated decision model).
@@ -131,6 +134,7 @@ docs/
   HARDENING.md hardening roadmap with statuses
   notes/      source notes used for dogfooding
   wiki/       this project's own knowledge wiki (dogfood)
+  RELEASING.md release runbook
 research/     source material gathered during design
 ```
 

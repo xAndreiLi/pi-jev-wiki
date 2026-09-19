@@ -4,6 +4,15 @@
   "description": "Project mental-model wiki for pi, maintained by agent insights and Jev decisions",
   "type": "module",
   "license": "MIT",
+  "author": "xAndreiLi",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/xAndreiLi/pi-jev-wiki.git"
+  },
+  "homepage": "https://github.com/xAndreiLi/pi-jev-wiki#readme",
+  "bugs": {
+    "url": "https://github.com/xAndreiLi/pi-jev-wiki/issues"
+  },
   "engines": {
     "node": ">=20"
   },
@@ -11,6 +20,7 @@
     "src",
     "skills",
     "README.md",
+    "CHANGELOG.md",
     "LICENSE"
   ],
   "keywords": [
