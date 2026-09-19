@@ -130,3 +130,45 @@
 - Raw: raw/sessions/2026-09-19-session-2026-09-19-1808.md
 - Filed 1 · reinforced 0 · review 1 · rejected 2
 
+## [2026-09-19] lint | 0 added, 0 broken links, 2 unbacked claims
+- Pages: 15
+- TOC updated: 0 · missing files: 0
+- Orphans: 7 · raw backlog: 0
+- Contradiction checks: 1
+
+## [2026-09-19] lint | 0 added, 0 broken links, 0 unbacked claims
+- Pages: 15
+- TOC updated: 0 · missing files: 0
+- Orphans: 7 · raw backlog: 0
+- Contradiction checks: 1
+
+## [2026-09-19] lint | 0 added, 0 broken links, 0 unbacked claims
+- Pages: 15
+- TOC updated: 0 · missing files: 0
+- Orphans: 7 · raw backlog: 0
+- Contradiction checks: 1
+
+## [2026-09-19] capture | 4 insights (settled)
+- Raw: raw/sessions/2026-09-19-session-2026-09-19-1810.md
+- Filed 0 · reinforced 2 · review 0 · rejected 2
+
+## [2026-09-19] capture | 1 insights (tool)
+- Raw: raw/sessions/2026-09-19-session-2026-09-19-1811.md
+- Filed 0 · reinforced 0 · review 0 · rejected 1
+
+## [2026-09-19] capture | 3 insights (settled)
+- Raw: raw/sessions/2026-09-19-session-2026-09-19-1811.md
+- Filed 0 · reinforced 0 · review 0 · rejected 3
+
+## [2026-09-19] write | 1 page(s) (auto)
+- Written: decisions/decision-rejected-claims-stay-visible-in.md
+
+## [2026-09-19] capture | 1 insights (tool)
+- Raw: raw/sessions/2026-09-19-session-2026-09-19-1812.md
+- Filed 1 · reinforced 0 · review 0 · rejected 0
+- Auto-written: decisions/decision-rejected-claims-stay-visible-in.md
+
+## [2026-09-19] capture | 2 insights (settled)
+- Raw: raw/sessions/2026-09-19-session-2026-09-19-1812.md
+- Filed 0 · reinforced 0 · review 0 · rejected 2
+

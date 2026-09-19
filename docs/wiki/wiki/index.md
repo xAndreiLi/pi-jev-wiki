@@ -15,6 +15,7 @@
 | Page | Type | Tags | Summary | Updated |
 |------|------|------|---------|---------|
 | [Agent-managed review with user escalation for critical items](decisions/review-escalation.md) | decision | review escalation workflow | Review work is agent-managed. The user is only escalated for critical items such as security, breaking API changes, or data loss. | 2026-09-19 |
+| [Decision ledger retention](decisions/decision-rejected-claims-stay-visible-in.md) | decision | decisions ledger audit threshold-tuning retention | Rejected claims remain visible in the decision ledger to support future threshold tuning audit. | 2026-09-19 |
 | [Guided writing as default mode](decisions/guided-writing.md) | decision | workflow writing policy | Jev decides placement, the agent writes the content, and code enforces policy. | 2026-09-19 |
 | [Lint Queues Unbacked Claims](decisions/lint-queues-unbacked-claims.md) | decision | lint claims review-queue ledger bookkeeping | The wiki lint process queues claims lacking accepted ledger entries as review items instead of deleting or rejecting them, because a missing ledger entry may be a bookkeeping gap rather than bad knowledge. | 2026-09-19 |
 | [Provider-agnostic Jev client schema](decisions/provider-agnostic-schema.md) | decision | jev provider typesafe openrouter aimlapi configuration | Provider switching between TypeSafe, OpenRouter, and AI/ML API is configuration only, because every provider accepts the same System One request schema. | 2026-09-19 |

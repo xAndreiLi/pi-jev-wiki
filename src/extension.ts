@@ -12,13 +12,14 @@ import { basename, dirname, isAbsolute, join, relative, resolve } from "node:pat
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { StringEnum } from "@earendil-works/pi-ai";
 import { Type } from "typebox";
-import { loadConfig, type LoadedConfig, type JevWikiConfig } from "./config.ts";
+import { loadConfig, type LoadedConfig, type JevWikiConfig, type WriterMode } from "./config.ts";
 import { git, headCommit, isGitRepo } from "./git.ts";
 import { appendLedger, readLedger, summarizeLedger } from "./ledger.ts";
 import { lintWiki } from "./lint.ts";
 import { readMetrics, recordMetric, summarizeMetrics } from "./metrics.ts";
 import { applyReinforcement, applySupersession, bestCandidatePage } from "./provenance.ts";
 import { appendSessionLog, promoteRecurring } from "./sessionlog.ts";
+import { renderStructure, scanStructure } from "./structure.ts";
 import { extractInsights, sessionTextFromEntries } from "./pipeline/capture.ts";
 import {
 	applyReviewResolution,
@@ -31,6 +32,7 @@ import {
 import { readSyncState, syncWiki } from "./sync.ts";
 import { createJevClient, type JevClient } from "./jev.ts";
 import { adjudicateClaim, chooseTarget, decideClaim, type CandidateClaim, type CandidatePage } from "./pipeline/adjudicate.ts";
+import { resolveWriterMode, writeAcceptedPages, type WriterClaim } from "./pipeline/write.ts";
 import { extractClaims, quoteIsPresent } from "./pipeline/extract.ts";
 import {
 	ensureLayout,
@@ -227,7 +229,7 @@ interface ClaimReport {
 	newPage: boolean;
 }
 
-function renderBrief(title: string, reports: ClaimReport[], extras: string[] = []): string {
+function renderBrief(title: string, reports: ClaimReport[], extras: string[] = [], options?: { guided?: boolean }): string {
 	const filed = reports.filter((report) => report.action === "file" || report.action === "file_user_stated");
 	const reinforced = reports.filter((report) => report.action === "reinforce");
 	const review = reports.filter((report) => report.action === "review");
@@ -275,6 +277,7 @@ function renderBrief(title: string, reports: ClaimReport[], extras: string[] = [
 		lines.push("");
 	}
 	if (extras.length > 0) lines.push(...extras, "");
+	if (options?.guided === false) return lines.join("\n");
 	lines.push(
 		"### Next steps (guided mode)",
 		"1. Write or merge **only the claims listed under File/Reinforce above**. Rejected claims must not be written, even if the user asked for them — report the rejection and its reason instead.",
@@ -455,6 +458,7 @@ async function mapLimitLocal<T, R>(items: T[], limit: number, fn: (item: T) => P
 
 interface ProcessInsightsOptions {
 	source: "tool" | "compact" | "settled";
+	mode?: WriterMode;
 }
 
 interface ProcessInsightsResult {
@@ -638,17 +642,57 @@ async function processInsights(
 		},
 		rawBody,
 	);
+	const rawPathRel = relative(layout.root, rawPath).split("\\").join("/");
+
+	const writerClaims: WriterClaim[] = reports
+		.filter((report) => report.action === "file" || report.action === "file_user_stated")
+		.map((report) => {
+			const entry = perInsight.find((candidate) => candidate.insight.text === report.text);
+			return {
+				text: report.text,
+				kind: entry?.insight.kind,
+				pageType: report.pageType,
+				topic: report.topic,
+				target: report.target,
+				trustTier: report.trustTier,
+				files: report.files,
+				evidence: [rawPathRel, ...(entry?.insight.evidence ?? []).map((item) => item.ref)],
+				grounded: report.grounded,
+				criticality: report.criticalityNorm,
+			};
+		});
+	const writeResult = await writeAcceptedPages(
+		ctx,
+		layout,
+		config,
+		{
+			title: `Session capture ${todayISO(stamp)}`,
+			topic: topics[0] ?? "general",
+			sourcePath: rawPathRel,
+			claims: writerClaims,
+		},
+		options.mode ?? config.writer.mode,
+	);
 
 	await appendLog(layout, "capture", `${reports.length} insights (${options.source})`, [
-		`Raw: ${relative(layout.root, rawPath).split("\\").join("/")}`,
+		`Raw: ${rawPathRel}`,
 		`Filed ${reports.filter((r) => r.action === "file" || r.action === "file_user_stated").length} · reinforced ${reports.filter((r) => r.action === "reinforce").length} · review ${reports.filter((r) => r.action === "review").length} · rejected ${reports.filter((r) => r.action.startsWith("reject")).length}`,
 		...((promoted ?? 0) > 0 ? [`Promoted ${promoted} recurring candidate(s) to review`] : []),
+		...(writeResult.written.length > 0 ? [`Auto-written: ${writeResult.written.join(", ")}`] : []),
+		...(writeResult.drafted.length > 0 ? [`Drafts: ${writeResult.drafted.join(", ")}`] : []),
 	]);
 
-	const brief = renderBrief(`session ${todayISO(stamp)}`, reports, [
-		`Raw session record: \`${relative(layout.root, rawPath).split("\\").join("/")}\``,
-		...(reinforcements.length > 0 ? [`Reinforced: ${reinforcements.join(", ")}`] : []),
-	]);
+	const brief = renderBrief(
+		`session ${todayISO(stamp)}`,
+		reports,
+		[
+			`Raw session record: \`${rawPathRel}\``,
+			...(reinforcements.length > 0 ? [`Reinforced: ${reinforcements.join(", ")}`] : []),
+			...(writeResult.written.length > 0 ? [`Written automatically (${writeResult.mode}): ${writeResult.written.join(", ")}`] : []),
+			...(writeResult.drafted.length > 0 ? [`Drafts written (${writeResult.mode}): ${writeResult.drafted.join(", ")}`] : []),
+		],
+		{ guided: writeResult.mode === "guided" },
+	);
 	const accepted = reports.filter((report) => ["file", "file_user_stated", "reinforce"].includes(report.action)).length;
 	return {
 		brief,
@@ -660,6 +704,7 @@ async function processInsights(
 			promoted,
 			source: options.source,
 			accepted,
+			writer: writeResult,
 			usage: client.totals,
 		},
 		accepted,
@@ -823,6 +868,7 @@ export default function (pi: ExtensionAPI) {
 			title: Type.Optional(Type.String({ description: "Title override" })),
 			topic: Type.Optional(Type.String({ description: "Topic directory override" })),
 			source: Type.Optional(Type.String({ description: "Origin URL or description" })),
+			mode: Type.Optional(StringEnum(["guided", "draft", "auto"] as const, { description: "Writer mode override; critical claims downgrade automatically" })),
 		}),
 		async execute(_id, params, _signal, onUpdate, ctx) {
 			const runtime = runtimeFor(ctx);
@@ -841,7 +887,36 @@ export default function (pi: ExtensionAPI) {
 			const topic = params.topic ?? slugify(title.split(/\s+/).slice(0, 3).join("-"), 30);
 			onUpdate?.({ content: [{ type: "text", text: `Staging "${title}"…` }], details: {} });
 			const result = await ingestSource(runtime, ctx, { text, title, topic, source: params.source });
-			return { content: [{ type: "text", text: result.brief }], details: result.details };
+			const requestedMode = params.mode ?? runtime.loaded.config.writer.mode;
+			let brief = result.brief;
+			if (requestedMode !== "guided") {
+				const reports = (result.details.claims ?? []) as ClaimReport[];
+				const rawPathRel = relative(runtime.layout.root, result.rawPath).split("\\").join("/");
+				const writerClaims: WriterClaim[] = reports
+					.filter((report) => report.action === "file" || report.action === "file_user_stated")
+					.map((report) => ({
+						text: report.text,
+						pageType: report.pageType,
+						topic: report.topic ?? topic,
+						target: report.target,
+						trustTier: report.trustTier,
+						files: report.files,
+						evidence: [rawPathRel],
+						grounded: report.grounded,
+						criticality: report.criticalityNorm,
+					}));
+				const writeResult = await writeAcceptedPages(
+					ctx,
+					runtime.layout,
+					runtime.loaded.config,
+					{ title, topic, sourcePath: rawPathRel, claims: writerClaims },
+					requestedMode,
+				);
+				if (writeResult.written.length > 0) brief += `\n\nWritten automatically (${writeResult.mode}): ${writeResult.written.join(", ")}`;
+				if (writeResult.drafted.length > 0) brief += `\n\nDrafts written (${writeResult.mode}): ${writeResult.drafted.join(", ")}`;
+				(result.details as Record<string, unknown>).writer = writeResult;
+			}
+			return { content: [{ type: "text", text: brief }], details: result.details };
 		},
 	});
 
@@ -875,25 +950,19 @@ export default function (pi: ExtensionAPI) {
 					confidence: Type.Optional(Type.Number()),
 				}),
 			),
+			mode: Type.Optional(StringEnum(["guided", "draft", "auto"] as const, { description: "Writer mode override; critical claims downgrade automatically" })),
 		}),
 		async execute(_id, params, _signal, onUpdate, ctx) {
 			const runtime = runtimeFor(ctx);
 			const { loaded, layout } = runtime;
 			const client = requireClient(loaded);
-			const config = loaded.config;
 			await ensureLayout(layout);
 			if (params.insights.length === 0) {
 				return { content: [{ type: "text", text: "No insights submitted." }], details: { count: 0 } };
 			}
 
-			const candidates = await collectCandidatePages(layout);
-			const candidateClaims = await collectCandidateClaims(layout);
-			const topics = await existingTopics(layout);
-			const stamp = new Date();
-			const slug = `session-${todayISO(stamp)}-${String(stamp.getHours()).padStart(2, "0")}${String(stamp.getMinutes()).padStart(2, "0")}`;
-
 			onUpdate?.({ content: [{ type: "text", text: `Adjudicating ${params.insights.length} insights…` }], details: {} });
-			const result = await processInsights(runtime, ctx, client, params.insights, { source: "tool" });
+			const result = await processInsights(runtime, ctx, client, params.insights, { source: "tool", mode: params.mode });
 			return { content: [{ type: "text", text: result.brief }], details: result.details };
 		},
 	});
@@ -1189,6 +1258,23 @@ export default function (pi: ExtensionAPI) {
 		},
 	});
 
+	pi.registerTool({
+		name: "wiki_structure",
+		label: "Scan Repository Structure",
+		description:
+			"Deterministic module and dependency map: manifests, entry points, module import edges, test surface, and which modules lack an architecture page. No model calls.",
+		promptSnippet: "Scan repository structure and wiki architecture coverage",
+		promptGuidelines: [
+			"Use wiki_structure before large refactors or when architecture pages may be stale, then capture or update architecture knowledge via wiki_insights.",
+		],
+		parameters: Type.Object({}),
+		async execute(_id, _params, _signal, _onUpdate, ctx) {
+			const { layout } = runtimeFor(ctx);
+			const report = await scanStructure(ctx.cwd, layout);
+			return { content: [{ type: "text", text: renderStructure(report) }], details: report };
+		},
+	});
+
 	// Commands -----------------------------------------------------------------
 
 	pi.registerCommand("wiki:status", {
@@ -1314,7 +1400,7 @@ export default function (pi: ExtensionAPI) {
 			};
 			await ensureLayout(runtime.layout);
 			const client = requireClient(loaded);
-			const result = await processInsights(runtime, ctx, client, insights, { source });
+			const result = await processInsights(runtime, ctx, client, insights, { source, mode: loaded.config.writer.mode });
 			lastAutoCaptureAt = Date.now();
 			lastAutoCaptureMessageCount = messageCount;
 			return { accepted: result.accepted, brief: result.brief };
