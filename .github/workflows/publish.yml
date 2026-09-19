@@ -32,6 +32,17 @@ jobs:
       - run: npm run typecheck
       - run: npm run test:unit
       - run: npm run test:scale
-      - run: npm publish --provenance --access public
+      - name: Publish
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          set +e
+          npm publish --provenance --access public > publish.log 2>&1
+          code=$?
+          cat publish.log
+          if [ $code -ne 0 ]; then
+            grep -E "npm error|EOTP|E403|E404|ENEEDAUTH|error" publish.log | head -20 | while IFS= read -r line; do
+              echo "::error::publish: ${line}"
+            done
+          fi
+          exit $code
