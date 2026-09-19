@@ -10,9 +10,20 @@ import { existsSync } from "node:fs";
 import { readFile, writeFile } from "node:fs/promises";
 import { basename, dirname, isAbsolute, join, relative, resolve } from "node:path";
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
+import { StringEnum } from "@earendil-works/pi-ai";
 import { Type } from "typebox";
 import { loadConfig, type LoadedConfig, type JevWikiConfig } from "./config.ts";
+import { headCommit, isGitRepo } from "./git.ts";
 import { appendLedger, readLedger, summarizeLedger } from "./ledger.ts";
+import {
+	applyReviewResolution,
+	enqueueReview,
+	listOpenReviews,
+	openReviewCount,
+	readReviews,
+	resolveReview,
+} from "./review.ts";
+import { readSyncState, syncWiki } from "./sync.ts";
 import { createJevClient, type JevClient } from "./jev.ts";
 import { adjudicateClaim, chooseTarget, decideClaim, type CandidateClaim, type CandidatePage } from "./pipeline/adjudicate.ts";
 import { extractClaims, quoteIsPresent } from "./pipeline/extract.ts";
@@ -146,6 +157,7 @@ interface ClaimReport {
 	importanceNorm: number;
 	criticalityNorm: number;
 	trustTier?: string;
+	files: string[];
 	pageType?: string;
 	topic?: string;
 	target?: string;
@@ -170,7 +182,8 @@ function renderBrief(title: string, reports: ClaimReport[], extras: string[] = [
 				? `merge → \`${report.target}\``
 				: `new page (${report.pageType ?? "concept"}${report.topic ? `, topic \`${report.topic}\`` : ""})`;
 			const trust = report.action === "file_user_stated" ? " [user-stated: use `status: user-stated`]" : "";
-			lines.push(`- ${where} — ${report.text}${trust}`);
+			const files = report.files.length > 0 ? ` (files: ${report.files.map((file) => `\`${file}\``).join(", ")})` : "";
+			lines.push(`- ${where} — ${report.text}${trust}${files}`);
 			lines.push(
 				`  grounded ${report.grounded.toFixed(2)} · derivable ${report.derivable.toFixed(2)} · importance ${report.importanceNorm.toFixed(2)} · criticality ${report.criticalityNorm.toFixed(2)}`,
 			);
@@ -203,7 +216,8 @@ function renderBrief(title: string, reports: ClaimReport[], extras: string[] = [
 		"### Next steps (guided mode)",
 		"1. Write or merge pages per the llm-wiki skill, citing the raw source.",
 		"2. Include YAML frontmatter (title, type, topic, summary, tags, updated, claims with status/support/evidence).",
-		"3. Call `wiki_finalize` with the touched page paths.",
+		"3. Set page-level `files: [...]` (or per-claim `files`) for claims about code, so `wiki_sync` can detect when the code changes.",
+		"4. Call `wiki_finalize` with the touched page paths.",
 	);
 	return lines.join("\n");
 }
@@ -275,6 +289,27 @@ async function ingestSource(
 			input_tokens: adjudication.usage.input_tokens + (placement?.usage.input_tokens ?? 0),
 			output_tokens: adjudication.usage.output_tokens + (placement?.usage.output_tokens ?? 0),
 		};
+		if (decision.action === "review") {
+			await enqueueReview(layout, {
+				kind: "claim_review",
+				claimText: claim.text,
+				page: verdicts.target,
+				claimId: undefined,
+				criticality: Math.max(0.3, 1 - verdicts.grounded),
+				reason: decision.reasons.join("; "),
+				verdicts,
+			});
+		}
+		if (verdicts.relation === "contradicts") {
+			await enqueueReview(layout, {
+				kind: "dispute",
+				claimText: claim.text,
+				page: verdicts.target,
+				criticality: 0.8,
+				reason: "contradicts existing wiki knowledge",
+				verdicts,
+			});
+		}
 		await appendLedger(layout, {
 			actor: "jev",
 			op: "ingest.adjudicate",
@@ -307,6 +342,7 @@ async function ingestSource(
 		importanceNorm: verdicts.importanceNorm,
 		criticalityNorm: verdicts.criticalityNorm,
 		trustTier: verdicts.trustTier,
+		files: claim.files ?? [],
 		pageType: verdicts.pageType,
 		topic: verdicts.topic,
 		target: verdicts.target,
@@ -379,6 +415,7 @@ export default function (pi: ExtensionAPI) {
 				`- Provider/model: ${loaded.config.provider} · ${loaded.config.model}`,
 				`- API key: ${loaded.apiKey ? "configured" : `MISSING (${loaded.envFilePath})`}`,
 				`- Writer mode: ${loaded.config.writer.mode} · review: ${loaded.config.review.mode}`,
+				`- Review queue: ${await openReviewCount(layout)} open`,
 				`- Ledger: ${summary.total} decisions (${JSON.stringify(summary.byActor)})`,
 				`- Jev tokens: ${summary.jevTokensIn} in / ${summary.jevTokensOut} out${summary.jevCost ? ` · $${summary.jevCost.toFixed(6)}` : ""}`,
 				"",
@@ -594,6 +631,26 @@ export default function (pi: ExtensionAPI) {
 					input_tokens: adjudication.usage.input_tokens + (placement?.usage.input_tokens ?? 0),
 					output_tokens: adjudication.usage.output_tokens + (placement?.usage.output_tokens ?? 0),
 				};
+				if (decision.action === "review") {
+					await enqueueReview(layout, {
+						kind: "claim_review",
+						claimText: insight.text,
+						page: verdicts.target,
+						criticality: Math.max(0.3, 1 - verdicts.grounded),
+						reason: decision.reasons.join("; "),
+						verdicts,
+					});
+				}
+				if (verdicts.relation === "contradicts") {
+					await enqueueReview(layout, {
+						kind: "dispute",
+						claimText: insight.text,
+						page: verdicts.target,
+						criticality: 0.8,
+						reason: "contradicts existing wiki knowledge",
+						verdicts,
+					});
+				}
 				await appendLedger(layout, {
 					actor: "agent",
 					op: "insight.proposed",
@@ -619,10 +676,10 @@ export default function (pi: ExtensionAPI) {
 					reason: decision.reasons.join("; "),
 					verdict: { score: decision.score, target: verdicts.target ?? null, newPage: verdicts.newPage, trustTier: verdicts.trustTier ?? null },
 				});
-				return { insight, verdicts, decision };
+				return { insight, verdicts, decision, files };
 			});
 
-			const reports: ClaimReport[] = perInsight.map(({ insight, verdicts, decision }) => ({
+			const reports: ClaimReport[] = perInsight.map(({ insight, verdicts, decision, files }) => ({
 				text: insight.text,
 				quoteVerified: false,
 				action: decision.action,
@@ -633,6 +690,7 @@ export default function (pi: ExtensionAPI) {
 				importanceNorm: verdicts.importanceNorm,
 				criticalityNorm: verdicts.criticalityNorm,
 				trustTier: verdicts.trustTier,
+				files,
 				pageType: verdicts.pageType,
 				topic: verdicts.topic,
 				target: verdicts.target,
@@ -727,6 +785,137 @@ export default function (pi: ExtensionAPI) {
 		},
 	});
 
+	pi.registerTool({
+		name: "wiki_sync",
+		label: "Sync Wiki with Code",
+		description:
+			"Diff the repository since the last synced commit, ask Jev which file-linked claims are affected, and update them (no_impact / needs_recheck / supersede / dispute). Affected claims are queued for wiki_review. The first run initializes the sync baseline.",
+		promptSnippet: "Re-verify the wiki after code changes (diff since last sync)",
+		promptGuidelines: [
+			"Run wiki_sync after pulling, rebasing, or before relying on wiki claims about recently changed files.",
+			"The first wiki_sync initializes the baseline; later runs check all commits since then.",
+		],
+		parameters: Type.Object({
+			baseline: Type.Optional(Type.String({ description: "Git ref to diff from (default: last synced commit)" })),
+			dryRun: Type.Optional(Type.Boolean({ description: "Report impacts without changing pages or the baseline" })),
+		}),
+		async execute(_id, params, signal, onUpdate, ctx) {
+			const { loaded, layout } = runtimeFor(ctx);
+			const client = requireClient(loaded);
+			onUpdate?.({ content: [{ type: "text", text: "Checking code changes since the last wiki sync…" }], details: {} });
+			const report = await syncWiki(layout, client, loaded.config, ctx.cwd, {
+				baseline: params.baseline,
+				dryRun: params.dryRun,
+				signal: ctx.signal,
+			});
+			if (!report.repo) {
+				return { content: [{ type: "text", text: "Not a git repository; change-driven sync is unavailable." }], details: report };
+			}
+			if (report.baselineInitialized) {
+				return {
+					content: [{ type: "text", text: `Sync baseline initialized at ${report.head?.slice(0, 7)}. Future runs will check commits after this point.` }],
+					details: report,
+				};
+			}
+			const lines = [
+				`## Wiki sync — ${report.baseline?.slice(0, 7)} → ${report.head?.slice(0, 7)}${report.dryRun ? " (dry run)" : ""}`,
+				"",
+				`Changed files: ${report.changedFiles.length} · file-linked claims matched: ${report.matchedClaims}`,
+			];
+			if (report.impacts.length === 0) {
+				lines.push("", "No file-linked claims were affected. The wiki is current for this diff.");
+			} else {
+				lines.push("", "| Page | Claim | Impact | Still true |", "|------|-------|--------|------------|");
+				for (const impact of report.impacts) {
+					lines.push(
+						`| \`${impact.page}\` | ${impact.text.slice(0, 70)} | ${impact.impact} (${impact.confidence.toFixed(2)}) | ${impact.stillTrue.toFixed(2)} |`,
+					);
+				}
+				if (report.applied.length > 0) lines.push("", "Applied:", ...report.applied.map((line) => `- ${line}`));
+				lines.push("", "Run `wiki_review` to resolve any queued needs-recheck or dispute items.");
+			}
+			return { content: [{ type: "text", text: lines.join("\n") }], details: report };
+		},
+	});
+
+	pi.registerTool({
+		name: "wiki_review",
+		label: "Work the Wiki Review Queue",
+		description:
+			"List open wiki review items (disputes, needs-recheck claims, low-confidence claims) or resolve one. Critical items require user confirmation before they are applied.",
+		promptSnippet: "List or resolve wiki review items",
+		promptGuidelines: [
+			"When the user asks to review the wiki, call wiki_review with action=list, read the referenced pages to gather evidence, then resolve each item.",
+			"Resolve items with accept (claim confirmed), reject (claim wrong), supersede (newer knowledge exists), or defer (leave open).",
+		],
+		parameters: Type.Object({
+			action: StringEnum(["list", "resolve"] as const),
+			id: Type.Optional(Type.String({ description: "Review item id (for resolve)" })),
+			resolution: Type.Optional(StringEnum(["accept", "reject", "supersede", "defer"] as const)),
+			note: Type.Optional(Type.String({ description: "Reasoning or evidence for the resolution" })),
+		}),
+		async execute(_id, params, _signal, _onUpdate, ctx) {
+			const { loaded, layout } = runtimeFor(ctx);
+			if (params.action === "list") {
+				const open = await listOpenReviews(layout, loaded.config.review.maxPerSession);
+				if (open.length === 0) {
+					return { content: [{ type: "text", text: "Review queue is empty." }], details: { items: [] } };
+				}
+				const lines = [`## Wiki review queue (${open.length} open)`, ""];
+				for (const item of open) {
+					lines.push(
+						`- \`${item.id}\` · **${item.kind}** · criticality ${item.criticality.toFixed(2)}`,
+						`  claim: ${item.claimText}`,
+						item.page ? `  page: \`${item.page}\`${item.claimId ? ` (${item.claimId})` : ""}` : "  page: (not attached)",
+						item.reason ? `  reason: ${item.reason}` : "",
+					);
+				}
+				lines.push("", "Read the referenced pages, then resolve each with action=resolve, id=<id>, resolution=accept|reject|supersede|defer.");
+				return { content: [{ type: "text", text: lines.filter(Boolean).join("\n") }], details: { items: open } };
+			}
+
+			if (!params.id || !params.resolution) throw new Error("wiki_review resolve needs `id` and `resolution`.");
+			const all = await readReviews(layout);
+			const item = all.find((candidate) => candidate.id === params.id);
+			if (!item) throw new Error(`Review item not found: ${params.id}`);
+
+			const critical = item.criticality >= loaded.config.review.escalateCriticality;
+			if (critical && params.resolution !== "defer") {
+				if (!ctx.hasUI) {
+					await resolveReview(layout, item.id, "defer", "critical item requires user confirmation");
+					return {
+						content: [{ type: "text", text: `Item \`${item.id}\` is critical (${item.criticality.toFixed(2)}); deferred for user confirmation.` }],
+						details: { deferred: true, item },
+					};
+				}
+				const approved = await ctx.ui.confirm(
+					"Critical wiki claim",
+					`${item.claimText}\n\nResolve as "${params.resolution}"?`,
+				);
+				if (!approved) {
+					await resolveReview(layout, item.id, "defer", "user declined at escalation");
+					return { content: [{ type: "text", text: `User declined; item \`${item.id}\` deferred.` }], details: { deferred: true, item } };
+				}
+			}
+
+			const applied = await applyReviewResolution(layout, item, params.resolution);
+			await resolveReview(layout, item.id, params.resolution, params.note);
+			await appendLedger(layout, {
+				actor: "agent",
+				op: "wiki.review",
+				subject: item.id,
+				action: params.resolution,
+				reason: params.note ?? item.reason,
+				outcome: applied,
+				verdict: { kind: item.kind, criticality: item.criticality, escalated: critical },
+			});
+			return {
+				content: [{ type: "text", text: `Resolved \`${item.id}\` as ${params.resolution}. ${applied}` }],
+				details: { id: item.id, resolution: params.resolution, applied },
+			};
+		},
+	});
+
 	// Commands -----------------------------------------------------------------
 
 	pi.registerCommand("wiki:status", {
@@ -764,10 +953,42 @@ export default function (pi: ExtensionAPI) {
 		},
 	});
 
+	pi.registerCommand("wiki:sync", {
+		description: "Re-verify the wiki against commits since the last sync",
+		handler: async (_args, ctx) => {
+			if (!ctx.hasUI) return;
+			pi.sendUserMessage(
+				"Sync the project wiki with the code: call wiki_sync, then use wiki_review to resolve any affected claims (read the referenced pages first).",
+			);
+		},
+	});
+
+	pi.registerCommand("wiki:review", {
+		description: "Work the wiki review queue (disputes, needs-recheck, low-confidence claims)",
+		handler: async (_args, ctx) => {
+			if (!ctx.hasUI) return;
+			pi.sendUserMessage(
+				"Review the project wiki: call wiki_review with action=list, read the referenced pages for evidence, then resolve each item with wiki_review action=resolve. Defer anything you cannot decide; critical items will be escalated to the user.",
+			);
+		},
+	});
+
 	pi.on("session_start", async (_event, ctx) => {
 		const loaded = loadConfig(ctx.cwd);
 		if (!loaded.apiKey) {
 			ctx.ui.notify(`jev-wiki: no Jev token found (expected JEV_TOKEN in ${loaded.envFilePath})`, "warning");
+		}
+		try {
+			if (loaded.config.sync.onSessionStart !== "check") return;
+			const layout = resolveLayout(ctx.cwd, loaded.config.wikiRoot);
+			if (!existsSync(layout.stateDir) || !(await isGitRepo(ctx.cwd))) return;
+			const state = await readSyncState(layout);
+			const head = await headCommit(ctx.cwd);
+			if (state.lastSyncCommit && head && state.lastSyncCommit !== head) {
+				ctx.ui.notify("jev-wiki: the wiki may be out of date with code changes — run /wiki:sync", "warning");
+			}
+		} catch {
+			/* sync check is best-effort */
 		}
 	});
 }
