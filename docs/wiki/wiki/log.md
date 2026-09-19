@@ -106,3 +106,27 @@
 - Updated: decisions/guided-writing.md
 - Updated: architecture/module-pi-extension.md
 
+## [2026-09-19] capture | 1 insights (settled)
+- Raw: raw/sessions/2026-09-19-session-2026-09-19-1806.md
+- Filed 1 · reinforced 0 · review 0 · rejected 0
+
+## [2026-09-19] capture | 1 insights (settled)
+- Raw: raw/sessions/2026-09-19-session-2026-09-19-1806.md
+- Filed 0 · reinforced 0 · review 1 · rejected 0
+
+## [2026-09-19] finalize | Accepted user-stated decision from raw session 2026-09-19-1806.
+- Updated: decisions/retry-handling-in-client.md
+
+## [2026-09-19] finalize | Documented lint unbacked-claims behavior as a formal decision, resolving review queue item mu8xtla9-3cf8f2.
+- Updated: decisions/lint-queues-unbacked-claims.md
+
+## [2026-09-19] lint | 0 added, 0 broken links, 2 unbacked claims
+- Pages: 15
+- TOC updated: 0 · missing files: 0
+- Orphans: 7 · raw backlog: 0
+- Contradiction checks: 1
+
+## [2026-09-19] capture | 4 insights (settled)
+- Raw: raw/sessions/2026-09-19-session-2026-09-19-1808.md
+- Filed 1 · reinforced 0 · review 1 · rejected 2
+

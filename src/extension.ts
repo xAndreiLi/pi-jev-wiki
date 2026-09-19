@@ -17,6 +17,9 @@ import { git, headCommit, isGitRepo } from "./git.ts";
 import { appendLedger, readLedger, summarizeLedger } from "./ledger.ts";
 import { lintWiki } from "./lint.ts";
 import { readMetrics, recordMetric, summarizeMetrics } from "./metrics.ts";
+import { applyReinforcement, applySupersession, bestCandidatePage } from "./provenance.ts";
+import { appendSessionLog, promoteRecurring } from "./sessionlog.ts";
+import { extractInsights, sessionTextFromEntries } from "./pipeline/capture.ts";
 import {
 	applyReviewResolution,
 	enqueueReview,
@@ -447,6 +450,224 @@ async function mapLimitLocal<T, R>(items: T[], limit: number, fn: (item: T) => P
 }
 
 // ---------------------------------------------------------------------------
+// Insight processing (shared by the tool and auto-capture hooks)
+// ---------------------------------------------------------------------------
+
+interface ProcessInsightsOptions {
+	source: "tool" | "compact" | "settled";
+}
+
+interface ProcessInsightsResult {
+	brief: string;
+	details: Record<string, unknown>;
+	accepted: number;
+	rawPath: string;
+}
+
+async function processInsights(
+	runtime: Runtime,
+	ctx: ExtensionContext,
+	client: JevClient,
+	insights: Array<{ text: string; kind?: string; evidence?: Array<{ kind: string; ref: string; quote?: string }>; confidence?: number }>,
+	options: ProcessInsightsOptions,
+): Promise<ProcessInsightsResult> {
+	const { loaded, layout } = runtime;
+	const config = loaded.config;
+	const candidates = await collectCandidatePages(layout);
+	const candidateClaims = await collectCandidateClaims(layout);
+	const topics = await existingTopics(layout);
+	const stamp = new Date();
+	const slug = `session-${todayISO(stamp)}-${String(stamp.getHours()).padStart(2, "0")}${String(stamp.getMinutes()).padStart(2, "0")}`;
+
+	const perInsight = await mapLimitLocal(insights, 4, async (insight) => {
+		const { evidenceText, files } = await buildInsightEvidence(insight, ctx.cwd);
+		const evidenceLines = evidenceText.split("\n\n").slice(0, 8);
+		const adjudication = await adjudicateClaim(
+			client,
+			{ text: insight.text, kind: insight.kind ?? "fact", files, evidenceText },
+			config,
+			{ candidateClaims, existingTopics: topics, signal: ctx.signal, evidenceText },
+		);
+		const decision = decideClaim(adjudication.verdicts, config);
+		let placement: Awaited<ReturnType<typeof chooseTarget>> | undefined;
+		if (decision.action === "file" || decision.action === "reinforce") {
+			placement = await chooseTarget(client, { text: insight.text, kind: insight.kind ?? "fact", files, evidenceText }, candidates, config, {
+				signal: ctx.signal,
+				evidenceText,
+			});
+		}
+		const verdicts = { ...adjudication.verdicts, ...(placement?.verdicts ?? {}) };
+		const totalUsage = {
+			input_tokens: adjudication.usage.input_tokens + (placement?.usage.input_tokens ?? 0),
+			output_tokens: adjudication.usage.output_tokens + (placement?.usage.output_tokens ?? 0),
+		};
+		if (decision.action === "review") {
+			await enqueueReview(layout, {
+				kind: "claim_review",
+				claimText: insight.text,
+				page: verdicts.target,
+				criticality: Math.max(0.3, 1 - verdicts.grounded),
+				reason: decision.reasons.join("; "),
+				verdicts,
+			});
+		}
+		if (verdicts.relation === "contradicts") {
+			await enqueueReview(layout, {
+				kind: "dispute",
+				claimText: insight.text,
+				page: verdicts.target,
+				criticality: 0.8,
+				reason: "contradicts existing wiki knowledge",
+				verdicts,
+			});
+		}
+
+		let reinforcement: Awaited<ReturnType<typeof applyReinforcement>>;
+		if ((decision.action === "file" || decision.action === "reinforce") && verdicts.target) {
+			reinforcement = await applyReinforcement(layout, verdicts.target, insight.text, { evidence: files });
+			if (reinforcement) {
+				decision.reasons.push(
+					`corroborated ${verdicts.target}${reinforcement.claimId ? `#${reinforcement.claimId}` : ""} (${reinforcement.corroborations}×)`,
+				);
+			}
+		}
+		let supersession: Awaited<ReturnType<typeof applySupersession>>;
+		if (verdicts.relation === "supersedes") {
+			const supersededPage = bestCandidatePage(candidateClaims, insight.text);
+			if (supersededPage) supersession = await applySupersession(layout, supersededPage, insight.text);
+		}
+
+		await appendLedger(layout, {
+			actor: "agent",
+			op: "insight.proposed",
+			subject: insight.text.slice(0, 120),
+			evidence: evidenceLines,
+			action: "submitted",
+			source: options.source,
+		});
+		await appendLedger(layout, {
+			actor: "jev",
+			op: "insight.adjudicate",
+			subject: insight.text.slice(0, 120),
+			verdict: verdicts,
+			thresholds: config.thresholds,
+			action: decision.action,
+			reason: decision.reasons.join("; "),
+			usage: totalUsage,
+		});
+		await appendLedger(layout, {
+			actor: "code",
+			op: "insight.decide",
+			subject: insight.text.slice(0, 120),
+			action: decision.action,
+			reason: decision.reasons.join("; "),
+			verdict: {
+				score: decision.score,
+				target: verdicts.target ?? null,
+				newPage: verdicts.newPage,
+				trustTier: verdicts.trustTier ?? null,
+				reinforcement: reinforcement ? { page: reinforcement.page, claimId: reinforcement.claimId, corroborations: reinforcement.corroborations } : null,
+				supersession: supersession ? { page: supersession.page, claimId: supersession.claimId } : null,
+			},
+		});
+		await appendSessionLog(layout, {
+			text: insight.text,
+			kind: insight.kind,
+			source: options.source,
+			action: decision.action,
+			reason: decision.reasons.join("; "),
+			grounded: verdicts.grounded,
+			derivable: verdicts.derivable,
+			importance: verdicts.importanceNorm,
+		});
+		return { insight, verdicts, decision, files, reinforcement, supersession };
+	});
+
+	const promoted = await promoteRecurring(layout);
+	const reports: ClaimReport[] = perInsight.map(({ insight, verdicts, decision, files }) => ({
+		text: insight.text,
+		quoteVerified: false,
+		action: decision.action,
+		score: decision.score,
+		reasons: decision.reasons,
+		grounded: verdicts.grounded,
+		derivable: verdicts.derivable,
+		importanceNorm: verdicts.importanceNorm,
+		criticalityNorm: verdicts.criticalityNorm,
+		trustTier: verdicts.trustTier,
+		files,
+		pageType: verdicts.pageType,
+		topic: verdicts.topic,
+		target: verdicts.target,
+		newPage: verdicts.newPage,
+	}));
+	const reinforcements = perInsight
+		.filter((entry) => entry.reinforcement)
+		.map(
+			(entry) =>
+				`${entry.reinforcement!.page}${entry.reinforcement!.claimId ? `#${entry.reinforcement!.claimId}` : ""} (${entry.reinforcement!.corroborations}×)`,
+		);
+
+	const rawBody = perInsight
+		.map(({ insight, verdicts, decision, reinforcement, supersession }) => {
+			const evidence = (insight.evidence ?? []).map((item) => `- ${item.kind}: ${item.ref}${item.quote ? ` — "${item.quote}"` : ""}`).join("\n");
+			return [
+				`### ${insight.text}`,
+				insight.kind ? `Kind: ${insight.kind}` : "",
+				evidence ? `Evidence:\n${evidence}` : "",
+				`Verdict: ${decision.action} (grounded ${verdicts.grounded.toFixed(2)}, derivable ${verdicts.derivable.toFixed(2)}, importance ${verdicts.importanceNorm.toFixed(2)}, criticality ${verdicts.criticalityNorm.toFixed(2)})`,
+				verdicts.target ? `Target: ${verdicts.target}` : "",
+				reinforcement ? `Reinforced: ${reinforcement.page}${reinforcement.claimId ? `#${reinforcement.claimId}` : ""} (${reinforcement.corroborations}×)` : "",
+				supersession ? `Superseded: ${supersession.page}${supersession.claimId ? `#${supersession.claimId}` : ""}` : "",
+			]
+				.filter(Boolean)
+				.join("\n");
+		})
+		.join("\n\n");
+
+	const rawPath = await writeRawSource(
+		layout,
+		"sessions",
+		slug,
+		{
+			title: `Session capture ${todayISO(stamp)} (${options.source})`,
+			type: "raw-source",
+			source: "session",
+			collected: todayISO(stamp),
+			sha256: await sha256Hex(rawBody),
+		},
+		rawBody,
+	);
+
+	await appendLog(layout, "capture", `${reports.length} insights (${options.source})`, [
+		`Raw: ${relative(layout.root, rawPath).split("\\").join("/")}`,
+		`Filed ${reports.filter((r) => r.action === "file" || r.action === "file_user_stated").length} · reinforced ${reports.filter((r) => r.action === "reinforce").length} · review ${reports.filter((r) => r.action === "review").length} · rejected ${reports.filter((r) => r.action.startsWith("reject")).length}`,
+		...((promoted ?? 0) > 0 ? [`Promoted ${promoted} recurring candidate(s) to review`] : []),
+	]);
+
+	const brief = renderBrief(`session ${todayISO(stamp)}`, reports, [
+		`Raw session record: \`${relative(layout.root, rawPath).split("\\").join("/")}\``,
+		...(reinforcements.length > 0 ? [`Reinforced: ${reinforcements.join(", ")}`] : []),
+	]);
+	const accepted = reports.filter((report) => ["file", "file_user_stated", "reinforce"].includes(report.action)).length;
+	return {
+		brief,
+		details: {
+			rawPath,
+			insights: reports,
+			reinforcements,
+			supersessions: perInsight.filter((entry) => entry.supersession).map((entry) => entry.supersession),
+			promoted,
+			source: options.source,
+			accepted,
+			usage: client.totals,
+		},
+		accepted,
+		rawPath,
+	};
+}
+
+// ---------------------------------------------------------------------------
 // Extension entry
 // ---------------------------------------------------------------------------
 
@@ -672,133 +893,8 @@ export default function (pi: ExtensionAPI) {
 			const slug = `session-${todayISO(stamp)}-${String(stamp.getHours()).padStart(2, "0")}${String(stamp.getMinutes()).padStart(2, "0")}`;
 
 			onUpdate?.({ content: [{ type: "text", text: `Adjudicating ${params.insights.length} insights…` }], details: {} });
-
-			const perInsight = await mapLimitLocal(params.insights, 4, async (insight) => {
-				const { evidenceText, files } = await buildInsightEvidence(insight, ctx.cwd);
-				const evidenceLines = evidenceText.split("\n\n").slice(0, 8);
-				const adjudication = await adjudicateClaim(
-					client,
-					{ text: insight.text, kind: insight.kind ?? "fact", files, evidenceText },
-					config,
-					{ candidateClaims, existingTopics: topics, signal: ctx.signal, evidenceText },
-				);
-				const decision = decideClaim(adjudication.verdicts, config);
-				let placement: Awaited<ReturnType<typeof chooseTarget>> | undefined;
-				if (decision.action === "file" || decision.action === "reinforce") {
-					placement = await chooseTarget(client, { text: insight.text, kind: insight.kind ?? "fact", files, evidenceText }, candidates, config, {
-						signal: ctx.signal,
-						evidenceText,
-					});
-				}
-				const verdicts = { ...adjudication.verdicts, ...(placement?.verdicts ?? {}) };
-				const totalUsage = {
-					input_tokens: adjudication.usage.input_tokens + (placement?.usage.input_tokens ?? 0),
-					output_tokens: adjudication.usage.output_tokens + (placement?.usage.output_tokens ?? 0),
-				};
-				if (decision.action === "review") {
-					await enqueueReview(layout, {
-						kind: "claim_review",
-						claimText: insight.text,
-						page: verdicts.target,
-						criticality: Math.max(0.3, 1 - verdicts.grounded),
-						reason: decision.reasons.join("; "),
-						verdicts,
-					});
-				}
-				if (verdicts.relation === "contradicts") {
-					await enqueueReview(layout, {
-						kind: "dispute",
-						claimText: insight.text,
-						page: verdicts.target,
-						criticality: 0.8,
-						reason: "contradicts existing wiki knowledge",
-						verdicts,
-					});
-				}
-				await appendLedger(layout, {
-					actor: "agent",
-					op: "insight.proposed",
-					subject: insight.text.slice(0, 120),
-					evidence: evidenceLines,
-					action: "submitted",
-				});
-				await appendLedger(layout, {
-					actor: "jev",
-					op: "insight.adjudicate",
-					subject: insight.text.slice(0, 120),
-					verdict: verdicts,
-					thresholds: config.thresholds,
-					action: decision.action,
-					reason: decision.reasons.join("; "),
-					usage: totalUsage,
-				});
-				await appendLedger(layout, {
-					actor: "code",
-					op: "insight.decide",
-					subject: insight.text.slice(0, 120),
-					action: decision.action,
-					reason: decision.reasons.join("; "),
-					verdict: { score: decision.score, target: verdicts.target ?? null, newPage: verdicts.newPage, trustTier: verdicts.trustTier ?? null },
-				});
-				return { insight, verdicts, decision, files };
-			});
-
-			const reports: ClaimReport[] = perInsight.map(({ insight, verdicts, decision, files }) => ({
-				text: insight.text,
-				quoteVerified: false,
-				action: decision.action,
-				score: decision.score,
-				reasons: decision.reasons,
-				grounded: verdicts.grounded,
-				derivable: verdicts.derivable,
-				importanceNorm: verdicts.importanceNorm,
-				criticalityNorm: verdicts.criticalityNorm,
-				trustTier: verdicts.trustTier,
-				files,
-				pageType: verdicts.pageType,
-				topic: verdicts.topic,
-				target: verdicts.target,
-				newPage: verdicts.newPage,
-			}));
-
-			const rawBody = perInsight
-				.map(({ insight, verdicts, decision }) => {
-					const evidence = (insight.evidence ?? []).map((item) => `- ${item.kind}: ${item.ref}${item.quote ? ` — "${item.quote}"` : ""}`).join("\n");
-					return [
-						`### ${insight.text}`,
-						insight.kind ? `Kind: ${insight.kind}` : "",
-						evidence ? `Evidence:\n${evidence}` : "",
-						`Verdict: ${decision.action} (grounded ${verdicts.grounded.toFixed(2)}, derivable ${verdicts.derivable.toFixed(2)}, importance ${verdicts.importanceNorm.toFixed(2)}, criticality ${verdicts.criticalityNorm.toFixed(2)})`,
-						verdicts.target ? `Target: ${verdicts.target}` : "",
-					]
-						.filter(Boolean)
-						.join("\n");
-				})
-				.join("\n\n");
-
-			const rawPath = await writeRawSource(
-				layout,
-				"sessions",
-				slug,
-				{
-					title: `Session capture ${todayISO(stamp)}`,
-					type: "raw-source",
-					source: "session",
-					collected: todayISO(stamp),
-					sha256: await sha256Hex(rawBody),
-				},
-				rawBody,
-			);
-
-			await appendLog(layout, "capture", `${reports.length} insights`, [
-				`Raw: ${relative(layout.root, rawPath).split("\\").join("/")}`,
-				`Filed ${reports.filter((r) => r.action === "file").length} · reinforced ${reports.filter((r) => r.action === "reinforce").length} · review ${reports.filter((r) => r.action === "review").length} · rejected ${reports.filter((r) => r.action.startsWith("reject")).length}`,
-			]);
-
-			const brief = renderBrief(`session ${todayISO(stamp)}`, reports, [
-				`Raw session record: \`${relative(layout.root, rawPath).split("\\").join("/")}\``,
-			]);
-			return { content: [{ type: "text", text: brief }], details: { rawPath, insights: reports, usage: client.totals } };
+			const result = await processInsights(runtime, ctx, client, params.insights, { source: "tool" });
+			return { content: [{ type: "text", text: result.brief }], details: result.details };
 		},
 	});
 
@@ -834,6 +930,7 @@ export default function (pi: ExtensionAPI) {
 			}
 			await writeIndex(layout, upsertEntries(entries, updates));
 			await appendLog(layout, "finalize", params.note ?? `${updates.length} page(s)`, updates.map((entry) => `Updated: ${entry.path}`));
+			await removeFileIfExists(join(layout.stateDir, "pending-capture.md"));
 			await appendLedger(layout, {
 				actor: "agent",
 				op: "wiki.finalize",
@@ -964,6 +1061,16 @@ export default function (pi: ExtensionAPI) {
 
 			const applied = await applyReviewResolution(layout, item, params.resolution);
 			await resolveReview(layout, item.id, params.resolution, params.note);
+			if (params.resolution === "accept") {
+				await appendLedger(layout, {
+					actor: "code",
+					op: "wiki.review.accept",
+					action: "file",
+					subject: item.claimText.slice(0, 120),
+					reason: params.note ?? `reviewed as ${item.kind}`,
+					verdict: { reviewId: item.id, page: item.page ?? null, criticality: item.criticality },
+				});
+			}
 			await appendLedger(layout, {
 				actor: "agent",
 				op: "wiki.review",
@@ -1163,8 +1270,105 @@ export default function (pi: ExtensionAPI) {
 			if (state.lastSyncCommit && head && state.lastSyncCommit !== head) {
 				ctx.ui.notify("jev-wiki: the wiki may be out of date with code changes — run /wiki:sync", "warning");
 			}
+			if (existsSync(join(layout.stateDir, "pending-capture.md"))) {
+				ctx.ui.notify("jev-wiki: accepted insights are waiting to be written — run /wiki:review or ask to file pending captures", "info");
+			}
 		} catch {
 			/* sync check is best-effort */
+		}
+	});
+
+	// --- automatic capture ------------------------------------------------------
+
+	let autoCaptureInFlight = false;
+	let lastAutoCaptureAt = 0;
+	let lastAutoCaptureMessageCount = 0;
+
+	async function autoCapture(
+		ctx: ExtensionContext,
+		source: "compact" | "settled",
+		entries?: unknown[],
+	): Promise<{ accepted: number; brief: string } | undefined> {
+		const loaded = loadConfig(ctx.cwd);
+		if (!loaded.apiKey) return undefined;
+		const branch = entries ?? ctx.sessionManager.getBranch();
+		const messageCount = branch.filter((entry) => {
+			const candidate = entry as { type?: string; message?: { role?: string } };
+			return candidate?.type === "message" && (candidate.message?.role === "user" || candidate.message?.role === "assistant");
+		}).length;
+		if (messageCount < 3 || messageCount === lastAutoCaptureMessageCount) return undefined;
+		if (Date.now() - lastAutoCaptureAt < 10 * 60_000) return undefined;
+		if (autoCaptureInFlight) return undefined;
+		autoCaptureInFlight = true;
+		try {
+			const transcript = sessionTextFromEntries(branch);
+			const insights = await extractInsights(ctx, transcript);
+			if (insights.length === 0) {
+				lastAutoCaptureAt = Date.now();
+				lastAutoCaptureMessageCount = messageCount;
+				return { accepted: 0, brief: "No durable insights found." };
+			}
+			const runtime: Runtime = {
+				loaded,
+				layout: resolveLayout(ctx.cwd, loaded.config.wikiRoot, loaded.config.stateRoot),
+			};
+			await ensureLayout(runtime.layout);
+			const client = requireClient(loaded);
+			const result = await processInsights(runtime, ctx, client, insights, { source });
+			lastAutoCaptureAt = Date.now();
+			lastAutoCaptureMessageCount = messageCount;
+			return { accepted: result.accepted, brief: result.brief };
+		} catch {
+			return undefined;
+		} finally {
+			autoCaptureInFlight = false;
+		}
+	}
+
+	pi.on("agent_settled", async (_event, ctx) => {
+		try {
+			const loaded = loadConfig(ctx.cwd);
+			if (!loaded.config.capture.onSettle) return;
+			const result = await autoCapture(ctx, "settled");
+			if (!result || result.accepted === 0) return;
+			const layout = resolveLayout(ctx.cwd, loaded.config.wikiRoot, loaded.config.stateRoot);
+			await writeTextAtomic(join(layout.stateDir, "pending-capture.md"), `# Pending capture\n\n${result.brief}\n\nWrite or merge the accepted pages following the llm-wiki skill, then call wiki_finalize.\n`);
+			if (ctx.hasUI) {
+				pi.sendMessage(
+					{
+						customType: "jev-wiki",
+						content: `${result.brief}\n\nWrite or merge the accepted pages following the llm-wiki skill, then call wiki_finalize.`,
+						display: true,
+					},
+					{ deliverAs: "followUp", triggerTurn: true },
+				);
+			}
+		} catch {
+			/* auto-capture is best-effort and must never break the session */
+		}
+	});
+
+	pi.on("session_before_compact", async (event, ctx) => {
+		try {
+			const loaded = loadConfig(ctx.cwd);
+			if (!loaded.config.capture.onCompact) return;
+			const preparation = (event as { preparation?: { messagesToSummarize?: unknown[] } }).preparation;
+			const result = await autoCapture(ctx, "compact", preparation?.messagesToSummarize);
+			if (!result || result.accepted === 0) return;
+			const layout = resolveLayout(ctx.cwd, loaded.config.wikiRoot, loaded.config.stateRoot);
+			await writeTextAtomic(join(layout.stateDir, "pending-capture.md"), `# Pending capture (pre-compaction)\n\n${result.brief}\n\nWrite or merge the accepted pages following the llm-wiki skill, then call wiki_finalize.\n`);
+			if (ctx.hasUI) {
+				pi.sendMessage(
+					{
+						customType: "jev-wiki",
+						content: `Captured before compaction:\n\n${result.brief}\n\nWrite or merge the accepted pages following the llm-wiki skill, then call wiki_finalize.`,
+						display: true,
+					},
+					{ deliverAs: "nextTurn" },
+				);
+			}
+		} catch {
+			/* auto-capture is best-effort and must never break the session */
 		}
 	});
 }
