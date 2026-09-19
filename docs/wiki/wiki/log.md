@@ -92,3 +92,17 @@
 - Orphans: 5 · raw backlog: 0
 - Contradiction checks: 0
 
+## [2026-09-19] capture | 3 insights
+- Raw: raw/sessions/2026-09-19-session-2026-09-19-1741.md
+- Filed 0 · reinforced 0 · review 0 · rejected 3
+
+## [2026-09-19] finalize | Session 2026-09-19: three insights submitted via wiki_insights; all rejected by Jev as not grounded in evidence. No pages written.
+
+## [2026-09-19] capture | 3 insights
+- Raw: raw/sessions/2026-09-19-session-2026-09-19-1741.md
+- Filed 0 · reinforced 2 · review 0 · rejected 1
+
+## [2026-09-19] finalize | Reinforced two claims from session insights: (1) rejection policy in guided-writing, (2) lint backstop behavior in module-pi-extension. Duplicate insight on review escalation skipped.
+- Updated: decisions/guided-writing.md
+- Updated: architecture/module-pi-extension.md
+

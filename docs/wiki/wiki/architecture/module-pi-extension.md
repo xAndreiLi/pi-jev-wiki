@@ -12,6 +12,11 @@ claims:
     status: verified
     support: 0.97
     evidence: [raw/jev-wiki-architecture-notes/2026-09-19-jev-wiki-architecture-notes.md]
+  - id: c2
+    text: "Claims without file links are not checked on code changes; they rely on the periodic lint backstop instead."
+    status: verified
+    support: 0.95
+    evidence: [PLAN.md]
 files: []
 ---
 
@@ -28,6 +33,7 @@ files: []
 ## Invariants
 
 - Jev returns typed decisions (`noul`, `choice`, `score`), never free-form text.
+- Claims without file links are not checked on code changes; they rely on the periodic `wiki_lint` backstop instead.
 
 ## Failure modes
 

@@ -12,6 +12,11 @@ claims:
     status: verified
     support: 0.99
     evidence: [raw/jev-wiki-architecture-notes/2026-09-19-jev-wiki-architecture-notes.md]
+  - id: c2
+    text: "Rejected claims are never written to the wiki, even when the user explicitly asks for that content; the writer reports the rejection instead."
+    status: verified
+    support: 0.95
+    evidence: [skills/llm-wiki/SKILL.md, research/karpathy-llm-wiki-gist.md]
 files: []
 ---
 
@@ -44,6 +49,7 @@ files: []
 - Pages are uniform in structure.
 - Agents remain responsible for clarity and concision.
 - Misalignment between Jev placement and agent prose is caught during `wiki_finalize`.
+- Rejected claims are never written to the wiki, even when the user explicitly asks for that content; the agent reports the rejection and its reason instead.
 
 ## Evidence
 
