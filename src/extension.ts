@@ -33,6 +33,7 @@ import {
 	ensureLayout,
 	listMarkdownFiles,
 	readPage,
+	removeFileIfExists,
 	resolveLayout,
 	sha256Hex,
 	slugify,
@@ -1025,6 +1026,59 @@ export default function (pi: ExtensionAPI) {
 			if (report.fixed.length > 0) lines.push("", `Auto-fixed: ${report.fixed.join("; ")}`);
 			lines.push("", "Judgment items were queued for wiki_review where applicable.");
 			return { content: [{ type: "text", text: lines.join("\n") }], details: report };
+		},
+	});
+
+	pi.registerTool({
+		name: "wiki_remove",
+		label: "Remove Wiki Pages",
+		description:
+			"Remove pages from the wiki and their TOC entries. Use for pages that violate the quality bar (derivable/duplicate) or are obsolete. Raw sources are never removed.",
+		promptSnippet: "Remove obsolete or invalid wiki pages",
+		promptGuidelines: [
+			"Use wiki_remove to delete pages that lint flags as derivable, duplicate, or obsolete; never remove raw sources.",
+		],
+		parameters: Type.Object({
+			pages: Type.Array(Type.String({ description: "Page paths relative to the project or wiki root" })),
+			reason: Type.String({ description: "Why these pages are being removed" }),
+		}),
+		async execute(_id, params, _signal, _onUpdate, ctx) {
+			const { layout } = runtimeFor(ctx);
+			const removed: string[] = [];
+			const refused: string[] = [];
+			for (const page of params.pages) {
+				const absolute = await resolvePagePath(layout, ctx.cwd, page);
+				if (!absolute) {
+					refused.push(`${page} (missing)`);
+					continue;
+				}
+				const rel = relative(layout.wikiDir, absolute).split("\\").join("/");
+				if (rel.startsWith("..")) {
+					refused.push(`${page} (outside the wiki)");
+					continue;
+				}
+				await removeFileIfExists(absolute);
+				removed.push(rel);
+			}
+			const entries = await readIndex(layout);
+			await writeIndex(
+				layout,
+				entries.filter((entry) => !removed.includes(entry.path)),
+			);
+			await appendLog(layout, "remove", `${removed.length} page(s)`, [
+				`Reason: ${params.reason}`,
+				...removed.map((page) => `Removed: ${page}`),
+			]);
+			await appendLedger(layout, {
+				actor: "agent",
+				op: "wiki.remove",
+				action: "removed",
+				subject: removed.join(", ").slice(0, 200),
+				reason: params.reason,
+			});
+			const lines = [`Removed ${removed.length} page(s): ${removed.join(", ") || "(none)"}`];
+			if (refused.length > 0) lines.push(`Refused: ${refused.join(", ")}`);
+			return { content: [{ type: "text", text: lines.join("\n") }], details: { removed, refused } };
 		},
 	});
 

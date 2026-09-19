@@ -60,6 +60,15 @@ function normalize(text: string): string {
 	return text.toLowerCase().replace(/\s+/g, " ").trim();
 }
 
+function tokenSet(text: string): Set<string> {
+	return new Set(
+		text
+			.toLowerCase()
+			.split(/[^a-z0-9_]+/)
+			.filter((token) => token.length > 3),
+	);
+}
+
 function isActiveClaim(claim: Record<string, unknown>): boolean {
 	const status = String(claim.status ?? "verified");
 	return status !== "superseded" && status !== "rejected";
@@ -144,25 +153,47 @@ export async function lintWiki(
 	// --- Raw backlog ----------------------------------------------------------
 	const rawFiles = existsSync(layout.rawDir) ? await listMarkdownFiles(layout.rawDir) : [];
 	for (const raw of rawFiles) {
+		const rel = relative(layout.root, raw).split("\\").join("/");
+		if (rel.startsWith("raw/sessions/")) continue; // session journals are records, not pending sources
 		const name = raw.split(/[\\/]/).pop() ?? raw;
-		if (!pages.some((page) => page.text.includes(name))) report.rawBacklog.push(relative(layout.root, raw).split("\\").join("/"));
+		if (!pages.some((page) => page.text.includes(name))) report.rawBacklog.push(rel);
 	}
 
 	// --- Unbacked claims (no accepted ledger entry) ----------------------------
 	const ledger = await readLedger(layout);
 	const accepted = ledger
-		.filter((entry) => entry.actor === "code" && ["file", "reinforce", "file_user_stated"].includes(String(entry.action)) && entry.subject)
-		.map((entry) => normalize(String(entry.subject)));
+		.filter(
+			(entry) =>
+				entry.actor === "code" &&
+				["file", "reinforce", "file_user_stated"].includes(String(entry.action)) &&
+				entry.subject,
+		)
+		.map((entry) => ({ subject: normalize(String(entry.subject)), tokens: tokenSet(String(entry.subject)) }));
+	const referenced = new Set<string>();
+	for (const entry of ledger) {
+		for (const value of [entry.subject, entry.outcome, entry.reason]) {
+			if (typeof value === "string") referenced.add(normalize(value));
+		}
+	}
 	for (const page of pages) {
 		const claims = Array.isArray(page.data.claims) ? (page.data.claims as Record<string, unknown>[]) : [];
 		for (const claim of claims) {
 			if (typeof claim.text !== "string" || !isActiveClaim(claim)) continue;
 			const needle = normalize(claim.text);
-			const backed = accepted.some((subject) => {
+			const claimTokens = tokenSet(claim.text);
+			const backed = accepted.some(({ subject, tokens }) => {
 				const head = needle.slice(0, 100);
-				return subject === head || subject.startsWith(head) || head.startsWith(subject);
+				if (subject === head || subject.startsWith(head) || head.startsWith(subject)) return true;
+				if (tokens.size === 0 || claimTokens.size === 0) return false;
+				let shared = 0;
+				for (const token of tokens) if (claimTokens.has(token)) shared++;
+				return shared / Math.min(tokens.size, claimTokens.size) >= 0.5;
 			});
-			if (!backed) {
+			const reviewed = [...referenced].some((value) => {
+				if (!value.includes(normalize(page.rel))) return false;
+				return !claim.id || value.includes(String(claim.id)) || value.includes(needle.slice(0, 60));
+			});
+			if (!backed && !reviewed) {
 				report.unbackedClaims.push({
 					page: page.rel,
 					claimId: typeof claim.id === "string" ? claim.id : undefined,

@@ -60,3 +60,9 @@
 
 ## [2026-09-19] finalize | Insights session: 3 submitted, 0 accepted, 3 rejected (all derivable from code). No pages written per guided-mode instruction to only write accepted claims.
 
+## [2026-09-19] lint | 0 added, 0 broken links, 9 unbacked claims
+- Pages: 15
+- TOC updated: 0 · missing files: 0
+- Orphans: 7 · raw backlog: 2
+- Contradiction checks: 2
+
