@@ -87,7 +87,7 @@ export async function collectMappedClaims(layout: WikiLayout): Promise<MappedCla
 			const page = await readPage(file);
 			const pageFiles = normalizeFiles(page.data.files);
 			const claims = Array.isArray(page.data.claims) ? (page.data.claims as Record<string, unknown>[]) : [];
-			const pagePath = join(layout.wikiDir, file);
+			const pagePath = file; // listMarkdownFiles returns absolute paths
 			const rel = file.split("\\").join("/").replace(`${layout.wikiDir.split("\\").join("/")}/`, "");
 			for (const claim of claims) {
 				if (typeof claim.text !== "string") continue;
