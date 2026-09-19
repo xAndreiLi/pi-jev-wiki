@@ -2,7 +2,7 @@
 title: Provider-agnostic Jev client schema
 type: decision
 topic: decisions
-summary: Provider switching between TypeSafe, OpenRouter, and AI/ML API is configuration only, because every provider accepts the same System One request schema.
+summary: "Provider switching between TypeSafe, OpenRouter, and AI/ML API is configuration only, because every provider accepts the same System One request schema."
 tags: [jev, provider, typesafe, openrouter, aimlapi, configuration]
 updated: 2026-09-19
 sources: [raw/sessions/2026-09-19-session-2026-09-19-1730.md]
@@ -12,8 +12,10 @@ claims:
     status: verified
     support: 0.96
     evidence: [raw/sessions/2026-09-19-session-2026-09-19-1730.md]
+    last_checked: 2026-09-19
 files: [src/config.ts, src/jev.ts]
 ---
+
 
 # Provider-agnostic Jev client schema
 

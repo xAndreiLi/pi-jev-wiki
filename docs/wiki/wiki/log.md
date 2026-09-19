@@ -37,3 +37,11 @@
 - Updated: invariants/wiki-layout-atomic-root.md
 - Updated: decisions/provider-agnostic-schema.md
 
+## [2026-09-19] sync | 2 claim(s) checked
+- Baseline: 7f05448 → a627568
+- Changed files: 6
+- Applied: invariants/wiki-layout-atomic-root.md#c1 → needs_recheck
+
+## [2026-09-19] finalize | Updated wiki-layout-atomic-root invariant to reflect that raw/ and wiki/ derive from wikiRoot while runtime state is independently configurable via stateRoot, which may be absolute.
+- Updated: invariants/wiki-layout-atomic-root.md
+
