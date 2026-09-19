@@ -7,8 +7,8 @@ markdown wiki and maintained with **Jev** (TypeSafe's calibrated decision model)
 Jev decides what is grounded, derivable, durable, and where it belongs. The agent writes. Code
 owns every threshold.
 
-- Read [`PLAN.md`](PLAN.md) for the design and phases.
-- Read [`CRITIQUE.md`](CRITIQUE.md) for the risk analysis and efficiency evaluation.
+- Read [`PLAN.md`](docs/plans/PLAN.md) for the design and phases.
+- Read [`CRITIQUE.md`](docs/CRITIQUE.md) for the risk analysis and efficiency evaluation.
 - Research sources live in [`research/`](research/README.md).
 
 ## What it does
@@ -118,9 +118,28 @@ npx tsc --noEmit      # typecheck
 npm run smoke         # deterministic checks + live Jev round-trips
 ```
 
+## Repository layout
+
+```text
+src/          pi extension, Jev client, pipelines, wiki primitives
+skills/       llm-wiki skill + page templates (the schema layer)
+scripts/      unit, smoke, paging, and scale tests
+docs/
+  plans/      PLAN.md (master plan) + plans index
+  DESIGN.md   detailed technical design
+  CRITIQUE.md pre-implementation critique and efficiency evaluation
+  HARDENING.md hardening roadmap with statuses
+  notes/      source notes used for dogfooding
+  wiki/       this project's own knowledge wiki (dogfood)
+research/     source material gathered during design
+```
+
+The published npm package ships only `src/`, `skills/`, `README.md`, and `LICENSE`; everything
+under `docs/` and `research/` stays in the repository.
+
 ## Status
 
 P0 (walking skeleton) implemented: both intake channels (research ingest + agent insights),
 architecture-first pages, TOC/log, decision ledger, Jev client with retries and usage accounting,
-guided writing. See `PLAN.md` §9 for P1–P3 (change-driven invalidation, paged routing beyond 250
+guided writing. See `docs/plans/PLAN.md` §9 for P1–P3 (change-driven invalidation, paged routing beyond 250
 pages, agent-managed review queue, lint, decision-quality evaluation).

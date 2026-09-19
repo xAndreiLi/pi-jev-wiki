@@ -1,7 +1,7 @@
 # Research artifacts (2026-09-19)
 
 Primary sources fetched during the design of `jev-wiki`. Everything here is a local copy for
-reference; see [`../DESIGN.md`](../DESIGN.md) for the synthesis.
+reference; see [`../docs/DESIGN.md`](../docs/DESIGN.md) for the synthesis.
 
 ## Jev / TypeSafe AI
 

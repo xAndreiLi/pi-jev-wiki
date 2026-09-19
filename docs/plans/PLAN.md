@@ -6,8 +6,8 @@
 > project-root `.env` token) is the calibrated judge for truth, placement, invalidation, and
 > maintenance; pi's agent is the only writer; code owns every threshold and every number.
 >
-> **Companion docs:** [`CRITIQUE.md`](CRITIQUE.md) (risks + resolutions, efficiency evaluation, Jev
-> expansion) · [`DESIGN.md`](DESIGN.md) (detailed design) · [`research/`](research/README.md)
+> **Companion docs:** [`CRITIQUE.md`](../CRITIQUE.md) (risks + resolutions, efficiency evaluation, Jev
+> expansion) · [`DESIGN.md`](../DESIGN.md) (detailed design) · [`research/`](../../research/README.md)
 > (primary sources: Jev docs, Karpathy's gist, production lessons, pi API notes).
 
 ---

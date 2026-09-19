@@ -4,7 +4,7 @@
 > **Jev (TypeSafe System One)** as the calibrated decision layer for truthfulness, placement,
 > and maintenance.
 
-Status: **v0.4** — [`PLAN.md`](PLAN.md) is now the authoritative, decision-oriented document;
+Status: **v0.4** — [`PLAN.md`](plans/PLAN.md) is now the authoritative, decision-oriented document;
 this file is the detailed technical appendix. Sections that changed with the 2026-09-19
 resolutions (no injection, paged routing, agent-managed review, architecture-first pages) have
 been reconciled below. [`CRITIQUE.md`](CRITIQUE.md) holds the risk analysis and resolution log.
@@ -314,7 +314,7 @@ with hard gates (fabricated/contradicted/sensitive always human). Weights live i
 
 ### 5.1 Ingest
 
-Three modes, one pipeline (see [`PLAN.md`](PLAN.md) §3 for the full trade-offs):
+Three modes, one pipeline (see [`PLAN.md`](plans/PLAN.md) §3 for the full trade-offs):
 
 - **Guided (default)** — Karpathy-style, transparent:
   `wiki_ingest` stages the source, runs Jev, and returns a **brief**: accepted claims with
@@ -358,11 +358,11 @@ Pipeline guarantees:
 `durable`, `verifiable`, `already_known`, `relation` (both directions), `page_type`,
 `target_page` (paged tournament), `topic`, `importance`, `criticality`, `sensitive`, `action`.
 Reinforcement bumps corroboration; sessions are stored as ordinary raw sources with evidence
-pointers. Full refinement in [`PLAN.md`](PLAN.md) §5. Optional `session_before_compact` hook and
+pointers. Full refinement in [`PLAN.md`](plans/PLAN.md) §5. Optional `session_before_compact` hook and
 `agent_settled` auto-capture (off by default). **Nothing is injected into sessions** — the TOC is
 surfaced like a skill (`wiki_toc` + the `llm-wiki` skill) and the agent consults it on demand.
 The review queue is worked by the agent (`wiki_review`); the user is escalated only for critical
-items. See [`PLAN.md`](PLAN.md) §§4–5.
+items. See [`PLAN.md`](plans/PLAN.md) §§4–5.
 
 ---
 
@@ -465,7 +465,7 @@ project files; `.env` is gitignored.
 
 ## 10. Phased roadmap
 
-The authoritative phases and acceptance criteria are in [`PLAN.md`](PLAN.md) §9. Summary:
+The authoritative phases and acceptance criteria are in [`PLAN.md`](plans/PLAN.md) §9. Summary:
 
 - **P0 — walking skeleton (both channels):** package/config/.env, Jev client, architecture-first wiki
   layout + TOC, guided `wiki_ingest`, `wiki_insights` (with `derivable_from_code`), ledger, baseline
@@ -493,4 +493,4 @@ The authoritative phases and acceptance criteria are in [`PLAN.md`](PLAN.md) §9
    index → BM25 → qmd. Jev cost stays negligible at every tier.
 6. **Package name** — `jev-wiki` (open). Distribution via local path or git initially.
 
-Next: P0 walking skeleton per [`PLAN.md`](PLAN.md) §8.
+Next: P0 walking skeleton per [`PLAN.md`](plans/PLAN.md) §8.

@@ -13,7 +13,7 @@
 
 ## 0. Resolution log (user decisions, 2026-09-19)
 
-All critique items were reviewed and resolved; [`PLAN.md`](PLAN.md) is now the authoritative
+All critique items were reviewed and resolved; [`PLAN.md`](plans/PLAN.md) is now the authoritative
 design. What was decided:
 
 | Item | Resolution |

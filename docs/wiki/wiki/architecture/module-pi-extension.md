@@ -16,7 +16,7 @@ claims:
     text: "Claims without file links are not checked on code changes; they rely on the periodic lint backstop instead."
     status: verified
     support: 0.95
-    evidence: [PLAN.md]
+    evidence: [docs/plans/PLAN.md]
 files: []
 ---
 
