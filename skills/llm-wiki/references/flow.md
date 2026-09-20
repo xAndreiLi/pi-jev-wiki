@@ -1,6 +1,18 @@
 ---
-name: flow-page
-description: Template for end-to-end data or control flow wiki pages.
+title: <Flow name>
+type: architecture/flow
+topic: architecture
+summary: <What this flow accomplishes end to end.>
+tags: [<tag>]
+updated: YYYY-MM-DD
+sources: [<raw source>]
+claims:
+  - id: c1
+    text: "<atomic claim>"
+    status: verified
+    support: 0.0
+    evidence: [<raw source>]
+files: [src/<entry>.ts]
 ---
 
 # <Flow name>

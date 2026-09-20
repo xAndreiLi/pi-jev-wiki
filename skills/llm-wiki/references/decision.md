@@ -1,6 +1,18 @@
 ---
-name: decision-page
-description: Template for ADR-style decision records.
+title: <Decision title>
+type: decision
+topic: decisions
+summary: <The decision and its decisive reason, in one sentence.>
+tags: [<tag>]
+updated: YYYY-MM-DD
+sources: [<raw source>]
+claims:
+  - id: c1
+    text: "<the decision and its rationale>"
+    status: verified
+    support: 0.0
+    evidence: [<introducing commit hash>]
+files: [src/<affected file>.ts]
 ---
 
 # <Decision title>

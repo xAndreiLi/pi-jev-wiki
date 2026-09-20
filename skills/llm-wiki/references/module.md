@@ -1,11 +1,23 @@
 ---
-name: architecture-page
-description: Template for architecture module/flow/layer wiki pages.
+title: <Module name>
+type: architecture/module
+topic: architecture
+summary: <What this module owns, in one sentence.>
+tags: [<tag>]
+updated: YYYY-MM-DD
+sources: [<raw source>]
+claims:
+  - id: c1
+    text: "<atomic claim>"
+    status: verified
+    support: 0.0
+    evidence: [<raw source>]
+files: [src/<module>/index.ts]
 ---
 
-# <Subject>
+# <Module name>
 
-**Responsibility.** What this module/flow/layer owns, in one or two sentences.
+**Responsibility.** What this module owns, in one or two sentences.
 
 **Public surface.** The contracts other parts of the system rely on.
 

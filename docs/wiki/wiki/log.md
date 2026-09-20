@@ -278,3 +278,19 @@
 - Raw: raw/sessions/2026-09-20-session-2026-09-20-2038.md
 - Filed 0 · reinforced 0 · review 0 · rejected 3
 
+## [2026-09-20] capture | 8 insights (settled)
+- Raw: raw/sessions/2026-09-20-session-2026-09-20-2115.md
+- Filed 1 · reinforced 0 · review 3 · rejected 4
+
+## [2026-09-20] finalize | Ingest 2026-09-20-2115: filed the accepted gotcha on skill/claim-schema drift (c1, verified_in_repo, support 0.35). Other 3 review + 4 rejected claims not written.
+- Updated: architecture/gotcha-skill-schema-drift.md
+
+## [2026-09-20] finalize | Skill refinement: schema-accurate SKILL.md (160 lines, down from 240), 8 page templates with frontmatter skeletons; superseded the schema-drift gotcha as resolved.
+- Updated: architecture/gotcha-skill-schema-drift.md
+
+## [2026-09-20] lint | 0 added, 0 broken links, 0 unbacked claims
+- Pages: 24
+- TOC updated: 0 · missing files: 0
+- Orphans: 0 · raw backlog: 0
+- Contradiction checks: 0 · duplicate candidates: 0
+

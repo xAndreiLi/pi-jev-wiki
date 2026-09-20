@@ -1,6 +1,18 @@
 ---
-name: gotcha-page
-description: Template for footguns and non-obvious failure modes.
+title: <Gotcha>
+type: gotcha
+topic: <topic>
+summary: <Symptom and cause, in one sentence.>
+tags: [<tag>]
+updated: YYYY-MM-DD
+sources: [<raw source>]
+claims:
+  - id: c1
+    text: "<the non-obvious failure mode>"
+    status: verified
+    support: 0.0
+    evidence: [<file or commit>]
+files: [src/<affected file>.ts]
 ---
 
 # <Gotcha>

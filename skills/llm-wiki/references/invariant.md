@@ -1,6 +1,18 @@
 ---
-name: invariant-page
-description: Template for rules that must always hold.
+title: <Invariant statement>
+type: invariant
+topic: invariants
+summary: <The rule, in one sentence.>
+tags: [<tag>]
+updated: YYYY-MM-DD
+sources: [<raw source>]
+claims:
+  - id: c1
+    text: "<the rule, testable>"
+    status: verified
+    support: 0.0
+    evidence: [<raw source>]
+files: [src/<enforcing file>.ts]
 ---
 
 # <Invariant statement>
@@ -15,6 +27,6 @@ description: Template for rules that must always hold.
 
 **How to verify.** The test or command that proves it holds.
 
-## Related
+## See also
 
 - Decisions, modules, and gotchas that interact with this invariant.
