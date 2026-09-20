@@ -267,3 +267,7 @@
 - Raw: raw/sessions/2026-09-20-session-2026-09-20-2022.md
 - Filed 1 · reinforced 1 · review 0 · rejected 2
 
+## [2026-09-20] capture | 1 insights (tool)
+- Raw: raw/sessions/2026-09-20-session-2026-09-20-2035.md
+- Filed 0 · reinforced 1 · review 0 · rejected 0
+

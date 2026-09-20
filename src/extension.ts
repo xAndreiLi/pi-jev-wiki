@@ -967,8 +967,9 @@ export default function (pi: ExtensionAPI) {
 		promptSnippet: "Capture durable project insights from this session into the wiki",
 		promptGuidelines: [
 			"Use wiki_insights at the end of substantive work to capture durable, non-derivable knowledge (decisions, invariants, architecture, gotchas) with evidence pointers.",
+			"Before submitting, apply the pre-submission checklist in the llm-wiki skill (How claims are judged): the evidence must state the claim; attach the introducing commit for decisions and the user's own words for policy.",
 			"Do not capture transient task state, code snippets, or anything derivable by reading the repo.",
-			"After wiki_insights, write or merge the recommended pages, then call wiki_finalize.",
+			"After wiki_insights, write or merge only the accepted pages, then call wiki_finalize. Use wiki_triage to diagnose rejected claims instead of writing them by hand.",
 		],
 		parameters: Type.Object({
 			insights: Type.Array(
