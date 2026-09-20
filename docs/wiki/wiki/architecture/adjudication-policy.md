@@ -4,8 +4,8 @@ type: architecture/layer
 topic: architecture
 summary: "Thresholds and composite scores are computed in code, making Jev verdicts advisory and policy changes model-free."
 tags: [adjudication, thresholds, policy, jev]
-updated: 2026-09-19
-sources: [raw/sessions/2026-09-19-session-2026-09-19-1730.md]
+updated: 2026-09-20
+sources: [raw/sessions/2026-09-19-session-2026-09-19-1730.md, raw/sessions/2026-09-20-session-2026-09-20-2035.md]
 claims:
   - id: c1
     text: "The extension treats every Jev verdict as advisory; thresholds and composite scores are computed in code, so policy changes never require a model call."
@@ -14,6 +14,13 @@ claims:
     evidence: [raw/sessions/2026-09-19-session-2026-09-19-1730.md]
     reviewed: 2026-09-19
     last_checked: 2026-09-19
+  - id: c2
+    text: "High-importance architecture, invariant, and decision framing is queued for confirmation when Jev rates it derivable from code, instead of being rejected, because a real-project agent reported that its most important insights were being dropped."
+    status: verified
+    support: 0.86
+    evidence: [raw/sessions/2026-09-20-session-2026-09-20-2035.md]
+    reviewed: 2026-09-20
+    last_checked: 2026-09-20
 files: [src/pipeline/adjudicate.ts]
 ---
 
@@ -32,6 +39,7 @@ files: [src/pipeline/adjudicate.ts]
 ## Invariants
 
 - Policy logic lives entirely in `decideClaim`; no model call is required to change thresholds or weights.
+- High-importance architecture, invariant, and decision framing is queued for confirmation when Jev rates it derivable from code, instead of being rejected, because a real-project agent reported that its most important insights were being dropped.
 
 ## Failure modes
 

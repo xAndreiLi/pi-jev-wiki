@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.3.0 — 2026-09-20
+
+### Added
+
+- `wiki_triage`: rejected-claim triage. Lists recent rejections with Jev scores, whether the
+  problem is evidence or policy, a concrete remedy per claim, and the accepted-vs-rejected
+  derivability ranges so miscalibrated thresholds are visible.
+
+### Changed
+
+- The `llm-wiki` skill now teaches the judgment criteria comprehensively: every score, the decision
+  gates in order, the framing exception, which evidence kinds pass, phrasing rules, a pre-submission
+  checklist, and threshold calibration.
+- High-importance architecture, invariant, and decision framing that Jev rates derivable is queued
+  for confirmation instead of rejected (`thresholds.framingImportance`, default 0.6).
+- Rejection guidance treats a correctly rejected claim as a working system rather than a failure;
+  `wiki_insights` guidelines point at the criteria and at `wiki_triage`.
+
 ## 0.2.0 — 2026-09-19
 
 First public release. A pi package that builds and maintains a project mental-model wiki,
