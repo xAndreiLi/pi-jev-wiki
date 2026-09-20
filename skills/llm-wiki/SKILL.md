@@ -69,6 +69,22 @@ Rejected claims are **not** written to the wiki — even when the user explicitl
 content. Report what was rejected and why, so the user can supply better evidence or a stronger
 artifact. Never hand-write a rejected claim into a page.
 
+### When an insight is rejected
+
+Rejections are diagnosable — run `wiki_triage` to see the scores, the reason, and the fix for each:
+
+- **derivable from code**: add what the code cannot show — a commit message (evidence `kind: commit`),
+  a source quote, or the rationale behind the decision. High-importance architecture, invariant, and
+  decision framing is queued for confirmation instead of dropped.
+- **unsupported**: attach evidence that *states* the claim: a verbatim quote, the commit that
+  introduced it, or the user's own words (`kind: user`). Referencing a file without a supporting
+  passage is not enough.
+- **duplicate**: find the page that covers it and reinforce or extend it instead of filing a new claim.
+- **sensitive**: never file it; redact secrets and PII first.
+
+If a rejected claim still matters after the remedy, re-submit it with the better evidence rather
+than writing it by hand.
+
 ### Ingest a document (research channel)
 
 1. `wiki_ingest` with `path` (or `text`) — it stores the raw source, extracts claims, and returns

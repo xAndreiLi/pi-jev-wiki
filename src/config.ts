@@ -40,6 +40,7 @@ export interface JevWikiConfig {
 		autoAccept: number;
 		minSupport: number;
 		minDerivable: number;
+		framingImportance: number;
 		minNovelty: number;
 		minImportance: number;
 	};
@@ -65,7 +66,7 @@ export const DEFAULT_CONFIG: JevWikiConfig = {
 	routing: { shardSize: 250, minFit: 0.6, newPageConfidence: 0.7 },
 	review: { mode: "agent", escalateCriticality: 0.85, maxPerSession: 10 },
 	sync: { onSessionStart: "check", onCommit: false, backstopLintDays: 14 },
-	thresholds: { autoAccept: 0.8, minSupport: 0.7, minDerivable: 0.5, minNovelty: 0.6, minImportance: 1 },
+	thresholds: { autoAccept: 0.8, minSupport: 0.7, minDerivable: 0.5, framingImportance: 0.6, minNovelty: 0.6, minImportance: 1 },
 	weights: { grounded: 0.45, importance: 0.25, nonDerivable: 0.2, authority: 0.1 },
 	toc: { maxTokens: 3000 },
 	lint: { orphanMinAgeDays: 7, duplicateSimilarity: 0.72 },

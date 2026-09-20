@@ -23,6 +23,7 @@ import { applyReinforcement, applySupersession, bestCandidatePage } from "./prov
 import { redact } from "./redact.ts";
 import { appendSessionLog, promoteRecurring } from "./sessionlog.ts";
 import { renderStructure, scanStructure } from "./structure.ts";
+import { buildTriageReport, renderTriage } from "./triage.ts";
 import { extractInsights, sessionTextFromEntries } from "./pipeline/capture.ts";
 import {
 	applyReviewResolution,
@@ -1443,6 +1444,28 @@ export default function (pi: ExtensionAPI) {
 					details: { error: String((error as Error).message) },
 				};
 			}
+		},
+	});
+
+	pi.registerTool({
+		name: "wiki_triage",
+		label: "Triage Rejected Insights",
+		description:
+			"Explain rejected wiki claims: why each was rejected, its Jev scores, whether the problem is evidence or policy, how to fix it, and whether the derivability threshold is calibrated for this project. No model calls.",
+		promptSnippet: "Triage rejected insights and how to fix them",
+		promptGuidelines: [
+			"Use wiki_triage when an agent or user disagrees with rejected insights, and before re-submitting a rejection.",
+			"After wiki_triage, re-submit fixable claims with wiki_insights using commit messages or quotes as evidence.",
+		],
+		parameters: Type.Object({
+			limit: Type.Optional(Type.Number({ description: "Max rejections to list (default 20)" })),
+			sinceDays: Type.Optional(Type.Number({ description: "Only consider rejections from the last N days" })),
+		}),
+		async execute(_id, params, _signal, _onUpdate, ctx) {
+			const { layout } = runtimeFor(ctx);
+			const ledger = await readLedger(layout);
+			const report = buildTriageReport(ledger, { limit: params.limit ?? 20, sinceDays: params.sinceDays });
+			return { content: [{ type: "text", text: renderTriage(report) }], details: report };
 		},
 	});
 

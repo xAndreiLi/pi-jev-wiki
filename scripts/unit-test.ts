@@ -13,6 +13,8 @@ import { checkLiterals } from "../src/grounding.ts";
 import { redact } from "../src/redact.ts";
 import { applyReviewResolution, enqueueReview, listOpenReviews, resolveReview } from "../src/review.ts";
 import { fileMatches } from "../src/git.ts";
+import type { LedgerEntry } from "../src/ledger.ts";
+import { buildTriageReport, remedyFor } from "../src/triage.ts";
 import { DEFAULT_CONFIG, type ResolvedConfig } from "../src/config.ts";
 import { ensureLayout, resolveLayout, writePage } from "../src/wiki/layout.ts";
 import { parseFrontmatter, serializeFrontmatter } from "../src/wiki/frontmatter.ts";
@@ -65,7 +67,10 @@ await check("rejects sensitive content", () => {
 	assert.equal(decideClaim({ ...baseVerdicts, sensitive: 0.95 }, config).action, "reject_sensitive");
 });
 await check("rejects derivable implementation detail", () => {
-	assert.equal(decideClaim({ ...baseVerdicts, derivable: 0.8 }, config).action, "reject_derivable");
+	assert.equal(
+		decideClaim({ ...baseVerdicts, derivable: 0.8, kind: "fact", importanceNorm: 0.3 }, config).action,
+		"reject_derivable",
+	);
 });
 await check("rejects duplicates", () => {
 	assert.equal(decideClaim({ ...baseVerdicts, alreadyKnown: 0.95 }, config).action, "reject_duplicate");
@@ -84,6 +89,20 @@ await check("files repo-verified claims that lack a quoted passage", () => {
 });
 await check("rejects ungrounded claims with no trust tier", () => {
 	assert.equal(decideClaim({ ...baseVerdicts, grounded: 0.2 }, config).action, "reject_unsupported");
+});
+await check("queues high-importance framing that is derivable instead of dropping it", () => {
+	const decision = decideClaim(
+		{ ...baseVerdicts, derivable: 0.62, grounded: 0.8, kind: "architecture", importanceNorm: 0.7 },
+		config,
+	);
+	assert.equal(decision.action, "review");
+	assert.match(decision.reasons.join(" "), /framing/);
+});
+await check("still rejects low-importance derivable claims", () => {
+	assert.equal(
+		decideClaim({ ...baseVerdicts, derivable: 0.62, kind: "fact", importanceNorm: 0.3 }, config).action,
+		"reject_derivable",
+	);
 });
 
 console.log("\nplacement tournament (chooseTarget)");
@@ -225,6 +244,25 @@ try {
 } finally {
 	await rm(root, { recursive: true, force: true });
 }
+
+console.log("\ntriage report");
+await check("classifies rejections, computes stats, and remedies", async () => {
+	const ledger = [
+		{ ts: "2026-01-01T00:00:00Z", actor: "jev", op: "insight.adjudicate", subject: "accepted claim", action: "file", verdict: { derivable: 0.3, grounded: 0.9, importanceNorm: 0.8 } },
+		{ ts: "2026-01-02T00:00:00Z", actor: "jev", op: "insight.adjudicate", subject: "derivable claim", action: "reject_derivable", verdict: { derivable: 0.6, grounded: 0.8, kind: "fact", importanceNorm: 0.4 } },
+		{ ts: "2026-01-03T00:00:00Z", actor: "jev", op: "insight.adjudicate", subject: "unsupported claim", action: "reject_unsupported", verdict: { grounded: 0.2, derivable: 0.3 } },
+	] as LedgerEntry[];
+	const report = buildTriageReport(ledger);
+	assert.equal(report.rejections.length, 2);
+	assert.equal(report.separated.acceptedDerivable?.max, 0.3);
+	assert.equal(report.separated.rejectedDerivable?.min, 0.6);
+	assert.equal(report.counts.reject_unsupported, 1);
+	assert.match(remedyFor(report.rejections.find((entry) => entry.action === "reject_unsupported")!), /Ground it/);
+	assert.match(
+		remedyFor({ ts: "", claim: "", action: "reject_derivable", reason: "", kind: "architecture", importance: 0.8 }),
+		/framing/i,
+	);
+});
 
 console.log("\nredaction, literals, paths, frontmatter");
 await check("redacts tokens and emails, keeps normal text", () => {

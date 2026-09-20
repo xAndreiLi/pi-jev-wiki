@@ -371,6 +371,20 @@ export function decideClaim(verdicts: ClaimVerdicts, config: ResolvedConfig): Cl
 		return { action: "reject_sensitive", score: 0, reasons: ["contains sensitive content"] };
 	}
 	if (verdicts.derivable >= thresholds.minDerivable) {
+		const framingKinds = ["architecture", "invariant", "decision"];
+		const framing =
+			framingKinds.includes(verdicts.kind) &&
+			verdicts.importanceNorm >= thresholds.framingImportance &&
+			verdicts.grounded >= 0.5;
+		if (framing) {
+			return {
+				action: "review",
+				score: 0,
+				reasons: [
+					`derivable from code (${verdicts.derivable.toFixed(2)} ≥ ${thresholds.minDerivable}) but high-importance ${verdicts.kind} framing — queued for confirmation instead of dropped`,
+				],
+			};
+		}
 		return {
 			action: "reject_derivable",
 			score: 0,
