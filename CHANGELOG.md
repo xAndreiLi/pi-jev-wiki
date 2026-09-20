@@ -5,6 +5,9 @@
 First public release. A pi package that builds and maintains a project mental-model wiki,
 with [Jev](https://typesafe.ai) (TypeSafe System One) as the calibrated decision layer.
 
+Published to npm as `pi-jev-wiki@0.2.0` on 2026-09-20 via an interactive publish, so this version
+has no provenance attestation; the next CI-published release will carry provenance.
+
 ### Intake
 
 - Research ingest (`wiki_ingest`): immutable raw sources, claim extraction with verbatim quote

@@ -146,7 +146,16 @@ under `docs/` and `research/` stays in the repository.
 
 ## Status
 
-P0 (walking skeleton) implemented: both intake channels (research ingest + agent insights),
-architecture-first pages, TOC/log, decision ledger, Jev client with retries and usage accounting,
-guided writing. See `docs/plans/PLAN.md` §9 for P1–P3 (change-driven invalidation, paged routing beyond 250
-pages, agent-managed review queue, lint, decision-quality evaluation).
+**Published:** [`pi-jev-wiki@0.2.0`](https://www.npmjs.com/package/pi-jev-wiki) — first release was
+an interactive publish, so it has no provenance attestation; CI publishing is wired and the next
+version bump will be the first release with provenance.
+
+Implemented through P3: both intake channels (research ingest + agent insights), architecture-first
+pages, TOC/log, decision ledger, change-driven invalidation (`wiki_sync`), agent-managed review,
+draft/auto writers with adaptive risk, pluggable search (index/BM25/qmd), hierarchical TOC,
+lint/consolidation checks, redaction, cross-process locking, `wiki_doctor`/`wiki_setup`, and
+offline unit + scale tests.
+
+Not yet done: trusted publishing (OIDC) migration, the decision-quality evaluation harness, and the
+remaining hardening items tracked in [`docs/HARDENING.md`](docs/HARDENING.md). See
+[`docs/RELEASING.md`](docs/RELEASING.md) for the release process.
