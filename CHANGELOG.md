@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.4.0 — 2026-09-20
+
+### Added
+
+- Page templates for the remaining page types: `layer.md`, `concept.md`, and `summary.md`
+  (source summaries).
+- Claim frontmatter skeletons in every template, covering `reviewed`, `last_checked`,
+  `needs_review`, and `superseded_by`/`superseded_at`.
+
+### Changed
+
+- The `llm-wiki` skill was restructured and cut from 240 to 160 lines while adding coverage:
+  accurate claim statuses and fields, the restricted frontmatter YAML subset, merge and post-write
+  rules, a worked rejected-vs-durable example, and the lifecycle tools (`wiki_sync`, `wiki_lint`,
+  `wiki_remove`, `wiki_structure`, `wiki_doctor`, `wiki_status`, `wiki_setup`).
+- `module.md` no longer claims to cover flow and layer pages, which now have their own templates.
+
 ## 0.3.0 — 2026-09-20
 
 ### Added
