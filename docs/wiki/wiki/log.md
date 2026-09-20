@@ -221,3 +221,35 @@
 - Raw: raw/sessions/2026-09-19-session-2026-09-19-1923.md
 - Filed 0 · reinforced 2 · review 0 · rejected 3
 
+## [2026-09-20] capture | 3 insights (tool)
+- Raw: raw/sessions/2026-09-20-session-2026-09-20-2012.md
+- Filed 0 · reinforced 0 · review 0 · rejected 3
+
+## [2026-09-20] finalize | All three insights were rejected by Jev (not grounded/derivable), so no pages were written or modified.
+
+## [2026-09-20] ingest | Releasing
+- Raw: raw/releasing/2026-09-20-releasing.md
+- Claims: 15 (filed 4, reinforced 0)
+
+## [2026-09-20] finalize | Ingested docs/RELEASING.md — wrote 4 accepted claims into wiki pages under invariants/ and decisions/
+- Updated: invariants/oidc-requires-existing-package.md
+- Updated: invariants/granular-token-all-packages.md
+- Updated: invariants/package-json-repository-fields.md
+- Updated: decisions/bypass-2fa-token-restrictions.md
+
+## [2026-09-20] lint | 0 added, 0 broken links, 0 unbacked claims
+- Pages: 22
+- TOC updated: 0 · missing files: 0
+- Orphans: 0 · raw backlog: 0
+- Contradiction checks: 1 · duplicate candidates: 1
+
+## [2026-09-20] lint | 0 added, 0 broken links, 0 unbacked claims
+- Pages: 22
+- TOC updated: 1 · missing files: 0
+- Orphans: 0 · raw backlog: 0
+- Contradiction checks: 0 · duplicate candidates: 0
+
+## [2026-09-20] capture | 6 insights (settled)
+- Raw: raw/sessions/2026-09-20-session-2026-09-20-2017.md
+- Filed 0 · reinforced 0 · review 0 · rejected 6
+

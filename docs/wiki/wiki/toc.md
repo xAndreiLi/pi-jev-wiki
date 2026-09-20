@@ -1,16 +1,16 @@
 # Wiki TOC
 
-> 18 pages across 3 topics. Per-topic tables: `toc/<topic>.md`. Full machine index: `index.md`.
+> 22 pages across 3 topics. Per-topic tables: `toc/<topic>.md`. Full machine index: `index.md`.
 
 | Topic | Pages | Table |
 |-------|-------|-------|
 | architecture | 5 | [toc/architecture.md](toc/architecture.md) |
-| decisions | 8 | [toc/decisions.md](toc/decisions.md) |
-| invariants | 5 | [toc/invariants.md](toc/invariants.md) |
+| decisions | 9 | [toc/decisions.md](toc/decisions.md) |
+| invariants | 8 | [toc/invariants.md](toc/invariants.md) |
 
 ## Recently updated
-- [Adjudication policy computed in code](architecture/adjudication-policy.md) — Thresholds and composite scores are computed in code, making Jev verdicts advisory and policy changes model-free. (2026-09-19)
-- [Capture flow](architecture/flow-capture.md) — At the end of work, the agent composes an insight list with evidence pointers; Jev filters and places each insight, and the agent writes the resulting updates. (2026-09-19)
-- [pi extension module](architecture/module-pi-extension.md) — Owns staging, Jev adjudication, placement, and TOC/log bookkeeping for the project wiki. (2026-09-19)
-- [Structure coverage check](architecture/structure-coverage.md) — How the structure scanner decides whether a module is documented in the wiki, using both name matching and file references to avoid false undocumented reports. (2026-09-19)
-- [Agent-managed review with user escalation for critical items](decisions/review-escalation.md) — Review work is agent-managed. The user is only escalated for critical items such as security, breaking API changes, or data loss. (2026-09-19)
+- [Bypass-2FA token restrictions since August 2026](decisions/bypass-2fa-token-restrictions.md) — Since August 2026, bypass-2FA tokens on npm cannot perform account or package-governance actions, and direct publishing with them is scheduled for removal in January 2027. (2026-09-20)
+- [Lint Queues Unbacked Claims](decisions/lint-queues-unbacked-claims.md) — The wiki lint process queues claims lacking accepted ledger entries as review items instead of deleting or rejecting them, because a missing ledger entry may be a bookkeeping gap rather than bad knowledge. (2026-09-20)
+- [OIDC trusted publishing requires an existing npm package](invariants/oidc-requires-existing-package.md) — A trusted publisher (OIDC) can only be configured on a package that already exists on the npm registry; staged publishing explicitly cannot create a brand-new package. (2026-09-20)
+- [Package-scoped granular tokens cannot create new npm packages](invariants/granular-token-all-packages.md) — A package-scoped granular access token cannot create a new package name on npm; the 'All Packages' permission is required for initial package creation. (2026-09-20)
+- [package.json repository fields must point to the real repo before publishing](invariants/package-json-repository-fields.md) — The repository, homepage, and bugs fields in package.json must point at the real repository before publishing to npm. (2026-09-20)

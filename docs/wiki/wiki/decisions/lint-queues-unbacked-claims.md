@@ -4,15 +4,15 @@ type: decision
 topic: decisions
 summary: "The wiki lint process queues claims lacking accepted ledger entries as review items instead of deleting or rejecting them, because a missing ledger entry may be a bookkeeping gap rather than bad knowledge."
 tags: [lint, claims, review-queue, ledger, bookkeeping]
-updated: 2026-09-19
+updated: 2026-09-20
 sources: [src/lint.ts]
 claims:
   - id: c1
     text: "Unbacked claims are queued as review items rather than deleted, because a missing ledger entry may indicate a bookkeeping gap rather than bad knowledge."
-    status: verified
+    status: superseded
     support: 0.8
     evidence: ""
-    reviewed: 2026-09-19
+    reviewed: 2026-09-20
     last_checked: 2026-09-19
   - 0: s
     1: r
@@ -27,6 +27,7 @@ claims:
     10: s
 files: [src/lint.ts]
 ---
+
 
 
 
