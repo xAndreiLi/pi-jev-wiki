@@ -1,12 +1,13 @@
 # Wiki TOC
 
-> 22 pages across 3 topics. Per-topic tables: `toc/<topic>.md`. Full machine index: `index.md`.
+> 23 pages across 4 topics. Per-topic tables: `toc/<topic>.md`. Full machine index: `index.md`.
 
 | Topic | Pages | Table |
 |-------|-------|-------|
 | architecture | 5 | [toc/architecture.md](toc/architecture.md) |
 | decisions | 9 | [toc/decisions.md](toc/decisions.md) |
 | invariants | 8 | [toc/invariants.md](toc/invariants.md) |
+| pi | 1 | [toc/pi.md](toc/pi.md) |
 
 ## Recently updated
 - [Bypass-2FA token restrictions since August 2026](decisions/bypass-2fa-token-restrictions.md) — Since August 2026, bypass-2FA tokens on npm cannot perform account or package-governance actions, and direct publishing with them is scheduled for removal in January 2027. (2026-09-20)

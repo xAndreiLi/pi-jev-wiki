@@ -38,3 +38,9 @@
 | [package.json repository fields must point to the real repo before publishing](invariants/package-json-repository-fields.md) | invariant | npm package.json publishing metadata | The repository, homepage, and bugs fields in package.json must point at the real repository before publishing to npm. | 2026-09-20 |
 | [Raw sources are immutable](invariants/raw-immutable.md) | invariant | raw immutability evidence | Raw sources under raw/ are immutable; the wiki only ever reads them. | 2026-09-19 |
 | [Wiki layout derives from a single root](invariants/wiki-layout-atomic-root.md) | invariant | filesystem layout atomic paths | raw/ and wiki/ derive from wikiRoot, while runtime state is independently configurable via stateRoot, which may be absolute. | 2026-09-19 |
+
+## pi
+
+| Page | Type | Tags | Summary | Updated |
+|------|------|------|---------|---------|
+| [Gallery page is live before browsable catalog](pi/gallery-index-lag.md) | gotcha | npm gallery publishing pi-package | A package's pi.dev gallery page appears immediately after npm publish, but the browsable catalog can lag by hours because it is built from npm's search index. | 2026-09-20 |

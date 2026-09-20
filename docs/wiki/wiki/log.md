@@ -253,3 +253,17 @@
 - Raw: raw/sessions/2026-09-20-session-2026-09-20-2017.md
 - Filed 0 · reinforced 0 · review 0 · rejected 6
 
+## [2026-09-20] capture | 2 insights (tool)
+- Raw: raw/sessions/2026-09-20-session-2026-09-20-2021.md
+- Filed 1 · reinforced 0 · review 0 · rejected 1
+
+## [2026-09-20] finalize | Added gotcha: gallery page is live immediately after npm publish, but browsable catalog lags due to npm search indexing. Also reported rejection of invariant claim (gallery listing via pi-package tag and preview media) for insufficient evidence.
+- Updated: pi/gallery-index-lag.md
+
+## [2026-09-20] finalize | Fixed broken internal link in pi/gallery-index-lag.md by removing reference to non-existent invariant page.
+- Updated: pi/gallery-index-lag.md
+
+## [2026-09-20] capture | 4 insights (settled)
+- Raw: raw/sessions/2026-09-20-session-2026-09-20-2022.md
+- Filed 1 · reinforced 1 · review 0 · rejected 2
+
