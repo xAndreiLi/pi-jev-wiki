@@ -85,6 +85,37 @@ in January 2027.
    exist, so a version bump is required for it to publish.
 7. Create a GitHub release from the tag with the changelog section.
 
+## Gallery listing
+
+The [pi package gallery](https://pi.dev/packages) is **automatic**: npm packages carrying the
+`pi-package` keyword (plus a `pi` manifest or conventional directories) are indexed. There is no
+submission step and no form — the only contact path is the per-package "report" link, which opens an
+issue on `earendil-works/pi`.
+
+The per-package page is generated from the registry and is live as soon as the package exists:
+<https://pi.dev/packages/pi-jev-wiki>. The browsable catalog is built from npm's **search index**,
+which can lag a new publication by hours (npm search does not return a brand-new package
+immediately). Until then the catalog's "Recently published" list and client-side filter will not
+show it.
+
+Optional preview metadata in `package.json` makes the gallery card richer:
+
+```json
+{
+  "pi": {
+    "extensions": ["./src/extension.ts"],
+    "skills": ["./skills"],
+    "image": "https://example.com/preview.png"
+  }
+}
+```
+
+- `image`: PNG, JPEG, GIF, or WebP; shown as a static preview.
+- `video`: MP4 only; takes precedence over `image`.
+
+Verify with `pi install npm:pi-jev-wiki` after the catalog refreshes. If the package is still
+missing from the catalog a day after publishing, use the package page's "report" link.
+
 ## What never ships
 
 - `.env` (gitignored and unlisted), `docs/`, `research/`, `scripts/`, `.pi/`, `node_modules/`.
