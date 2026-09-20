@@ -274,3 +274,7 @@
 ## [2026-09-20] finalize | Reinforced adjudication-policy.md with claim c2 about high-importance framing being queued for confirmation instead of rejected when rated derivable, per session 2026-09-20-2035.
 - Updated: architecture/adjudication-policy.md
 
+## [2026-09-20] capture | 3 insights (settled)
+- Raw: raw/sessions/2026-09-20-session-2026-09-20-2038.md
+- Filed 0 · reinforced 0 · review 0 · rejected 3
+

@@ -146,10 +146,9 @@ under `docs/` and `research/` stays in the repository.
 
 ## Status
 
-**Published:** [`pi-jev-wiki@0.2.0`](https://www.npmjs.com/package/pi-jev-wiki) — first release was
-an interactive publish, so it has no provenance attestation; CI publishing is wired and the next
-version bump will be the first release with provenance. Listed on the
-[pi package gallery](https://pi.dev/packages/pi-jev-wiki).
+**Published:** [`pi-jev-wiki@0.3.0`](https://www.npmjs.com/package/pi-jev-wiki) — published by CI
+with SLSA provenance. The 0.2.0 first release was an interactive publish and has no attestation.
+Listed on the [pi package gallery](https://pi.dev/packages/pi-jev-wiki).
 
 Implemented through P3: both intake channels (research ingest + agent insights), architecture-first
 pages, TOC/log, decision ledger, change-driven invalidation (`wiki_sync`), agent-managed review,

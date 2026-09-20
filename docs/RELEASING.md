@@ -2,15 +2,13 @@
 
 ## Current state (2026-09-20)
 
-- **Published:** `pi-jev-wiki@0.2.0` on npm, tagged `latest` (manual interactive publish, **no
-  provenance attestation**).
-- **CI auth:** verified. `.github/workflows/publish.yml` authenticates with the `NPM_TOKEN` secret
-  — a granular access token with **Bypass two-factor authentication** checked — and the
-  idempotency guard skips versions that are already on the registry. The first *CI-published*
-  version (with provenance) will be the next version bump, so bump the version before expecting
-  CI to publish.
-- **Next improvement:** migrate to trusted publishing (OIDC) so no long-lived token is needed and
-  provenance is automatic. See Path B.
+- **Published:** `pi-jev-wiki@0.3.0` by CI with **SLSA provenance** (2026-09-20). `0.2.0` was the
+  manual first release and has no attestation.
+- **CI auth:** verified end-to-end. `.github/workflows/publish.yml` authenticates with the
+  `NPM_TOKEN` secret (a granular access token with **Bypass two-factor authentication** checked),
+  publishes with provenance, and skips versions that are already on the registry.
+- **Next improvement:** migrate to trusted publishing (OIDC) so no long-lived token is needed. See
+  Path B.
 
 > **npm removed classic tokens in December 2025.** "Classic → Automation" no longer exists, and
 > `npm token list` labels granular tokens by permission ("Publish token"), not by token type. A
