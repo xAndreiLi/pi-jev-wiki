@@ -423,3 +423,4 @@
 {"ts":"2026-09-20T01:16:23.244Z","actor":"agent","op":"wiki.finalize","action":"updated","subject":"architecture/gotcha-skill-schema-drift.md","outcome":"ok"}
 {"ts":"2026-09-20T01:20:22.162Z","actor":"agent","op":"wiki.finalize","action":"updated","subject":"architecture/gotcha-skill-schema-drift.md","outcome":"ok"}
 {"ts":"2026-09-20T01:20:23.415Z","actor":"code","op":"wiki.lint","action":"report","verdict":{"tocAdded":0,"brokenLinks":0,"orphans":0,"rawBacklog":0,"unbackedClaims":0,"contradictions":0,"duplicates":0}}
+{"ts":"2026-09-20T01:23:09.285Z","actor":"jev","op":"capture.screen","subject":"settled","verdict":{"worth_capturing":0.23},"action":"skip","usage":{"input_tokens":425,"output_tokens":23}}

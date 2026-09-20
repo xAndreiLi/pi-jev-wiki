@@ -146,7 +146,7 @@ under `docs/` and `research/` stays in the repository.
 
 ## Status
 
-**Published:** [`pi-jev-wiki@0.3.0`](https://www.npmjs.com/package/pi-jev-wiki) — published by CI
+**Published:** [`pi-jev-wiki@0.4.0`](https://www.npmjs.com/package/pi-jev-wiki) — published by CI
 with SLSA provenance. The 0.2.0 first release was an interactive publish and has no attestation.
 Listed on the [pi package gallery](https://pi.dev/packages/pi-jev-wiki).
 

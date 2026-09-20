@@ -2,7 +2,7 @@
 
 ## Current state (2026-09-20)
 
-- **Published:** `pi-jev-wiki@0.3.0` by CI with **SLSA provenance** (2026-09-20). `0.2.0` was the
+- **Published:** `pi-jev-wiki@0.4.0` by CI with **SLSA provenance** (2026-09-20). `0.2.0` was the
   manual first release and has no attestation.
 - **CI auth:** verified end-to-end. `.github/workflows/publish.yml` authenticates with the
   `NPM_TOKEN` secret (a granular access token with **Bypass two-factor authentication** checked),
