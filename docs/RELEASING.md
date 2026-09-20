@@ -2,17 +2,55 @@
 
 ## One-time setup
 
-1. Create a token that can publish **without a one-time password**. On the npm website:
-   - **Classic → Automation** token (simplest), or
-   - **Granular access token** with **Bypass 2FA** enabled, **Read and write** on packages, and
-     **All packages** selected. A granular token scoped to one package cannot create a *new*
-     package, so “All packages” is required for the first publish.
+> **npm removed classic tokens in December 2025.** "Classic → Automation" no longer exists. There are
+> two ways to publish, and a granular token with a **Bypass two-factor authentication** checkbox is
+> the only fallback (that capability is being removed for direct publishing in January 2027).
 
-   A *Publish* token will fail in CI with `EOTP`, because GitHub Actions has no authenticator.
-2. Add the token to the GitHub repository as the `NPM_TOKEN` secret
-   (Settings → Secrets and variables → Actions → New repository secret).
-3. Confirm the package name is available: `npm view pi-jev-wiki version` (an E404 means it is free).
-4. Confirm `repository`, `homepage`, and `bugs` in `package.json` point at the real repository.
+### Path A — first release with an interactive OTP (recommended for 0.2.0)
+
+`npm login` now creates a two-hour session token, and publishing operations require a one-time
+password. From the project root:
+
+```bash
+npm login
+npm publish --otp <code>
+```
+
+This publishes without provenance. Use it to get the first version live, then set up Path B so no
+long-lived credential is ever needed again.
+
+### Path B — trusted publishing (OIDC), no token
+
+1. Publish the first version once (Path A), because a trusted publisher is configured on an existing
+   package, and staged publishing explicitly cannot create a brand-new package.
+2. On npmjs.com open the package → **Settings → Trusted Publisher** → **GitHub Actions**:
+   - Organization or user: `xAndreiLi`
+   - Repository: `pi-jev-wiki`
+   - Workflow filename: `publish.yml`
+   - Allowed actions: enable direct publishing (`npm publish`)
+3. Update `.github/workflows/publish.yml`: remove the `NODE_AUTH_TOKEN` environment and install a
+   current npm before publishing, because Node 22 ships npm 10 which predates OIDC publishing:
+   `npm install -g npm@^11.5.1` (or later). Keep `id-token: write`.
+4. Push a version tag. The workflow publishes with provenance and no secrets.
+
+### Fallback — granular access token with Bypass 2FA (until January 2027)
+
+A granular access token can still publish directly, but **only if "Bypass two-factor
+authentication" is checked when it is created**. Without that checkbox the token requires an OTP
+and fails in CI with `EOTP`. Create it at **Access Tokens → Generate New Token**:
+
+- Token name/description: e.g. `pi-jev-wiki CI`
+- **Bypass two-factor authentication: checked** (step 5 on the form)
+- Packages and scopes → Permissions: **Read and write (publish and stage)**
+- Select Packages: **All Packages** (a package-scoped token cannot create a new package name)
+- Expiration: at least one day in the future
+
+Add the value as the `NPM_TOKEN` repository secret. Note that since August 2026 bypass-2FA tokens
+cannot perform account or package-governance actions, and direct publishing is scheduled to be
+removed in January 2027.
+
+2. Confirm the package name is available: `npm view pi-jev-wiki version` (an E404 means it is free).
+3. Confirm `repository`, `homepage`, and `bugs` in `package.json` point at the real repository.
 
 ## Release checklist
 
