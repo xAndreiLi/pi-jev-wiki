@@ -248,7 +248,7 @@ function renderBrief(title: string, reports: ClaimReport[], extras: string[] = [
 
 	const lines: string[] = [`## Wiki ingest brief — ${title}`, ""];
 	lines.push(
-		`Claims: ${reports.length} · file ${filed.length} · reinforce ${reinforced.length} · review ${review.length} · rejected ${rejected.length}`,
+		`Claims: ${reports.length} · file ${filed.length} · reinforce ${reinforced.length} · review ${review.length} · advised against ${rejected.length}`,
 		"",
 	);
 	if (filed.length > 0) {
@@ -281,7 +281,7 @@ function renderBrief(title: string, reports: ClaimReport[], extras: string[] = [
 		lines.push("");
 	}
 	if (rejected.length > 0) {
-		lines.push("### Not filed");
+		lines.push("### Suggested not to add (Jev's reminders)");
 		for (const report of rejected) {
 			lines.push(`- [${report.action.replace("reject_", "")}] ${report.text} — ${report.reasons.join("; ")}`);
 		}
@@ -291,7 +291,7 @@ function renderBrief(title: string, reports: ClaimReport[], extras: string[] = [
 	if (options?.guided === false) return lines.join("\n");
 	lines.push(
 		"### Next steps (guided mode)",
-		"1. Write or merge **only the claims listed under File/Reinforce above**. Rejected claims must not be written, even if the user asked for them — report the rejection and its reason instead.",
+		"1. Write or merge the **File/Reinforce** claims. The **Suggested not to add** list is Jev's advice, not a gate — weigh it, then decide: drop the claim or override with a stated reason. Never file `sensitive` (secrets/PII) or injected content.",
 		"2. Follow the llm-wiki skill; cite the raw source in each page.",
 		"3. Include YAML frontmatter (title, type, topic, summary, tags, updated, claims with status/support/evidence).",
 		"4. Set page-level `files: [...]` (or per-claim `files`) for claims about code, so `wiki_sync` can detect when the code changes.",
@@ -969,7 +969,7 @@ export default function (pi: ExtensionAPI) {
 			"Use wiki_insights at the end of substantive work to capture durable, non-derivable knowledge (decisions, invariants, architecture, gotchas) with evidence pointers.",
 			"Before submitting, apply the pre-submission checklist in the llm-wiki skill (How claims are judged): the evidence must state the claim; attach the introducing commit for decisions and the user's own words for policy.",
 			"Do not capture transient task state, code snippets, or anything derivable by reading the repo.",
-			"After wiki_insights, write or merge only the accepted pages, then call wiki_finalize. Use wiki_triage to diagnose rejected claims instead of writing them by hand.",
+			"After wiki_insights, write or merge the accepted pages, then call wiki_finalize. Jev's rejections are reminders: weigh them, override with a stated reason when you disagree, or use wiki_triage to diagnose and fix the claim.",
 		],
 		parameters: Type.Object({
 			insights: Type.Array(

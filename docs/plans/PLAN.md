@@ -3,8 +3,9 @@
 > **What this is:** a pi package that builds and maintains the **mental model of a project** — how
 > the system is shaped, why, and what a change touches — so coding agents make better decisions on
 > large codebases. **Jev** (TypeSafe's System One decision model, accessed directly via a
-> project-root `.env` token) is the calibrated judge for truth, placement, invalidation, and
-> maintenance; pi's agent is the only writer; code owns every threshold and every number.
+> project-root `.env` token) is the calibrated arbiter and reminder for truth, placement,
+> invalidation, and maintenance; pi's agent writes and has the final say; code owns every threshold
+> and every number.
 >
 > **Companion docs:** [`CRITIQUE.md`](../CRITIQUE.md) (risks + resolutions, efficiency evaluation, Jev
 > expansion) · [`DESIGN.md`](../DESIGN.md) (detailed design) · [`research/`](../../research/README.md)
@@ -22,7 +23,8 @@
   data flow, invariants and boundaries, decisions with rationale, change-impact maps, gotchas,
   glossary. **What it refuses to store:** anything derivable from the code in under a minute
   (`derivable_from_code` gate). The wiki is not a second copy of the repo.
-- **Split of labor:** Jev decides, the agent writes, code enforces policy. Jev generates no text;
+- **Split of labor:** Jev advises as arbiter and reminder, the agent decides and writes, code
+  enforces thresholds and safety. Jev generates no text;
   it returns `noul` (truth probability), `choice` (pick one, ≤255 options + distribution), and
   `score` (position on a rubric + distribution).
 - **Two intake channels, one pipeline:** (A) user-requested **research intake**; (B) **agent
@@ -522,7 +524,7 @@ This is the calibration and audit substrate: per-wiki precision of auto-accepts,
 ## 12. Ground rules
 
 - The wiki holds the frame, not the code: nothing derivable in a minute gets filed.
-- Jev decides; the agent writes and reviews; code owns every number, date, count, threshold, weight.
+- Jev advises; the agent decides, writes, and reviews; code owns every number, date, count, threshold, weight.
 - The agent consults the TOC; nothing is injected into sessions.
 - Never write a fact the evidence doesn't support; never delete a claim — supersede it with a link.
 - Claims link to files so diffs can find them; sync runs on change, not on hope.

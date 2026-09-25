@@ -10,8 +10,8 @@ markdown wiki and maintained with **Jev** (TypeSafe's calibrated decision model)
 The npm package is **`pi-jev-wiki`** (matching the repository); the extension, tools, and config
 files keep the `jev-wiki` name.
 
-Jev decides what is grounded, derivable, durable, and where it belongs. The agent writes. Code
-owns every threshold.
+Jev is the arbiter and reminder on what is grounded, derivable, durable, and where it belongs;
+the agent decides and writes, with the final say. Code owns every threshold.
 
 - Read [`PLAN.md`](docs/plans/PLAN.md) for the design and phases.
 - Read [`CRITIQUE.md`](docs/CRITIQUE.md) for the risk analysis and efficiency evaluation.
