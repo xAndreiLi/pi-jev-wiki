@@ -54,6 +54,15 @@ wiki_ask(query, scope) ──▶ embed ──▶ cosine KNN ─┐              
   20k+ chunks. Results carry `wiki`, `path`, `claim_id`, `status`, so `wiki_ask` can cite
   `[life] personal/summary-andrei-li.md#c3` and exclude superseded claims by default.
 
+## Model selection
+
+`wiki_index action=model` reports the effective preset and its source (project config > user config >
+built-in default). Before the first index build anywhere on the machine, `rebuild` stops with both
+presets described and instructs the agent to ask the user; the choice is persisted to the user-level
+config with `action=model model=performance|quality`. Switching presets marks every wiki stale and
+requires `rebuild all=true`; the previous model's rows are purged per wiki, and queries degrade to
+keyword search until the rebuild completes.
+
 ## Discovery and adoption
 
 `wiki_index action=discover` walks the configured scan roots (default: the home directory;

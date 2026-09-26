@@ -117,6 +117,19 @@ back to keyword search. Check state any time with `wiki_index action=status` or 
 Existing wikis are found with `wiki_index action=discover` (scans the home directory plus WSL
 distros), adopted with `register=true`, and indexed with `rebuild all=true`.
 
+**Choosing the embedding model.** `wiki_index action=model` reports the effective preset and where it
+came from; before the first build of an index the agent asks which one to use:
+
+| Preset | Model | Download | Dims |
+|---|---|---|---|
+| `performance` | EmbeddingGemma-300M (q8) | ~309 MB | 768 |
+| `quality` | Qwen3-Embedding-0.6B (q8) | ~614 MB | 1024 |
+
+`wiki_index action=model model=quality` persists the choice to `~/.pi/agent/jev-wiki.json` for every
+project; a project `.pi/jev-wiki.json` can override it. Switching presets requires
+`wiki_index action=rebuild all=true` — the previous model's vectors are purged per wiki, and queries
+fall back to keyword search until the rebuild finishes.
+
 The optional `globalWikiRoot` adds a read-only cross-project vault: `wiki_ask` also searches that
 wiki and tags its results `[global vault]`. It resolves against the pi agent dir when relative.
 

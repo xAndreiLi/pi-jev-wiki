@@ -179,6 +179,15 @@ export async function hasWarmIndex(agentDir: string, wiki: string, model: string
 	return counts.some((entry) => entry.wiki === wiki && entry.model === model && entry.chunks > 0);
 }
 
+/** True when any wiki has chunks or build state in the index database. */
+export async function indexExists(agentDir: string): Promise<boolean> {
+	const db = vectorDbFor(vectorDataDir(agentDir));
+	await db.init();
+	if (await db.hasAny()) return true;
+	const counts = await db.counts();
+	return counts.length > 0;
+}
+
 /** Total bytes of the local model cache (used for first-run status messages). */
 export async function modelsCacheBytes(dir: string): Promise<number> {
 	if (!existsSync(dir)) return 0;

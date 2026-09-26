@@ -159,6 +159,9 @@ docs/wiki/
   cache — never a source of truth, and safe to rebuild after a `search.vector.model` change.
   `wiki_index action=discover` finds existing wikis on the machine (home + WSL); `register=true`
   adopts them and `rebuild all=true` indexes them.
+- Before the first index build, confirm the embedding preset with the user
+  (`wiki_index action=model`), then persist it with `action=model model=performance|quality`.
+  Switching presets requires `rebuild all=true`; the old vectors are purged per wiki.
 - Code or history changed since the last sync → `wiki_sync`; it queues affected file-linked claims
   for `wiki_review`. Resolve items with accept/reject/supersede/defer. The agent owns routine
   upkeep; only critical items reach the user.

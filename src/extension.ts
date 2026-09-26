@@ -55,8 +55,9 @@ import {
 import { extractMarkdownLinks } from "./wiki/links.ts";
 import { appendLog, entryFromPage, isWikiMetaFile, parseIndex, readIndex, readRecentLog, renderCompactToc, renderIndex, topicSlug, updateIndex, upsertEntries, writeIndex, type TocEntry } from "./wiki/toc.ts";
 import { createSearchEngine, VectorSearchEngine, type SearchResult } from "./wiki/search.ts";
-import { forgetWikiIndex, hasWarmIndex, indexWiki, vectorStatus } from "./vector/index.ts";
-import { resolvePreset } from "./vector/embed.ts";
+import { forgetWikiIndex, hasWarmIndex, indexExists, indexWiki, vectorStatus } from "./vector/index.ts";
+import { MODEL_PRESETS, resolvePreset } from "./vector/embed.ts";
+import { modelChoiceSource, writeModelSetting } from "./vector/settings.ts";
 import { vectorEnabled, vectorSearch } from "./vector/query.ts";
 import { closeVectorDbs, vectorDbFor } from "./vector/db.ts";
 import { discoverWikis, maxScanDepth, scanRoots } from "./vector/discover.ts";
@@ -1484,18 +1485,20 @@ export default function (pi: ExtensionAPI) {
 		name: "wiki_index",
 		label: "Manage the Semantic Index",
 		description:
-			"Manage the cross-wiki semantic search index (PGlite + pgvector): status, rebuild a wiki, add/remove registered wikis, or enable/disable indexing.",
+			"Manage the cross-wiki semantic search index (PGlite + pgvector): status, discover existing wikis, choose the embedding model, rebuild, add/remove registered wikis, or enable/disable indexing.",
 		promptSnippet: "Manage the cross-wiki semantic index",
 		promptGuidelines: [
 			"Use wiki_index status to check index health; rebuild after changing search.vector.model or when doctor reports a stale index.",
+			"Before the first index build, ask the user which embedding preset to use (performance vs quality) and set it with wiki_index action=model — ingestion must not start until the choice is made.",
 			"Use wiki_index discover to find existing wikis on the machine, then register=true and rebuild all=true to adopt and index them.",
 			"The semantic index is a derived cache — a model change re-embeds the whole wiki.",
 		],
 		parameters: Type.Object({
-			action: StringEnum(["status", "discover", "rebuild", "add", "remove", "enable", "disable"] as const),
+			action: StringEnum(["status", "model", "discover", "rebuild", "add", "remove", "enable", "disable"] as const),
 			wiki: Type.Optional(Type.String({ description: "Registered wiki name (defaults to the current wiki)" })),
 			path: Type.Optional(Type.String({ description: "Wiki root path for action=add (defaults to the current wiki root)" })),
 			paths: Type.Optional(Type.Array(Type.String({ description: "Scan root paths for action=discover (defaults to configured roots, then home)" }))),
+			model: Type.Optional(StringEnum(["performance", "quality"] as const, { description: "action=model: embedding preset to persist for this user" })),
 			register: Type.Optional(Type.Boolean({ description: "action=discover: register every unregistered wiki found" })),
 			all: Type.Optional(Type.Boolean({ description: "action=rebuild: reindex every enabled registered wiki" })),
 		}),
@@ -1584,7 +1587,57 @@ export default function (pi: ExtensionAPI) {
 				}
 				return { content: [{ type: "text", text: lines.join("\n") }], details: { roots, discovered, adopted } };
 			}
+			if (params.action === "model") {
+				const current = await modelChoiceSource(loaded);
+				if (!params.model) {
+					const lines = [
+						"# Embedding model",
+						`- effective: **${current.model}** (${current.source === "default" ? "built-in default — not chosen yet" : `set in ${current.source} config`})`,
+						"",
+						...Object.entries(MODEL_PRESETS).map(
+							([key, preset]) =>
+								`- **${key}** — ${preset.id}, ${preset.dimensions}d, ~${Math.round(preset.expectedBytes / 1_000_000)} MB download, ${preset.repo}`,
+						),
+						"",
+						"Set with `wiki_index action=model model=performance|quality`, then `wiki_index action=rebuild all=true`.",
+					];
+					return { content: [{ type: "text", text: lines.join("\n") }], details: current };
+				}
+				await writeModelSetting(loaded.globalConfigPath, params.model);
+				const registry = await readRegistry(loaded.agentDir);
+				const db = vectorDbFor(vectorDataDir(loaded.agentDir));
+				const stale: string[] = [];
+				await db.init();
+				for (const entry of registry.wikis) {
+					const state = await db.state(entry.name);
+					if (!state || state.model !== params.model) stale.push(entry.name);
+				}
+				return {
+					content: [
+						{
+							type: "text",
+							text: `Set search.vector.model = **${params.model}** in ${loaded.globalConfigPath}.\nStale indexes needing a rebuild: ${stale.length > 0 ? stale.map((name) => `\`${name}\``).join(", ") : "(none)"}. Run \`wiki_index action=rebuild all=true\` to re-embed.`,
+						},
+					],
+					details: { model: params.model, stale },
+				};
+			}
 			if (params.action === "rebuild") {
+				const choice = await modelChoiceSource(loaded);
+				if (choice.source === "default" && !(await indexExists(loaded.agentDir))) {
+					const lines = [
+						"## Embedding model not chosen yet",
+						"No semantic index exists on this machine yet, so ask the user which embedding preset to use before indexing:",
+						"",
+						...Object.entries(MODEL_PRESETS).map(
+							([key, preset]) =>
+								`- **${key}** — ${preset.id}, ${preset.dimensions}d, ~${Math.round(preset.expectedBytes / 1_000_000)} MB download (${preset.repo})`,
+						),
+						"",
+						"Then run `wiki_index action=model model=<performance|quality>` and rebuild again.",
+					];
+					return { content: [{ type: "text", text: lines.join("\n") }], details: { needsModelChoice: true } };
+				}
 				if (params.all) {
 					const registry = await readRegistry(loaded.agentDir);
 					const reports: string[] = [];

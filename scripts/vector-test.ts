@@ -4,9 +4,9 @@
  * Run: npm run test:vector
  */
 import assert from "node:assert/strict";
-import { mkdtemp, rm, writeFile, mkdir } from "node:fs/promises";
+import { mkdtemp, readFile, rm, writeFile, mkdir } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { chunkPage, hashChunk, splitSections } from "../src/vector/chunks.ts";
 import { MODEL_PRESETS, previewEmbedText, truncateAndNormalize, type EmbedInput, type EmbeddingProvider } from "../src/vector/embed.ts";
 import { forgetWikiIndex, hasWarmIndex, indexWiki } from "../src/vector/index.ts";
@@ -14,6 +14,8 @@ import { enabledWikiNames, readRegistry, registerWiki, setWikiEnabled, unregiste
 import { vectorDbFor } from "../src/vector/db.ts";
 import { vectorDataDir } from "../src/vector/registry.ts";
 import { discoverWikis } from "../src/vector/discover.ts";
+import { configuredModel, modelChoiceSource, writeModelSetting } from "../src/vector/settings.ts";
+import type { LoadedConfig } from "../src/config.ts";
 import { rrfFuse, type SearchResult } from "../src/wiki/search.ts";
 
 let failures = 0;
@@ -246,6 +248,37 @@ await check("reconciles registered wikis and flags missing roots", async () => {
 	assert.equal(realEntry?.registered, true);
 	assert.equal(realEntry?.chunks, 7);
 	assert.equal(found.find((entry) => entry.name === "gone")?.missing, true);
+	await rm(dir, { recursive: true, force: true });
+});
+
+console.log("embedding model selection");
+await check("writes and reads the model choice while preserving other keys", async () => {
+	const dir = await mkdtemp(join(tmpdir(), "jev-settings-"));
+	const configPath = join(dir, "jev-wiki.json");
+	await writeFile(configPath, JSON.stringify({ provider: "typesafe", search: { engine: "auto" } }));
+	await writeModelSetting(configPath, "quality");
+	const written = JSON.parse(await readFile(configPath, "utf8")) as Record<string, unknown>;
+	assert.equal((written.search as { vector?: { model?: string } }).vector?.model, "quality");
+	assert.equal((written.search as { engine?: string }).engine, "auto");
+	assert.equal(written.provider, "typesafe");
+	assert.equal(await configuredModel(configPath), "quality");
+	await rm(dir, { recursive: true, force: true });
+});
+await check("model choice source prefers project over user over default", async () => {
+	const dir = await mkdtemp(join(tmpdir(), "jev-settings-src-"));
+	const userConfig = join(dir, "agent", "jev-wiki.json");
+	const projectConfig = join(dir, "project", ".pi", "jev-wiki.json");
+	await mkdir(dirname(userConfig), { recursive: true });
+	await mkdir(dirname(projectConfig), { recursive: true });
+	await writeModelSetting(userConfig, "quality");
+	const loaded = {
+		projectConfigPath: projectConfig,
+		globalConfigPath: userConfig,
+		config: { search: { vector: { model: "performance" } } },
+	} as unknown as LoadedConfig;
+	assert.deepEqual(await modelChoiceSource(loaded), { model: "quality", source: "user" });
+	await writeModelSetting(projectConfig, "performance");
+	assert.deepEqual(await modelChoiceSource(loaded), { model: "performance", source: "project" });
 	await rm(dir, { recursive: true, force: true });
 });
 
