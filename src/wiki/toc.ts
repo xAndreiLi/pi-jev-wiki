@@ -10,7 +10,7 @@
  *   | [Auth module](architecture/module-auth.md) | architecture/module | auth core | Owns token validation | 2026-09-19 |
  */
 import { existsSync } from "node:fs";
-import { readFile } from "node:fs/promises";
+import { readdir, readFile, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { todayISO, writeTextAtomic, type WikiLayout } from "./layout.ts";
 import { withWikiLock } from "./lock.ts";
@@ -145,8 +145,18 @@ export async function readIndex(layout: WikiLayout): Promise<TocEntry[]> {
 export async function writeIndex(layout: WikiLayout, entries: TocEntry[]): Promise<void> {
 	await writeTextAtomic(join(layout.wikiDir, "index.md"), renderIndex(entries));
 	await writeTextAtomic(join(layout.wikiDir, "toc.md"), renderCompactToc(entries));
-	for (const topic of groupEntries(entries).keys()) {
-		await writeTextAtomic(join(layout.wikiDir, "toc", `${topicSlug(topic)}.md`), renderTopicToc(entries, topic));
+	const tocDir = join(layout.wikiDir, "toc");
+	const topics = groupEntries(entries);
+	for (const topic of topics.keys()) {
+		await writeTextAtomic(join(tocDir, `${topicSlug(topic)}.md`), renderTopicToc(entries, topic));
+	}
+	// Prune shards whose topic has no entries left, so removing the last page of a
+	// topic cannot leave a stale toc/<topic>.md behind.
+	if (!existsSync(tocDir)) return;
+	const keep = new Set([...topics.keys()].map(topicSlug));
+	for (const shard of await readdir(tocDir)) {
+		if (!shard.endsWith(".md") || keep.has(shard.slice(0, -3))) continue;
+		await rm(join(tocDir, shard), { force: true });
 	}
 }
 

@@ -3,6 +3,7 @@
  * Run: npm run test:unit
  */
 import assert from "node:assert/strict";
+import { existsSync } from "node:fs";
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -17,6 +18,7 @@ import type { LedgerEntry } from "../src/ledger.ts";
 import { buildTriageReport, remedyFor } from "../src/triage.ts";
 import { DEFAULT_CONFIG, resolveCaptureTriggers, type ResolvedConfig } from "../src/config.ts";
 import { ensureLayout, resolveLayout, slugify, writePage } from "../src/wiki/layout.ts";
+import { updateIndex } from "../src/wiki/toc.ts";
 import { parseFrontmatter, serializeFrontmatter } from "../src/wiki/frontmatter.ts";
 import { isLocked, withWikiLock } from "../src/wiki/lock.ts";
 
@@ -263,6 +265,30 @@ try {
 	});
 } finally {
 	await rm(root, { recursive: true, force: true });
+}
+
+console.log("\ntoc shards");
+{
+	const shardRoot = await mkdtemp(join(tmpdir(), "jev-wiki-toc-"));
+	try {
+		const shardLayout = resolveLayout(shardRoot, "wiki", ".state");
+		await ensureLayout(shardLayout);
+		const entries = [
+			{ path: "pi/one.md", title: "One", type: "gotcha", tags: [], summary: "s", updated: "2026-01-01" },
+			{ path: "pi/two.md", title: "Two", type: "gotcha", tags: [], summary: "s", updated: "2026-01-01" },
+		];
+		await check("prunes topic shards whose last page was removed", async () => {
+			const shardPath = join(shardLayout.wikiDir, "toc", "pi.md");
+			await updateIndex(shardLayout, () => entries);
+			assert.ok(existsSync(shardPath));
+			await updateIndex(shardLayout, () => entries.slice(1));
+			assert.ok(existsSync(shardPath), "shard stays while the topic still has a page");
+			await updateIndex(shardLayout, () => []);
+			assert.ok(!existsSync(shardPath), "shard is pruned when the topic empties");
+		});
+	} finally {
+		await rm(shardRoot, { recursive: true, force: true });
+	}
 }
 
 console.log("\ntriage report");
