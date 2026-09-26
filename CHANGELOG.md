@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.7.1 — 2026-09-26
+
+### Fixed
+
+- Removing the last page of a topic no longer leaves a stale agent-facing TOC shard: `writeIndex`
+  prunes `toc/<topic>.md` files whose topic has no entries left. Previously `wiki_remove` (or any
+  deletion/move) left that shard listing a deleted page while `index.md` and `toc.md` were already
+  correct. Covered by the unit test "prunes topic shards whose last page was removed".
+- Embedding-model load progress no longer floods the terminal. `indexWiki` takes an `onProgress`
+  sink; the extension renders it as one throttled footer status entry (`ctx.ui.setStatus`, 250 ms,
+  cleared after indexing), and non-interactive modes print a single stable line. The local model
+  emits progress callbacks while loading **from cache** too (~180 events in ~1.3 s for the `quality`
+  preset), so printing each event produced a wall of lines on every reindex.
+
 ## 0.7.0 — 2026-09-26
 
 ### Added

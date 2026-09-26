@@ -50,6 +50,10 @@ wiki_ask(query, scope) ──▶ embed ──▶ cosine KNN ─┐              
   chunks, updated_at)`.
 - **Incremental**: `content_hash = sha256(title + text)`; only changed chunks are re-embedded.
   `wiki_finalize` reindexes just the touched pages (non-fatal if deps/index are unavailable).
+- **Progress**: `indexWiki` accepts an `onProgress` sink; the extension throttles it into one footer
+  status entry via `ctx.ui.setStatus` (250 ms, cleared after indexing) and prints a single stable
+  line when there is no UI. The transformers.js callback fires on cached loads too (~180 events in
+  ~1.3 s for `quality`), so a per-event console sink floods the TUI on every reindex.
 - **KNN**: exact cosine scan (`<=>`) — milliseconds at wiki scale; HNSW is a later option at
   20k+ chunks. Results carry `wiki`, `path`, `claim_id`, `status`, so `wiki_ask` can cite
   `[life] personal/summary-andrei-li.md#c3` and exclude superseded claims by default.

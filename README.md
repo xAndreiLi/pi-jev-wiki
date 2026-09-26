@@ -143,7 +143,9 @@ answer with `wiki_index action=model`:
 
 First run: `wiki_index action=rebuild` downloads the model once into `<agent dir>/jev-wiki/models`
 and builds the index; afterwards `wiki_finalize` keeps touched pages in sync automatically. Queries
-never trigger a download — a cold index silently falls back to keyword search. Existing wikis are
+never trigger a download — a cold index silently falls back to keyword search. Model loads report
+progress as a single footer status line in interactive sessions (one stable line in print/JSON
+runs), not as per-file console output. Existing wikis are
 found with `wiki_index action=discover` (scans the home directory and WSL distros), adopted with
 `register=true`, and indexed with `rebuild all=true`. Switching presets re-embeds everything and
 purges the previous model's vectors per wiki.

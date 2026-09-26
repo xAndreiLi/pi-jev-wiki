@@ -33,7 +33,8 @@ reads plus page-mtime walks, concurrency 4) in the vector test suite.
 
 - `index.md`, `toc/<topic>.md`, and `.jev-wiki/toc.json` are written together under the wiki lock.
   The manifest carries `entriesHash` (drift check), `pages`, `topics`, `generatedAt`, and the
-  write-time `newestPageMtime`.
+  write-time `newestPageMtime`. Topic shards whose topic has no entries left are pruned in the same
+  write, so `wiki_remove` on the last page of a topic cannot leave a stale `toc/<topic>.md` behind.
 - **Staleness is computed, not guessed**: the catalog walks the wiki's real pages (excluding
   generated files) and compares the *current* newest mtime against `manifest.generatedAt`
   (`toc-stale`) and against the index `updatedAt` (`index-stale`). The walk is the price of a
