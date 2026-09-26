@@ -134,6 +134,18 @@ the wiki the evidence points at, so you can re-submit with `wiki: <name>`. `capt
 A `user` evidence item is only presented to Jev as a user statement when it appears in an actual
 user turn; otherwise it is labeled `agent-stated (unverified)`. Do not attribute your own
 recommendation to the user — a pending proposal is not a decision.
+
+## Finalize before the final response
+
+Complete every wiki write — page edits, review dispositions, captures — and call `wiki_finalize`
+**before** composing the response that ends the task. If that response asks the user to decide
+something, the decisions section must be the **last** thing in it: no wiki bookkeeping after it, and
+no wiki-maintenance narration behind it.
+
+**Why.** `wiki_finalize` clears the pending capture, updates the TOC/log/ledger, and triggers the
+reindex; capture hooks may also fire when the turn settles. When any of that runs after the
+decisions, the user's terminal floods with maintenance chatter after the question they are being
+asked. Settle the wiki first; ask last.
 - **Rejections are reminders.** When you agree, the remedy is evidence, not prose — derivable →
   add what code cannot show (commit, quote, rationale); unsupported → attach evidence that states
   the claim; duplicate → reinforce the existing page. When you disagree, override it deliberately
