@@ -261,9 +261,13 @@ under `docs/` and `research/` stays in the repository.
 
 ## Status
 
-**Published:** [`pi-jev-wiki@0.8.0`](https://www.npmjs.com/package/pi-jev-wiki) — CI-published with
+**Published:** [`pi-jev-wiki@0.8.1`](https://www.npmjs.com/package/pi-jev-wiki) — CI-published with
 SLSA provenance (`0.2.0`, the first release, was an interactive publish and has no attestation).
 Listed on the [pi package gallery](https://pi.dev/packages/pi-jev-wiki).
+
+0.8.1 makes auto-capture advisory: the settle hook records the brief for the next turn instead of
+starting one (`capture.triggerTurn: true` restores the old behavior), and `wiki_review` resolutions
+verify the page after the serializer round-trip.
 
 0.8.0 adds cross-wiki writes: every write tool takes `wiki: "<registered name>"`, auto-capture
 routes to the subject wiki by default (warning instead of guessing on ambiguity), and ingest/review

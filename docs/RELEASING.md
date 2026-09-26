@@ -2,8 +2,8 @@
 
 ## Current state (2026-09-26)
 
-- **Published:** `pi-jev-wiki@0.8.0` by CI with **SLSA provenance** (2026-09-26). `0.2.0` was the
-  manual first release and has no attestation; `0.3.0`–`0.7.1` were CI-published.
+- **Published:** `pi-jev-wiki@0.8.1` by CI with **SLSA provenance** (2026-09-26). `0.2.0` was the
+  manual first release and has no attestation; `0.3.0`–`0.8.0` were CI-published.
 - **Installed copies do not cross minor versions by themselves.** pi's npm store pins a `^<minor>`
   range, and for 0.x releases that excludes the next minor (`^0.7.1` does not match `0.8.0`), so
   `pi update --extension npm:pi-jev-wiki@latest` can report success while staying on the old
