@@ -4,8 +4,8 @@ type: architecture/layer
 topic: architecture
 summary: "Thresholds and composite scores are computed in code, making Jev verdicts advisory and policy changes model-free."
 tags: [adjudication, thresholds, policy, jev]
-updated: 2026-09-20
-sources: [raw/sessions/2026-09-19-session-2026-09-19-1730.md, raw/sessions/2026-09-20-session-2026-09-20-2035.md]
+updated: 2026-09-26
+sources: [raw/sessions/2026-09-19-session-2026-09-19-1730.md, raw/sessions/2026-09-20-session-2026-09-20-2035.md, raw/sessions/2026-09-26-session-2026-09-26-2247.md]
 claims:
   - id: c1
     text: "The extension treats every Jev verdict as advisory; thresholds and composite scores are computed in code, so policy changes never require a model call."
@@ -21,8 +21,16 @@ claims:
     evidence: [raw/sessions/2026-09-20-session-2026-09-20-2035.md]
     reviewed: 2026-09-20
     last_checked: 2026-09-20
+  - id: c3
+    text: "Jev verdicts are advisory: the agent has the final say and records overrides in the ledger."
+    status: user-stated
+    support: 0.38
+    evidence: [raw/sessions/2026-09-26-session-2026-09-26-2247.md, "I want jev to act as a arbiter and reminder to LLM agents about what not to add, but I want the LLMs to act as the final say."]
+    reviewed: 2026-09-26
+    last_checked: 2026-09-26
 files: [src/pipeline/adjudicate.ts]
 ---
+
 
 
 
@@ -40,6 +48,7 @@ files: [src/pipeline/adjudicate.ts]
 
 - Policy logic lives entirely in `decideClaim`; no model call is required to change thresholds or weights.
 - High-importance architecture, invariant, and decision framing is queued for confirmation when Jev rates it derivable from code, instead of being rejected, because a real-project agent reported that its most important insights were being dropped.
+- Jev verdicts are advisory: the agent has the final say and records overrides in the ledger; hard boundaries (sensitive/injection, silent contradiction resolution) still apply.
 
 ## Failure modes
 

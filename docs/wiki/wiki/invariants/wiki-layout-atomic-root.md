@@ -4,8 +4,8 @@ type: invariant
 topic: invariants
 summary: "raw/ and wiki/ derive from wikiRoot, while runtime state is independently configurable via stateRoot, which may be absolute."
 tags: [filesystem, layout, atomic, paths]
-updated: 2026-09-19
-sources: [raw/sessions/2026-09-19-session-2026-09-19-1730.md]
+updated: 2026-09-26
+sources: [raw/sessions/2026-09-19-session-2026-09-19-1730.md, raw/knowledge-pipeline-current/2026-09-26-knowledge-pipeline-current-state.md]
 claims:
   - id: c1
     text: "raw/ and wiki/ derive from wikiRoot, while runtime state is independently configurable via stateRoot, which may be absolute."
@@ -14,6 +14,20 @@ claims:
     evidence: [raw/sessions/2026-09-19-session-2026-09-19-1730.md]
     last_checked: 2026-09-19
     reviewed: 2026-09-19
+  - id: c2
+    text: "Pages live in <wikiRoot>/wiki/<topic>/*.md with claim frontmatter (status, support, evidence)."
+    status: verified
+    support: 0.98
+    evidence: [raw/knowledge-pipeline-current/2026-09-26-knowledge-pipeline-current-state.md]
+    reviewed: 2026-09-26
+    last_checked: 2026-09-26
+  - id: c3
+    text: "The decision ledger, review queue, session log, TOC manifest, and locks live under stateRoot (by default <wikiRoot>/.jev-wiki/)."
+    status: verified
+    support: 0.98
+    evidence: [raw/knowledge-pipeline-current/2026-09-26-knowledge-pipeline-current-state.md]
+    reviewed: 2026-09-26
+    last_checked: 2026-09-26
 files: [src/wiki/layout.ts]
 ---
 

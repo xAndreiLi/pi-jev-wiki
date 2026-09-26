@@ -4,8 +4,8 @@ type: decision
 topic: decisions
 summary: "Review work is agent-managed. The user is only escalated for critical items such as security, breaking API changes, or data loss."
 tags: [review, escalation, workflow]
-updated: 2026-09-19
-sources: [raw/jev-wiki-architecture-notes/2026-09-19-jev-wiki-architecture-notes.md, raw/sessions/2026-09-19-session-2026-09-19-1734.md]
+updated: 2026-09-26
+sources: [raw/jev-wiki-architecture-notes/2026-09-19-jev-wiki-architecture-notes.md, raw/sessions/2026-09-19-session-2026-09-19-1734.md, raw/sessions/2026-09-26-session-2026-09-26-2247.md]
 claims:
   - id: c1
     text: "Review work is agent-managed. The user is only escalated for critical items such as security, breaking API changes, or data loss."
@@ -13,6 +13,13 @@ claims:
     support: 0.99
     evidence: [raw/jev-wiki-architecture-notes/2026-09-19-jev-wiki-architecture-notes.md]
     last_checked: 2026-09-19
+  - id: c2
+    text: "The user should not be involved in routine wiki upkeep; only critical items escalate to the user."
+    status: user-stated
+    support: 0.70
+    evidence: ["raw/sessions/2026-09-26-session-2026-09-26-2247.md", "I want the user to not have to be involved in the process of upkeeping the wiki for the most part."]
+    reviewed: 2026-09-26
+    last_checked: 2026-09-26
 files: [src/extension.ts, src/review.ts]
 ---
 

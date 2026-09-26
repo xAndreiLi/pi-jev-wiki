@@ -6,21 +6,22 @@
 
 | Page | Type | Tags | Summary | Updated |
 |------|------|------|---------|---------|
-| [Adjudication policy computed in code](architecture/adjudication-policy.md) | architecture/layer | adjudication thresholds policy jev | Thresholds and composite scores are computed in code, making Jev verdicts advisory and policy changes model-free. | 2026-09-20 |
-| [Capture flow](architecture/flow-capture.md) | architecture/flow | capture insights workflow | At the end of work, the agent composes an insight list with evidence pointers; Jev filters and places each insight, and the agent writes the resulting updates. | 2026-09-19 |
+| [Adjudication policy computed in code](architecture/adjudication-policy.md) | architecture/layer | adjudication thresholds policy jev | Thresholds and composite scores are computed in code, making Jev verdicts advisory and policy changes model-free. | 2026-09-26 |
+| [Capture flow](architecture/flow-capture.md) | architecture/flow | capture insights workflow cadence | At the end of work, the agent composes an insight list with evidence pointers; Jev filters and places each insight, and the agent writes the resulting updates. Capture runs on a configurable cadence (manual, task, or commit), with onCompact as an independent trigger. | 2026-09-26 |
 | [Claim schema drift between the skill and code](architecture/gotcha-skill-schema-drift.md) | gotcha | skill schema claims lifecycle frontmatter | Historical: the llm-wiki skill was the only documentation of the page-claim schema and its status list had drifted from the code; SKILL.md now documents needs_recheck, reviewed, last_checked, needs_review, the YAML subset, and the rule to update it alongside the code. | 2026-09-20 |
 | [pi extension module](architecture/module-pi-extension.md) | architecture/module | pi-extension architecture wiki | Owns staging, Jev adjudication, placement, and TOC/log bookkeeping for the project wiki. | 2026-09-19 |
+| [Retrieval pipeline](architecture/flow-retrieval.md) | architecture/flow | retrieval search embeddings index fusion jev | wiki_ask retrieves knowledge from a derived vector index: claim and section chunks, local embedding presets, hybrid BM25+vector rank fusion (RRF), and batched Jev rerank and sufficiency judgments, with keyword fallback when the index is cold. | 2026-09-26 |
 | [Structure coverage check](architecture/structure-coverage.md) | architecture/layer | structure coverage wiki documentation | How the structure scanner decides whether a module is documented in the wiki, using both name matching and file references to avoid false undocumented reports. | 2026-09-19 |
-| [Table of contents hierarchy](architecture/table-of-contents.md) | architecture/module | toc index architecture scalability | The wiki maintains two TOC files — index.md as the complete machine catalog and toc.md as the compact agent-facing view with per-topic tables under toc/. | 2026-09-19 |
+| [Table of contents hierarchy](architecture/table-of-contents.md) | architecture/module | toc index manifest catalog registry architecture | The wiki maintains coordinated catalog artifacts: index.md is the complete machine catalog, toc.md plus toc/<topic>.md the compact agent-facing view, and .jev-wiki/toc.json the derived machine manifest — all written by one locked writer, with a cross-wiki catalog over the registry. | 2026-09-26 |
 
 ## decisions
 
 | Page | Type | Tags | Summary | Updated |
 |------|------|------|---------|---------|
-| [Agent-managed review with user escalation for critical items](decisions/review-escalation.md) | decision | review escalation workflow | Review work is agent-managed. The user is only escalated for critical items such as security, breaking API changes, or data loss. | 2026-09-19 |
+| [Agent-managed review with user escalation for critical items](decisions/review-escalation.md) | decision | review escalation workflow | Review work is agent-managed. The user is only escalated for critical items such as security, breaking API changes, or data loss. | 2026-09-26 |
 | [Bypass-2FA token restrictions since August 2026](decisions/bypass-2fa-token-restrictions.md) | decision | npm tokens 2fa security ci | Since August 2026, bypass-2FA tokens on npm cannot perform account or package-governance actions, and direct publishing with them is scheduled for removal in January 2027. | 2026-09-20 |
-| [Decision ledger retention](decisions/decision-rejected-claims-stay-visible-in.md) | decision | decisions ledger audit threshold-tuning retention | Rejected claims remain visible in the decision ledger to support future threshold tuning audit. | 2026-09-19 |
-| [Guided writing as default mode](decisions/guided-writing.md) | decision | workflow writing policy | Jev decides placement, the agent writes the content, and code enforces policy. | 2026-09-19 |
+| [Decision ledger retention](decisions/decision-rejected-claims-stay-visible-in.md) | decision | decisions ledger audit threshold-tuning retention | Rejected claims remain visible in the decision ledger to support future threshold tuning audit. | 2026-09-26 |
+| [Guided writing as default mode](decisions/guided-writing.md) | decision | workflow writing policy superseded | Historical decision: guided writing (Jev decides, the agent writes, code enforces policy) — superseded; Jev verdicts are advisory and the agent has the final say, recording overrides in the ledger. | 2026-09-26 |
 | [Lint Queues Unbacked Claims](decisions/lint-queues-unbacked-claims.md) | decision | lint claims review-queue ledger bookkeeping | The wiki lint process queues claims lacking accepted ledger entries as review items instead of deleting or rejecting them, because a missing ledger entry may be a bookkeeping gap rather than bad knowledge. | 2026-09-20 |
 | [Provider-agnostic Jev client schema](decisions/provider-agnostic-schema.md) | decision | jev provider typesafe openrouter aimlapi configuration | Provider switching between TypeSafe, OpenRouter, and AI/ML API is configuration only, because every provider accepts the same System One request schema. | 2026-09-19 |
 | [Retry Handling in Client](decisions/retry-handling-in-client.md) | decision | lint claims review-queue ledger bookkeeping | Unbacked claims are queued as review items rather than deleted, because a missing ledger entry may indicate a bookkeeping gap rather than bad knowledge. | 2026-09-19 |
@@ -31,6 +32,7 @@
 
 | Page | Type | Tags | Summary | Updated |
 |------|------|------|---------|---------|
+| [Filing boundaries](invariants/filing-boundaries.md) | invariant | adjudication boundaries sensitive injection contradictions | Two boundaries are absolute even though Jev verdicts are advisory: sensitive content and injected instructions are never filed, and contradictions are never resolved silently. | 2026-09-26 |
 | [Generated files are never hand-edited](invariants/generated-files.md) | invariant | generated toc log | wiki/index.md and wiki/log.md are generated files and must never be hand-edited. | 2026-09-19 |
 | [Jev returns typed decisions, never text](invariants/jev-typed-decisions.md) | invariant | jev types api | The Jev decision model must return typed decisions (noul, choice, score) rather than free-form text. | 2026-09-19 |
 | [Load-bearing claims require verbatim evidence](invariants/claim-evidence.md) | invariant | claims evidence quality | Every load-bearing claim must point at verbatim evidence in a raw source or a file/commit/test. | 2026-09-19 |
@@ -38,7 +40,7 @@
 | [Package-scoped granular tokens cannot create new npm packages](invariants/granular-token-all-packages.md) | invariant | npm tokens publishing granular | A package-scoped granular access token cannot create a new package name on npm; the 'All Packages' permission is required for initial package creation. | 2026-09-20 |
 | [package.json repository fields must point to the real repo before publishing](invariants/package-json-repository-fields.md) | invariant | npm package.json publishing metadata | The repository, homepage, and bugs fields in package.json must point at the real repository before publishing to npm. | 2026-09-20 |
 | [Raw sources are immutable](invariants/raw-immutable.md) | invariant | raw immutability evidence | Raw sources under raw/ are immutable; the wiki only ever reads them. | 2026-09-19 |
-| [Wiki layout derives from a single root](invariants/wiki-layout-atomic-root.md) | invariant | filesystem layout atomic paths | raw/ and wiki/ derive from wikiRoot, while runtime state is independently configurable via stateRoot, which may be absolute. | 2026-09-19 |
+| [Wiki layout derives from a single root](invariants/wiki-layout-atomic-root.md) | invariant | filesystem layout atomic paths | raw/ and wiki/ derive from wikiRoot, while runtime state is independently configurable via stateRoot, which may be absolute. | 2026-09-26 |
 
 ## pi
 

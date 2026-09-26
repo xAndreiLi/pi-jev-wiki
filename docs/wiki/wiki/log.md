@@ -298,3 +298,26 @@
 - Raw: raw/sessions/2026-09-20-session-2026-09-20-2127.md
 - Filed 0 · reinforced 0 · review 2 · rejected 6
 
+## [2026-09-26] ingest | Knowledge pipeline (current state)
+- Raw: raw/knowledge-pipeline-current/2026-09-26-knowledge-pipeline-current-state.md
+- Claims: 40 (filed 2, reinforced 3)
+
+## [2026-09-26] capture | 2 insights (tool)
+- Raw: raw/sessions/2026-09-26-session-2026-09-26-2247.md
+- Filed 2 · reinforced 0 · review 0 · rejected 0
+
+## [2026-09-26] finalize | document the knowledge pipeline and the advisory verdict policy
+- Updated: architecture/flow-retrieval.md
+- Updated: architecture/table-of-contents.md
+- Updated: architecture/flow-capture.md
+- Updated: invariants/filing-boundaries.md
+- Updated: decisions/decision-rejected-claims-stay-visible-in.md
+- Updated: architecture/adjudication-policy.md
+- Updated: decisions/guided-writing.md
+- Updated: decisions/review-escalation.md
+- Updated: invariants/wiki-layout-atomic-root.md
+
+## [2026-09-26] capture | 8 insights (settled)
+- Raw: raw/sessions/2026-09-26-session-2026-09-26-2250.md
+- Filed 0 · reinforced 2 · review 1 · rejected 5
+
