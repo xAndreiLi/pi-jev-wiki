@@ -432,3 +432,9 @@
 - Updated: architecture/table-of-contents.md
 - Updated: decisions/cross-wiki-writes.md
 
+## [2026-09-26] lint | 0 added, 0 broken links, 0 unbacked claims
+- Pages: 34
+- TOC updated: 0 · missing files: 0
+- Orphans: 0 · raw backlog: 0
+- Contradiction checks: 8 · duplicate candidates: 2
+
