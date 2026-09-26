@@ -42,6 +42,10 @@ reads plus page-mtime walks, concurrency 4) in the vector test suite.
   `toc-stale`, `index-stale`, `model-mismatch`.
 - Page counting is shared (`countPages`) and excludes `index.md`, `log.md`, `toc.md`, and `toc/`,
   so `discover`, `status`, and the catalog agree.
+- **Upgrading:** wikis last written before manifests existed report `manifest-missing` (with a
+  correct filesystem fallback) until their next `wiki_finalize`/`wiki_lint`. `npm run toc:refresh`
+  migrates every registered wiki at once — it rewrites `index.md`/`toc/`/`toc.json` and changes no
+  content.
 
 ## Failure isolation
 

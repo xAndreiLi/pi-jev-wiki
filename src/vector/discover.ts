@@ -41,6 +41,7 @@ export interface DiscoverOptions {
 	roots?: string[];
 	maxDepth?: number;
 	wsl?: boolean;
+	stateRoot?: string;
 	registry?: WikiRegistration[];
 	states?: Map<string, IndexStateLite>;
 }
@@ -75,15 +76,16 @@ const DEFAULT_MAX_DEPTH = 6;
 export async function discoverWikis(options: DiscoverOptions = {}): Promise<DiscoveredWiki[]> {
 	const roots = options.roots && options.roots.length > 0 ? options.roots : [homedir()];
 	const maxDepth = Math.max(1, Math.min(options.maxDepth ?? DEFAULT_MAX_DEPTH, 12));
+	const stateRoot = options.stateRoot ?? ".jev-wiki";
 	const found = new Map<string, DiscoveredWiki>();
 
 	for (const root of roots) {
-		for (const entry of await scanRoot(root, maxDepth)) {
+		for (const entry of await scanRoot(root, maxDepth, stateRoot)) {
 			found.set(entry.root, entry);
 		}
 	}
 	if (options.wsl ?? process.platform === "win32") {
-		for (const entry of await scanWsl()) {
+		for (const entry of await scanWsl(stateRoot)) {
 			if (!found.has(entry.root)) found.set(entry.root, entry);
 		}
 	}
@@ -97,7 +99,7 @@ export async function discoverWikis(options: DiscoverOptions = {}): Promise<Disc
 			if (existing.name !== registration.name) existing.name = registration.name;
 			continue;
 		}
-		const describe = await describeRoot(root, "registry", "registry");
+		const describe = await describeRoot(root, "registry", "registry", stateRoot);
 		found.set(root, {
 			...describe,
 			name: registration.name,
@@ -133,7 +135,7 @@ export function maxScanDepth(configured?: number): number {
 	return Math.max(1, Math.min(configured, 12));
 }
 
-async function scanRoot(start: string, maxDepth: number): Promise<DiscoveredWiki[]> {
+async function scanRoot(start: string, maxDepth: number, stateRoot: string): Promise<DiscoveredWiki[]> {
 	const found: DiscoveredWiki[] = [];
 	const discovered = new Set<string>();
 	const seen = new Set<string>();
@@ -148,7 +150,7 @@ async function scanRoot(start: string, maxDepth: number): Promise<DiscoveredWiki
 		if (marker) {
 			if (!discovered.has(dir)) {
 				discovered.add(dir);
-				found.push(await describeRoot(dir, marker, "filesystem"));
+				found.push(await describeRoot(dir, marker, "filesystem", stateRoot));
 			}
 			continue; // a wiki root's children belong to that wiki
 		}
@@ -156,7 +158,7 @@ async function scanRoot(start: string, maxDepth: number): Promise<DiscoveredWiki
 		const configuredRoot = await projectConfigRoot(dir);
 		if (configuredRoot && !discovered.has(configuredRoot) && (await detectWikiRoot(configuredRoot))) {
 			discovered.add(configuredRoot);
-			found.push(await describeRoot(configuredRoot, "project-config", "filesystem"));
+			found.push(await describeRoot(configuredRoot, "project-config", "filesystem", stateRoot));
 		}
 
 		if (depth >= maxDepth) continue;
@@ -189,8 +191,8 @@ async function projectConfigRoot(dir: string): Promise<string | undefined> {
 	}
 }
 
-async function describeRoot(root: string, marker: WikiMarker, source: DiscoveredWiki["source"]): Promise<DiscoveredWiki> {
-	const pages = await countPages(resolveLayout(root, ".", ".jev-wiki")).catch(() => 0);
+async function describeRoot(root: string, marker: WikiMarker, source: DiscoveredWiki["source"], stateRoot: string): Promise<DiscoveredWiki> {
+	const pages = await countPages(resolveLayout(root, ".", stateRoot)).catch(() => 0);
 	const rawSources = existsSync(join(root, "raw")) ? (await listMarkdownFiles(join(root, "raw"))).length : 0;
 	return {
 		root,
@@ -204,7 +206,7 @@ async function describeRoot(root: string, marker: WikiMarker, source: Discovered
 }
 
 /** Discover wikis inside WSL distros (Windows only), mapped to \\wsl.localhost paths. */
-async function scanWsl(): Promise<DiscoveredWiki[]> {
+async function scanWsl(stateRoot: string): Promise<DiscoveredWiki[]> {
 	if (process.platform !== "win32") return [];
 	const distros = await run("wsl.exe", ["-l", "-q"], { timeout: 15_000, windowsHide: true })
 		.then((result) => result.stdout.replace(/\0/g, "").split(/\r?\n/).map((line) => line.trim()).filter(Boolean))
@@ -230,7 +232,7 @@ async function scanWsl(): Promise<DiscoveredWiki[]> {
 		for (const linuxRoot of roots) {
 			const unc = normalizeRoot(["", "", "wsl.localhost", distro, ...linuxRoot.split("/").filter(Boolean)].join("\\"));
 			if (!existsSync(join(unc, "wiki"))) continue;
-			const described = await describeRoot(unc, "wsl", "wsl");
+			const described = await describeRoot(unc, "wsl", "wsl", stateRoot);
 			out.push(described);
 		}
 	}

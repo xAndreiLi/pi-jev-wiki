@@ -1676,6 +1676,7 @@ export default function (pi: ExtensionAPI) {
 					roots,
 					maxDepth: maxScanDepth(scan.maxDepth),
 					wsl: scan.wsl,
+					stateRoot: loaded.config.stateRoot,
 					registry: registry.wikis,
 					states,
 				});

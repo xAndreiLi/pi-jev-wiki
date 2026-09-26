@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.6.0 — 2026-09-26
 
 ### Added
 
@@ -15,6 +15,9 @@
   (rerank) plus an evidence-sufficiency verdict. `search.jev.rerank` = `auto` (hybrid only) |
   `always` | `never`; `search.jev.sufficiency` adds a calibrated "may not cover this yet" note below
   `minSufficiency`. Verdicts land in the ledger (`ask.judge`) for the retrieval benchmark.
+- `npm run toc:refresh`: refreshes every registered wiki's TOC and derived manifest — the migration
+  path for wikis last written before manifests existed (rewrites `index.md`/`toc/`/`toc.json` only;
+  no content changes).
 
 ### Fixed
 
@@ -28,6 +31,7 @@
   `wiki_index action=rebuild`, instead of reporting a generic "no pages match".
 - Generated `toc.md` files are excluded from the index alongside `index.md`/`log.md`/`toc/`, so
   table-of-contents boilerplate no longer competes with real claims in retrieval.
+- Discovery resolves page counts with the configured `stateRoot` instead of a hardcoded one.
 
 ## 0.5.0 — 2026-09-26
 

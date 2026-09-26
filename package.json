@@ -47,6 +47,7 @@
     "test:vector": "jiti scripts/vector-test.ts",
     "test:all": "tsc --noEmit && jiti scripts/unit-test.ts && jiti scripts/scale-test.ts && jiti scripts/vector-test.ts",
     "release": "jiti scripts/release.ts",
+    "toc:refresh": "jiti scripts/refresh-toc.ts",
     "prepublishOnly": "npm run test:all"
   },
   "peerDependencies": {
