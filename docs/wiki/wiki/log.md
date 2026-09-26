@@ -455,3 +455,7 @@
 
 ## [2026-09-26] finalize | Dispositioned the post-publish capture: all File recommendations restated already-filed pi/ claims (and reinforced them mechanically), the Jev-liberal restatement maps to adjudication-policy c4, and the review item restated cross-wiki-writes c1 (confirmed). Two release-runbook gaps it surfaced were added to docs/RELEASING.md instead.
 
+## [2026-09-26] sync | 3 claim(s) checked
+- Baseline: 7165a91 → afbcc1a
+- Changed files: 25
+

@@ -31,6 +31,7 @@ files: [README.md]
 
 
 
+
 # One install source only
 
 **Symptom.** After adding a second copy of the extension (for example installing the npm release while a

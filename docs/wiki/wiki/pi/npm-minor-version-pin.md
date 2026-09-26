@@ -20,6 +20,7 @@ files: [docs/RELEASING.md]
 ---
 
 
+
 # npm-installed extensions do not cross minor versions on update
 
 **Symptom.** After publishing 0.8.0, `pi update --extension npm:pi-jev-wiki@latest` printed

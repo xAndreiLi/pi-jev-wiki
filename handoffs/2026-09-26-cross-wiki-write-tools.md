@@ -3,7 +3,10 @@
 **Date:** 2026-09-26
 **Repo:** `C:\Coding\pi-jev-wiki` @ v0.7.1
 **Requested by:** Andrei (via an agent session in `C:\Users\liand\docs\life\calisthenics`)
-**Status:** not started
+**Status:** done — implemented and released as pi-jev-wiki 0.8.0 (2026-09-26); the durable
+outcomes are filed in this repository's wiki (`decisions/cross-wiki-writes.md`,
+`decisions/out-of-scope-disposition.md`, `invariants/raw-immutable.md`,
+`invariants/capture-routing-and-gating.md`). Kept here as provenance, not as pending work.
 
 **How to read this:**
 
