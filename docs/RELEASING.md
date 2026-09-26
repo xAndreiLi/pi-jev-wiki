@@ -2,12 +2,14 @@
 
 ## Current state (2026-09-26)
 
-- **Published:** `pi-jev-wiki@0.5.0` by CI with **SLSA provenance** (2026-09-26). `0.2.0` was the
-  manual first release and has no attestation; `0.3.0` and `0.4.0` were CI-published.
+- **Published:** `pi-jev-wiki@0.6.0` by CI with **SLSA provenance** (2026-09-26). `0.2.0` was the
+  manual first release and has no attestation; `0.3.0`–`0.5.0` were CI-published.
 - **Release flow:** `npm run release -- <version|major|minor|patch>` verifies a clean tree, the
   changelog section, and the tag; runs the full suite; bumps, commits, and creates an **annotated**
   tag. Then `git push origin main --follow-tags` — CI runs `npm run test:all` and publishes on the
-  tag. Lightweight tags are not pushed by `--follow-tags`, so always use annotated tags.
+  tag. Lightweight tags are not pushed by `--follow-tags`, so always use annotated tags. Verify the
+  run with `gh run list --workflow publish.yml --limit 10 --json status,conclusion,headBranch`
+  (filter on the tag — the newest entry by creation time may be an older release).
 - **CI auth:** verified end-to-end. `.github/workflows/publish.yml` authenticates with the
   `NPM_TOKEN` secret (a granular access token with **Bypass two-factor authentication** checked),
   publishes with provenance, and skips versions that are already on the registry.
@@ -87,8 +89,12 @@ in January 2027.
    `npm publish --provenance`). The workflow can also be run manually from the Actions tab
    (`workflow_dispatch`), but it skips versions that already exist, so a version bump is required
    for it to publish.
-6. Create a GitHub release from the tag with the changelog section, then record the release in the
-   repository with a `docs(release)` commit.
+6. Create a GitHub release from the tag with the changelog section (`gh` is installed and
+   authenticated on this machine):
+   ```bash
+   gh release create vX.Y.Z --title vX.Y.Z --notes-file <changelog-section-file> --verify-tag
+   ```
+   Then record the release in the repository with a `docs(release)` commit.
 
 ## Gallery listing
 

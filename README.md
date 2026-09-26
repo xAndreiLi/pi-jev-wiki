@@ -216,17 +216,17 @@ under `docs/` and `research/` stays in the repository.
 
 ## Status
 
-**Published:** [`pi-jev-wiki@0.5.0`](https://www.npmjs.com/package/pi-jev-wiki) — CI-published with
+**Published:** [`pi-jev-wiki@0.6.0`](https://www.npmjs.com/package/pi-jev-wiki) — CI-published with
 SLSA provenance (`0.2.0`, the first release, was an interactive publish and has no attestation).
 Listed on the [pi package gallery](https://pi.dev/packages/pi-jev-wiki).
 
-0.5.0 adds cross-wiki semantic search (PGlite + pgvector, `performance`/`quality` model presets,
+0.6.0 adds the cross-wiki catalog (`wiki_toc scope=all`) with per-wiki TOC manifests and staleness
+flags, Jev retrieval judgments (batched rerank + evidence sufficiency, ledger-recorded), wiki-tagged
+lexical results with granularity-aware fusion, and generated-file/staleness fixes.
+
+0.5.0 added cross-wiki semantic search (PGlite + pgvector, `performance`/`quality` model presets,
 RRF hybrid retrieval), wiki discovery and adoption, the embedding-model choice flow, advisory Jev
 verdicts with a recorded override ledger, bulk review resolution, and the first-run/shutdown fixes.
-
-**Unreleased on `main`:** the cross-wiki catalog (`wiki_toc scope=all`) with per-wiki TOC
-manifests and staleness flags, Jev retrieval judgments (batched rerank + evidence sufficiency),
-wiki-tagged lexical results, granularity-aware fusion, and generated-file exclusion from the index.
 
 Implemented through P3: both intake channels (research ingest + agent insights), architecture-first
 pages, TOC/log, decision ledger, change-driven invalidation (`wiki_sync`), agent-managed review,
