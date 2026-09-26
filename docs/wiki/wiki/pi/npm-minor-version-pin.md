@@ -11,13 +11,14 @@ claims:
     text: "An npm-installed extension does not cross minor versions through `pi update --extension <source>@latest` alone: pi's npm store records a `^<minor>` dependency range and for 0.x releases that excludes the next minor (`^0.7.1` does not match `0.8.0`), so the update reports success while the installed copy stays old; installing the explicit version rewrites the spec to `^0.8.0`."
     status: verified
     support: 0.97
-    evidence: [raw/sessions/2026-09-26-session-2026-09-26-0041.md, docs/RELEASING.md, "Observed 2026-09-26: @latest reported success while the store copy stayed 0.7.1; @0.8.0 installed 0.8.0 and rewrote the spec."]
+    evidence: [raw/sessions/2026-09-26-session-2026-09-26-0041.md, docs/RELEASING.md, "Observed 2026-09-26: @latest reported success while the store copy stayed 0.7.1; @0.8.0 installed 0.8.0 and rewrote the spec.", pi/npm-minor-version-pin.md]
     reviewed: 2026-09-26
     last_checked: 2026-09-26
-    corroborations: 3
+    corroborations: 4
     last_confirmed: 2026-09-26
 files: [docs/RELEASING.md]
 ---
+
 
 
 

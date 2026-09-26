@@ -465,3 +465,10 @@
 
 ## [2026-09-26] finalize | Dispositioned the fourth post-release capture: all four File recommendations restated already-filed pi/ claims (mechanically reinforced to 3–4×) or duplicated docs/RELEASING.md, which stays the release single source; the review item restated the out-of-scope disposition decision (confirmed). No pages changed.
 
+## [2026-09-26] capture | 5 insights (settled)
+- Raw: raw/sessions/2026-09-26-session-2026-09-26-005931.md
+- Filed 4 · reinforced 0 · review 0 · rejected 1
+
+## [2026-09-26] finalize | File the finalize-before-decisions decision (user-stated, with Andrei's words): wiki writes and finalize complete before the task-ending response, decisions last, no maintenance narration after them. Other capture items were restatements or pending (capture.cadence: commit is still undecided).
+- Updated: decisions/finalize-before-decisions.md
+
