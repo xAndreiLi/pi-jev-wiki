@@ -1,6 +1,6 @@
 {
   "name": "pi-jev-wiki",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "description": "Project mental-model wiki for pi, maintained by agent insights and Jev decisions",
   "type": "module",
   "license": "MIT",
