@@ -472,3 +472,11 @@
 ## [2026-09-26] finalize | File the finalize-before-decisions decision (user-stated, with Andrei's words): wiki writes and finalize complete before the task-ending response, decisions last, no maintenance narration after them. Other capture items were restatements or pending (capture.cadence: commit is still undecided).
 - Updated: decisions/finalize-before-decisions.md
 
+## [2026-09-26] capture | 2 insights (tool)
+- Raw: raw/sessions/2026-09-26-session-2026-09-26-010608.md
+- Filed 0 · reinforced 0 · review 2 · rejected 0
+
+## [2026-09-26] finalize | File the 0.8.1 decisions with commit evidence: auto-capture delivery is advisory and cannot start a turn (c2 on finalize-before-decisions), and wiki_review resolutions verify the claim status after the serializer round-trip (new decisions/review-round-trip-verification.md, closing the long-open serializer item).
+- Updated: decisions/finalize-before-decisions.md
+- Updated: decisions/review-round-trip-verification.md
+
