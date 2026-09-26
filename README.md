@@ -78,7 +78,7 @@ missing, everything degrades gracefully to keyword search.
 ```bash
 pi install npm:pi-jev-wiki                        # published release
 pi install /path/to/pi-jev-wiki                   # local folder
-pi install git:github.com/xAndreiLi/pi-jev-wiki@v0.4.0
+pi install git:github.com/xAndreiLi/pi-jev-wiki@v0.5.0
 ```
 
 For development, load it directly:
@@ -216,18 +216,13 @@ under `docs/` and `research/` stays in the repository.
 
 ## Status
 
-**Published:** [`pi-jev-wiki@0.4.0`](https://www.npmjs.com/package/pi-jev-wiki) — published by CI
-with SLSA provenance (the 0.2.0 first release was an interactive publish and has no attestation).
+**Published:** [`pi-jev-wiki@0.5.0`](https://www.npmjs.com/package/pi-jev-wiki) — CI-published with
+SLSA provenance (`0.2.0`, the first release, was an interactive publish and has no attestation).
 Listed on the [pi package gallery](https://pi.dev/packages/pi-jev-wiki).
 
-**Unreleased on `main`** (not yet on npm):
-
-- Jev verdicts are advisory; the agent has the final say and records overrides in the ledger.
-- Bulk review resolution and user-stated auto-accept keep upkeep agent-owned.
-- Cross-wiki semantic search: PGlite + pgvector index, `performance`/`quality` model presets with a
-  first-build choice, RRF hybrid retrieval, wiki discovery/adoption, and `wiki_index` management.
-- Word-boundary slug handling, a `globalWikiRoot` doctor check, and frictionless first-run behavior
-  (no surprise downloads, clean headless shutdown).
+0.5.0 adds cross-wiki semantic search (PGlite + pgvector, `performance`/`quality` model presets,
+RRF hybrid retrieval), wiki discovery and adoption, the embedding-model choice flow, advisory Jev
+verdicts with a recorded override ledger, bulk review resolution, and the first-run/shutdown fixes.
 
 Implemented through P3: both intake channels (research ingest + agent insights), architecture-first
 pages, TOC/log, decision ledger, change-driven invalidation (`wiki_sync`), agent-managed review,

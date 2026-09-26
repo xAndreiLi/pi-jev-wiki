@@ -1,9 +1,13 @@
 # Releasing
 
-## Current state (2026-09-20)
+## Current state (2026-09-26)
 
-- **Published:** `pi-jev-wiki@0.4.0` by CI with **SLSA provenance** (2026-09-20). `0.2.0` was the
-  manual first release and has no attestation.
+- **Published:** `pi-jev-wiki@0.5.0` by CI with **SLSA provenance** (2026-09-26). `0.2.0` was the
+  manual first release and has no attestation; `0.3.0` and `0.4.0` were CI-published.
+- **Release flow:** `npm run release -- <version|major|minor|patch>` verifies a clean tree, the
+  changelog section, and the tag; runs the full suite; bumps, commits, and creates an **annotated**
+  tag. Then `git push origin main --follow-tags` — CI runs `npm run test:all` and publishes on the
+  tag. Lightweight tags are not pushed by `--follow-tags`, so always use annotated tags.
 - **CI auth:** verified end-to-end. `.github/workflows/publish.yml` authenticates with the
   `NPM_TOKEN` secret (a granular access token with **Bypass two-factor authentication** checked),
   publishes with provenance, and skips versions that are already on the registry.
@@ -65,23 +69,26 @@ in January 2027.
 
 ## Release checklist
 
-1. Update `CHANGELOG.md` with the release notes.
-2. Bump the version and tag in one step: `npm version patch|minor|major`
-   (creates a commit and a `vX.Y.Z` tag).
-3. Run the full local check: `npm run test:all` (typecheck + offline unit tests + scale test).
-4. Inspect the tarball: `npm pack --dry-run` — expect 34+ files, only `src/`, `skills/`,
+1. Update `CHANGELOG.md` with the release notes and commit it.
+2. Run `npm run release -- <version|major|minor|patch>`. It verifies a clean tree, the changelog
+   section, and that the tag does not exist; runs the full suite; bumps `package.json`; commits
+   `chore(release): X`; and creates an annotated `vX.Y.Z` tag. (`npm version` by hand also works but
+   skips the clean-tree and changelog checks, and only annotated tags are pushed by
+   `--follow-tags`.)
+3. Inspect the tarball: `npm pack --dry-run` — expect 34+ files, only `src/`, `skills/`,
    `README.md`, `CHANGELOG.md`, and `LICENSE` (plus `package.json`).
-5. Smoke-test the packed artifact:
+4. Smoke-test the packed artifact:
    ```bash
    tmp=$(mktemp -d) && npm pack --pack-destination "$tmp"
    mkdir -p "$tmp/pkg" && tar -xzf "$tmp"/pi-jev-wiki-*.tgz -C "$tmp/pkg"
    pi -e "$tmp/pkg/package" -p "Call wiki_status and report the provider and wiki root."
    ```
-6. Publish: push the version tag (`git push origin vX.Y.Z`) to run
-   `.github/workflows/publish.yml` (tests + `npm publish --provenance`). The workflow can also be
-   run manually from the Actions tab (`workflow_dispatch`), but it skips versions that already
-   exist, so a version bump is required for it to publish.
-7. Create a GitHub release from the tag with the changelog section.
+5. Publish: `git push origin main --follow-tags` runs `.github/workflows/publish.yml` (full suite +
+   `npm publish --provenance`). The workflow can also be run manually from the Actions tab
+   (`workflow_dispatch`), but it skips versions that already exist, so a version bump is required
+   for it to publish.
+6. Create a GitHub release from the tag with the changelog section, then record the release in the
+   repository with a `docs(release)` commit.
 
 ## Gallery listing
 
