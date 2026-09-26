@@ -1,5 +1,20 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+
+- Lexical (index/BM25) results now carry their wiki name, so hybrid answers always show provenance
+  (`[home]`, `[pi-jev-wiki]`, …); global-vault hits are stamped `global-vault` internally while host
+  results still render as `[global vault]`.
+- Fusion is granularity-aware: a page-level lexical hit and a claim-level vector hit for the same page
+  merge into one entry (the anchored one wins), while distinct claims on one page stay separate —
+  removing the duplicate page/claim listings seen in cross-wiki queries.
+- Empty search results now name any scoped wiki that has no indexed content yet and point at
+  `wiki_index action=rebuild`, instead of reporting a generic "no pages match".
+- Generated `toc.md` files are excluded from the index alongside `index.md`/`log.md`/`toc/`, so
+  table-of-contents boilerplate no longer competes with real claims in retrieval.
+
 ## 0.5.0 — 2026-09-26
 
 ### Added

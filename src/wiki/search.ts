@@ -252,9 +252,10 @@ export function createSearchEngine(
 	layout: WikiLayout,
 	globalLayout?: WikiLayout,
 	vector?: SearchEngine,
+	names?: { wiki?: string; globalWiki?: string },
 ): SearchEngine {
 	const requested = config.search.engine;
-	const lexical = createLexicalEngine(config, layout, globalLayout, requested);
+	const lexical = createLexicalEngine(config, layout, globalLayout, requested, names);
 	const rrfK = config.search.vector?.fusion?.rrfK ?? 60;
 	if (requested === "vector") return vector ?? lexical;
 	if ((requested === "hybrid" || requested === "auto") && vector) return new HybridSearchEngine(lexical, vector, rrfK);
@@ -266,25 +267,44 @@ function createLexicalEngine(
 	layout: WikiLayout,
 	globalLayout: WikiLayout | undefined,
 	requested: ResolvedConfig["search"]["engine"],
+	names?: { wiki?: string; globalWiki?: string },
 ): SearchEngine {
 	const engines: SearchEngine[] = [];
 	if (requested === "qmd") engines.push(new QmdSearchEngine(layout, config.search.qmdCollection));
 	if (requested === "bm25" || requested === "hybrid" || requested === "auto") engines.push(new Bm25SearchEngine(layout));
 	if (engines.length === 0) engines.push(new IndexSearchEngine(layout));
 	if (globalLayout && existsSync(globalLayout.wikiDir)) engines.push(new Bm25SearchEngine(globalLayout));
-	const primary = engines[0];
-	if (engines.length <= 1) return primary;
+	const named = engines.map(
+		(engine, index) => new NamedSearchEngine(engine, index === 0 ? names?.wiki : names?.globalWiki ?? "global-vault"),
+	);
+	const primary = named[0];
+	if (named.length <= 1) return primary;
 	return {
 		name: `${primary.name}+global`,
 		async search(options) {
 			const results: SearchResult[] = [];
-			for (const [index, engine] of engines.entries()) {
-				const hits = await engine.search({ ...options, limit: Math.max(3, Math.round((options.limit ?? 5) / engines.length)) });
+			for (const [index, engine] of named.entries()) {
+				const hits = await engine.search({ ...options, limit: Math.max(3, Math.round((options.limit ?? 5) / named.length)) });
 				for (const hit of hits) results.push({ ...hit, source: index === 0 ? "project" : "global" });
 			}
 			return results.sort((a, b) => b.score - a.score).slice(0, options.limit ?? 5);
 		},
 	};
+}
+
+/** Stamp a stable wiki name onto results from engines that do not track provenance. */
+export class NamedSearchEngine implements SearchEngine {
+	name: string;
+
+	constructor(private readonly engine: SearchEngine, private readonly wikiName?: string) {
+		this.name = engine.name;
+	}
+
+	async search(options: SearchOptions): Promise<SearchResult[]> {
+		const results = await this.engine.search(options);
+		if (!this.wikiName) return results;
+		return results.map((result) => (result.wiki ? result : { ...result, wiki: this.wikiName }));
+	}
 }
 
 /** Wrap a query function (embed + KNN) as a search engine. */
@@ -301,19 +321,33 @@ export class VectorSearchEngine implements SearchEngine {
 /**
  * Reciprocal Rank Fusion of independently ranked result lists. Ranks are fused,
  * not scores — which is what makes lexical (BM25) and vector scores comparable.
+ *
+ * Granularity-aware: a page-level hit and a claim-level hit for the same page
+ * merge into one entry (the anchored one wins), while distinct claims on the
+ * same page stay separate.
  */
 export function rrfFuse(rankings: SearchResult[][], k = 60): SearchResult[] {
-	const fused = new Map<string, { result: SearchResult; score: number }>();
+	const entries = new Map<string, { result: SearchResult; score: number }>();
+	const pageToKey = new Map<string, string>();
 	for (const ranking of rankings) {
 		ranking.forEach((result, index) => {
-			const key = `${result.wiki ?? ""}\u0000${result.path}\u0000${result.anchor ?? ""}`;
-			const entry = fused.get(key) ?? { result, score: 0 };
-			entry.score += 1 / (k + index + 1);
-			if (!entry.result.wiki && result.wiki) entry.result = result;
-			fused.set(key, entry);
+			const pageKey = `${result.wiki ?? ""}\u0000${result.path}`;
+			const key = result.anchor ? `${pageKey}\u0000${result.anchor}` : pageToKey.get(pageKey) ?? pageKey;
+			const contribution = 1 / (k + index + 1);
+			const existing = entries.get(key);
+			if (existing) {
+				existing.score += contribution;
+				if (!existing.result.anchor && result.anchor) existing.result = result;
+				else if (!existing.result.wiki && result.wiki) existing.result = result;
+			} else {
+				const absorbed = result.anchor ? entries.get(pageKey)?.score ?? 0 : 0;
+				if (absorbed > 0) entries.delete(pageKey);
+				entries.set(key, { result, score: contribution + absorbed });
+			}
+			if (result.anchor) pageToKey.set(pageKey, key);
 		});
 	}
-	return [...fused.values()].sort((a, b) => b.score - a.score).map((entry) => ({ ...entry.result, score: entry.score }));
+	return [...entries.values()].sort((a, b) => b.score - a.score).map((entry) => ({ ...entry.result, score: entry.score }));
 }
 
 /** BM25/index results plus semantic results, fused by rank. */

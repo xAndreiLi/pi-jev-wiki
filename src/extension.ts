@@ -62,7 +62,7 @@ import { vectorEnabled, vectorSearch } from "./vector/query.ts";
 import { closeVectorDbs, vectorDbFor } from "./vector/db.ts";
 import { discoverWikis, maxScanDepth, scanRoots } from "./vector/discover.ts";
 import { vectorDataDir } from "./vector/registry.ts";
-import { enabledWikiNames, readRegistry, registerWiki, resolveWikiRoot, setWikiEnabled, setWikiRoot, unregisterWiki } from "./vector/registry.ts";
+import { enabledWikiNames, normalizeRoot, readRegistry, registerWiki, resolveWikiRoot, setWikiEnabled, setWikiRoot, unregisterWiki } from "./vector/registry.ts";
 
 interface Runtime {
 	loaded: LoadedConfig;
@@ -923,16 +923,26 @@ export default function (pi: ExtensionAPI) {
 			const { loaded, layout } = runtimeFor(ctx);
 			const limit = Math.max(1, Math.min(params.limit ?? 5, 10));
 			const notes: string[] = [];
+			const registry = await readRegistry(loaded.agentDir);
+			const globalLayout = globalLayoutFor(loaded);
+			const currentRoot = normalizeRoot(layout.root);
+			let currentWiki = registry.wikis.find((entry) => normalizeRoot(entry.root) === currentRoot)?.name;
+			const globalWiki = globalLayout
+				? registry.wikis.find((entry) => normalizeRoot(entry.root) === normalizeRoot(globalLayout.root))?.name
+				: undefined;
+			let scopeWikis: string[] | undefined;
 			let vectorEngine: VectorSearchEngine | undefined;
 			if (vectorEnabled(loaded.config) && params.search !== "keyword") {
 				try {
 					const { registration } = await registerWiki(loaded.agentDir, layout.root);
-					const registry = await readRegistry(loaded.agentDir);
+					currentWiki = registration.name;
+					const currentRegistry = await readRegistry(loaded.agentDir);
 					const wikis = params.wikis && params.wikis.length > 0
 						? params.wikis
 						: params.scope === "all"
-							? enabledWikiNames(registry)
+							? enabledWikiNames(currentRegistry)
 							: [registration.name];
+					scopeWikis = wikis;
 					vectorEngine = new VectorSearchEngine((query, count) =>
 						vectorSearch(loaded.agentDir, loaded.config, query, { limit: count, wikis }),
 					);
@@ -942,11 +952,13 @@ export default function (pi: ExtensionAPI) {
 			}
 			const mode = params.search;
 			const engineName = mode === "keyword" ? "index" : mode === "semantic" ? "vector" : mode === "hybrid" ? "hybrid" : loaded.config.search.engine;
+			const names = { wiki: currentWiki, globalWiki };
 			const engine = createSearchEngine(
 				{ ...loaded.config, search: { ...loaded.config.search, engine: engineName } },
 				layout,
-				globalLayoutFor(loaded),
+				globalLayout,
 				vectorEngine,
+				names,
 			);
 			let results: SearchResult[];
 			try {
@@ -956,7 +968,9 @@ export default function (pi: ExtensionAPI) {
 				const fallback = createSearchEngine(
 					{ ...loaded.config, search: { ...loaded.config.search, engine: "index" } },
 					layout,
-					globalLayoutFor(loaded),
+					globalLayout,
+					undefined,
+					names,
 				);
 				results = await fallback.search({ query: params.query, limit });
 			}
@@ -964,9 +978,21 @@ export default function (pi: ExtensionAPI) {
 				notes.push("Semantic mode requested but no vector engine is available; results are keyword-based. Run wiki_index status.");
 			}
 			if (results.length === 0) {
+				const hints = [...notes];
+				if (vectorEnabled(loaded.config) && scopeWikis && scopeWikis.length > 0) {
+					try {
+						const counts = await vectorDbFor(vectorDataDir(loaded.agentDir)).counts();
+						const empty = scopeWikis.filter((name) => !counts.some((entry) => entry.wiki === name && entry.chunks > 0));
+						if (empty.length > 0) {
+							hints.push(`No indexed content yet for: ${empty.join(", ")} — ingest pages, then run wiki_index action=rebuild wiki=<name>.`);
+						}
+					} catch {
+						// Index unavailable; the empty result stands on its own.
+					}
+				}
 				return {
-					content: [{ type: "text", text: [`No wiki pages match (engine: ${engine.name}). The wiki may not cover this yet.`, ...notes].join("\n") }],
-					details: { matches: 0, engine: engine.name },
+					content: [{ type: "text", text: [`No wiki pages match (engine: ${engine.name}). The wiki may not cover this yet.`, ...hints].join("\n") }],
+					details: { matches: 0, engine: engine.name, ...(scopeWikis ? { wikis: scopeWikis } : {}) },
 				};
 			}
 			const text = results

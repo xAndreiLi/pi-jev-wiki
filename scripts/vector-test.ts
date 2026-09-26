@@ -16,7 +16,7 @@ import { vectorDataDir } from "../src/vector/registry.ts";
 import { discoverWikis } from "../src/vector/discover.ts";
 import { configuredModel, modelChoiceSource, writeModelSetting } from "../src/vector/settings.ts";
 import type { LoadedConfig } from "../src/config.ts";
-import { rrfFuse, type SearchResult } from "../src/wiki/search.ts";
+import { NamedSearchEngine, rrfFuse, type SearchResult } from "../src/wiki/search.ts";
 
 let failures = 0;
 async function check(name: string, fn: () => Promise<void> | void): Promise<void> {
@@ -100,6 +100,34 @@ await check("fusion dedupes identical wiki/path/anchor keys", () => {
 	assert.equal(fused.length, 1);
 	assert.ok(fused[0].score > 1 / 61, "score should accumulate");
 });
+await check("fusion merges a page-level hit into its claim-level sibling", () => {
+	const page: SearchResult = { path: "p.md", title: "p", score: 1, excerpt: "page summary", wiki: "life" };
+	const claim: SearchResult = { path: "p.md", title: "p", score: 0.9, excerpt: "claim text", wiki: "life", anchor: "c1" };
+	const fused = rrfFuse([[page], [claim]], 60);
+	assert.equal(fused.length, 1);
+	assert.equal(fused[0].anchor, "c1");
+	assert.ok(fused[0].score > 1 / 61, "scores accumulate across granularities");
+});
+await check("fusion keeps distinct claim anchors on one page separate", () => {
+	const one: SearchResult = { path: "p.md", title: "p", score: 1, excerpt: "", wiki: "home", anchor: "c1" };
+	const two: SearchResult = { path: "p.md", title: "p", score: 1, excerpt: "", wiki: "home", anchor: "c5" };
+	const fused = rrfFuse([[one, two]], 60);
+	assert.equal(fused.length, 2);
+});
+await check("named engines stamp a wiki onto untagged results", async () => {
+	const engine = new NamedSearchEngine(
+		{
+			name: "fake",
+			async search() {
+				return [{ path: "p.md", title: "p", score: 1, excerpt: "", source: "global" as const }];
+			},
+		},
+		"global-vault",
+	);
+	const hits = await engine.search({ query: "x" });
+	assert.equal(hits[0].wiki, "global-vault");
+	assert.equal(engine.name, "fake");
+});
 
 console.log("wiki registry");
 await check("registers, dedupes, renames collisions, toggles, and removes", async () => {
@@ -135,11 +163,12 @@ await check("indexes, skips unchanged chunks, and re-embeds edits", async () => 
 	const alphaPath = join(wikiDir, "notes", "alpha.md");
 	await writeFile(alphaPath, page("Alpha page", "c1", "Alpha claim about widgets.", "widget maintenance details ".repeat(8)));
 	await writeFile(join(wikiDir, "notes", "beta.md"), page("Beta page", "c1", "Beta claim about gadgets.", "unrelated section body text ".repeat(8)));
+	await writeFile(join(wikiDir, "toc.md"), "# Wiki TOC\n\n> Generated table of contents.\n");
 
 	const provider = fakeProvider();
 	const base = { agentDir, wiki: "testwiki", root: agentDir, model: "performance", dimensions: 4, provider };
 	const first = await indexWiki(base);
-	assert.equal(first.embedded, 4, `expected 4 chunks, got ${first.embedded}`);
+	assert.equal(first.embedded, 4, `expected 4 chunks (generated toc.md excluded), got ${first.embedded}`);
 	assert.equal(first.total, 4);
 	const second = await indexWiki(base);
 	assert.equal(second.embedded, 0);

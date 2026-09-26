@@ -53,6 +53,10 @@ wiki_ask(query, scope) ──▶ embed ──▶ cosine KNN ─┐              
 - **KNN**: exact cosine scan (`<=>`) — milliseconds at wiki scale; HNSW is a later option at
   20k+ chunks. Results carry `wiki`, `path`, `claim_id`, `status`, so `wiki_ask` can cite
   `[life] personal/summary-andrei-li.md#c3` and exclude superseded claims by default.
+- **Provenance and fusion**: every lexical result is stamped with its wiki name; RRF merging is
+  granularity-aware — a page-level lexical hit merges into a claim-level vector hit for the same
+  page, while distinct claims stay separate. Empty results name scoped wikis with no indexed content
+  yet instead of a generic "no match".
 
 ## Model selection
 
@@ -74,6 +78,9 @@ counts, marker type, and index status. `register=true` adopts everything unregis
 `rebuild all=true` indexes every enabled wiki.
 
 ## Known limitations (P1)
+
+- Cross-wiki catalog questions ("what projects do I have?") are answered by `wiki_index status` and
+  `discover`, not by similarity search; a cross-wiki overview/TOC primitive is the next step (P2).
 
 - PGlite is a single-process database: concurrent pi sessions writing the index at the same
   moment can conflict. Reads are unaffected; the escape hatch is the planned server-Postgres

@@ -34,7 +34,7 @@ export interface IndexReport {
 	milliseconds: number;
 }
 
-const GENERATED = new Set(["index.md", "log.md"]);
+const GENERATED = new Set(["index.md", "log.md", "toc.md"]);
 
 export async function indexWiki(options: IndexOptions): Promise<IndexReport> {
 	const started = Date.now();
