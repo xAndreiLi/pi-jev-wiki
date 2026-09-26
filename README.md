@@ -78,10 +78,15 @@ missing, everything degrades gracefully to keyword search.
 ```bash
 pi install npm:pi-jev-wiki                        # published release
 pi install /path/to/pi-jev-wiki                   # local folder
-pi install git:github.com/xAndreiLi/pi-jev-wiki@v0.5.0
+pi install git:github.com/xAndreiLi/pi-jev-wiki@v0.7.0
 ```
 
-For development, load it directly:
+Install **one source at a time**. Registering two copies of the extension (for example the npm
+package *and* a local folder) makes pi refuse to load it with `Tool "wiki_*" conflicts with …`,
+because every tool name is registered twice. Check with `pi list`; drop the duplicate with
+`pi remove <source>`.
+
+For development, load the working copy directly instead of installing a second copy:
 
 ```bash
 pi -e ./src/extension.ts --skill ./skills/llm-wiki
