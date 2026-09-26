@@ -11,7 +11,7 @@ claims:
     text: "Session capture can extract the agent's own unapproved proposals as user-attributed evidence and recommend filing them: the 2026-09-26 planning capture records an assistant routing recommendation as `user: Assistant recommendation awaiting Andrei's call` with a file verdict at grounded 0.87, and the same claim scored trustTier user_stated 0.96 — so a recommendation awaiting the user's approval can reach the wiki as if the user had stated it."
     status: verified
     support: 0.79
-    evidence: [raw/sessions/2026-09-26-session-2026-09-26-0010.md, raw/sessions/2026-09-26-session-2026-09-26-0008.md, .jev-wiki/decisions.jsonl]
+    evidence: [raw/sessions/2026-09-26-session-2026-09-26-0010.md, raw/sessions/2026-09-26-session-2026-09-26-0008.md, .jev-wiki/decisions.jsonl, "c5e5f62"]
     reviewed: 2026-09-26
     last_checked: 2026-09-26
 files: [src/pipeline/capture.ts, src/extension.ts]
@@ -43,6 +43,12 @@ user agrees, or when the commit implementing it lands.
 **Detection.** In a capture brief, look for `user`-kind evidence whose ref or quote is clearly the
 assistant's own text ("recommendation", "awaiting", "we could") and cross-check the raw session
 record and the `trustTier` in `.jev-wiki/decisions.jsonl` (`insight.adjudicate`).
+
+**Mitigation (0.8.0).** `buildInsightEvidence` now checks every `user`-kind item against the
+session's actual user turns; a ref or quote that does not appear there is rendered to Jev as
+`agent-stated (unverified)`, so the `user_stated` trust tier can no longer be won by the agent's
+own text (commit `c5e5f62`). The failure mode remains for pre-fix captures and for evidence typed
+by hand without user support.
 
 **Related.** [Capture routing and gating](../invariants/capture-routing-and-gating.md) ·
 [Capture flow](../architecture/flow-capture.md) ·

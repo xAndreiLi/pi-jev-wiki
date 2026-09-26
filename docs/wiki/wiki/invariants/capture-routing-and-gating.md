@@ -2,18 +2,20 @@
 title: Capture routing and gating
 type: invariant
 topic: invariants
-summary: "Automatic capture targets the wiki of the session's working directory, and task-cadence captures pass a Jev pre-screen that extracts only sessions scoring at least 0.6 on worth_capturing."
+summary: "Automatic capture defaults to the subject wiki — the registered wiki that owns the session's edited files, when exactly one does — and falls back to the session's working-directory wiki with a visible warning; task-cadence captures pass a Jev pre-screen that extracts only sessions scoring at least 0.6 on worth_capturing."
 tags: [capture, routing, gating, cadence, jev]
 updated: 2026-09-26
 sources: [raw/session-capture-2026-09-26/2026-09-26-session-capture-2026-09-26-home-session-moved-from-the-life.md]
 claims:
   - id: c1
     text: "The capture target wiki is resolved from the session's working directory, not from the subject matter — a session run from home files captures into the life wiki even when the work concerns the package repository."
-    status: verified
+    status: superseded
     support: 0.87
     evidence: [raw/session-capture-2026-09-26/2026-09-26-session-capture-2026-09-26-home-session-moved-from-the-life.md, src/extension.ts]
     reviewed: 2026-09-26
     last_checked: 2026-09-26
+    superseded_by: "Capture routing defaults to the subject wiki (c3); the working-directory rule now applies only when capture.route is session or no registered wiki owns the session's edits."
+    superseded_at: 2026-09-26
   - id: c2
     text: "Task-cadence captures are gated by Jev's pre-screen: a session scoring below 0.6 on worth_capturing is skipped with only a capture.screen ledger entry and leaves no wiki trace, while at or above 0.6 the insights are extracted and proposed for the agent to write."
     status: verified
@@ -21,19 +23,31 @@ claims:
     evidence: [raw/session-capture-2026-09-26/2026-09-26-session-capture-2026-09-26-home-session-moved-from-the-life.md, src/extension.ts]
     reviewed: 2026-09-26
     last_checked: 2026-09-26
-files: [src/extension.ts, src/config.ts]
+  - id: c3
+    text: "Auto-capture routing defaults to the subject wiki: with capture.route: subject, the capture is filed into the registered wiki that owns the files the session edited when exactly one does; otherwise it stays on the session wiki with a visible warning. The working-directory rule applies when capture.route: session."
+    status: verified
+    support: 0.83
+    evidence: [raw/sessions/2026-09-26-session-2026-09-26-0025.md, "c5e5f62"]
+    reviewed: 2026-09-26
+    last_checked: 2026-09-26
+files: [src/extension.ts, src/config.ts, src/wiki/target.ts]
 ---
 
 # Capture routing and gating
 
-## Routing follows the working directory
+## Routing follows the subject by default
 
-`capture.cadence` decides *when* the wiki is updated; the session's working directory decides
-*which* wiki (`resolveLayout(ctx.cwd, …)`). Running pi from home files captures into the life wiki
-even when the work itself is package work — which is how package knowledge once ended up filed in
-the life wiki. To capture package knowledge into this wiki, run the session from the repository.
-Cross-wiki write routing is planned to replace this directory rule with per-claim routing; until
-then this is the behaviour to expect.
+`capture.cadence` decides *when* the wiki is updated; `capture.route` (default `subject`) decides
+*which* wiki. Auto-capture tracks the files the session **edited** (not merely read) and files the
+capture into the registered wiki that owns them when exactly one matches. Ambiguous edits, no
+matching registered wiki, or evidence-only matches keep the session's working-directory wiki and
+put a `⚠` warning in the brief naming where the evidence points. `capture.route: session` restores
+the working-directory rule, and an explicit `wiki: "<name>"` on a write tool always overrides
+inference. Every decision is logged as `capture.route` in the ledger.
+
+Historical note: before 0.8.0 the working directory decided the target unconditionally — which is
+how package knowledge once ended up filed in the life wiki. See
+[Cross-wiki write routing](../decisions/cross-wiki-writes.md).
 
 ## The pre-screen keeps routine work out
 

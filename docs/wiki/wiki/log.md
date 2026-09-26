@@ -386,3 +386,14 @@
 ## [2026-09-26] finalize | File the capture-files-proposals gotcha: task-cadence extraction can label an assistant recommendation as user: evidence and Jev scores it user_stated, so a pending proposal can be filed as if the user stated it. The capture's other three accepted claims were declined: the maxPerSession display-cap fact is about to be superseded by the 0.8.0 fix, the 10.1 routing design is awaiting Andrei's decision, and the SKILL.md schema-contract rule is already documented on gotcha-skill-schema-drift.
 - Updated: architecture/gotcha-capture-proposals.md
 
+## [2026-09-26] capture | 5 insights (tool)
+- Raw: raw/sessions/2026-09-26-session-2026-09-26-0025.md
+- Filed 1 · reinforced 0 · review 3 · rejected 1
+
+## [2026-09-26] finalize | File the 0.8.0 decisions with commit evidence: cross-wiki write routing (explicit per-call wiki targets; capture.route subject default with warning), the out_of_scope review disposition, the append-only/LF-normalized raw invariant merged into raw-immutable, the capture-routing invariant updated (session-directory rule superseded), and the capture-proposals gotcha annotated with its mitigation.
+- Updated: decisions/cross-wiki-writes.md
+- Updated: decisions/out-of-scope-disposition.md
+- Updated: invariants/raw-immutable.md
+- Updated: invariants/capture-routing-and-gating.md
+- Updated: architecture/gotcha-capture-proposals.md
+
