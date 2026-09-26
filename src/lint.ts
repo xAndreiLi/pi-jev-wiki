@@ -70,6 +70,16 @@ function normalize(text: string): string {
 	return text.toLowerCase().replace(/\s+/g, " ").trim();
 }
 
+/** Near-identical claim texts (e.g. two revisions of one source) are not contradictions. */
+export function nearIdenticalClaims(a: string, b: string, threshold = 0.9): boolean {
+	const left = tokenSet(a);
+	const right = tokenSet(b);
+	if (left.size === 0 || right.size === 0) return false;
+	let shared = 0;
+	for (const token of left) if (right.has(token)) shared++;
+	return shared / Math.min(left.size, right.size) >= threshold;
+}
+
 function tokenSet(text: string): Set<string> {
 	return new Set(
 		text
@@ -248,7 +258,8 @@ export async function lintWiki(
 			for (let j = i + 1; j < claims.length; j++) {
 				if (claims[i].page === claims[j].page) continue;
 				const shared = claims[i].files.some((file) => claims[j].files.includes(file));
-				if (shared) pairs.push({ a: claims[i], b: claims[j] });
+				// Two revisions of one source state the same thing; skip the Jev call.
+				if (shared && !nearIdenticalClaims(String(claims[i].claim.text), String(claims[j].claim.text))) pairs.push({ a: claims[i], b: claims[j] });
 			}
 		}
 

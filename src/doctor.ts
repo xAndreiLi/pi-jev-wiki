@@ -4,8 +4,8 @@
  * after moving it to a new machine/project.
  */
 import { existsSync } from "node:fs";
-import { readFile, stat } from "node:fs/promises";
-import { isAbsolute, join } from "node:path";
+import { readdir, readFile, stat } from "node:fs/promises";
+import { isAbsolute, join, relative } from "node:path";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import type { LoadedConfig } from "./config.ts";
@@ -16,7 +16,7 @@ import { readSyncState } from "./sync.ts";
 import { MODEL_PRESETS, modelsDir } from "./vector/embed.ts";
 import { modelsCacheBytes } from "./vector/index.ts";
 import { readRegistry } from "./vector/registry.ts";
-import { listMarkdownFiles, resolveLayout, type WikiLayout } from "./wiki/layout.ts";
+import { listMarkdownFiles, readPage, resolveLayout, sha256Hex, type WikiLayout } from "./wiki/layout.ts";
 import { isLocked } from "./wiki/lock.ts";
 
 const run = promisify(execFile);
@@ -34,6 +34,75 @@ export interface DoctorReport {
 
 function check(name: string, status: DoctorCheck["status"], detail: string): DoctorCheck {
 	return { name, status, detail };
+}
+
+export interface RawIntegrityReport {
+	total: number;
+	missing: string[];
+	drifted: string[];
+}
+
+/** Re-hash every indexed raw source against the recorded key in `.jev-wiki/raw-index.json`. */
+export async function verifyRawSources(layout: WikiLayout): Promise<RawIntegrityReport> {
+	const report: RawIntegrityReport = { total: 0, missing: [], drifted: [] };
+	const indexPath = join(layout.stateDir, "raw-index.json");
+	if (!existsSync(indexPath)) return report;
+	let index: Record<string, string>;
+	try {
+		index = JSON.parse(await readFile(indexPath, "utf8")) as Record<string, string>;
+	} catch {
+		return report;
+	}
+	const entries = Object.entries(index);
+	report.total = entries.length;
+	for (const [hash, rel] of entries) {
+		const abs = join(layout.root, String(rel));
+		if (!existsSync(abs)) {
+			report.missing.push(String(rel));
+			continue;
+		}
+		try {
+			const page = await readPage(abs);
+			// Reverse the serializer: it inserts one blank line after the frontmatter and trims
+			// trailing whitespace before appending a final newline, while the recorded key was taken
+			// from the text as read. Accept the exact form and the trailing-trimmed form.
+			const raw = page.body.replace(/^\n/, "");
+			const exact = await sha256Hex(raw);
+			const trimmed = exact === hash ? exact : await sha256Hex(raw.trimEnd());
+			if (trimmed !== hash) report.drifted.push(String(rel));
+		} catch {
+			report.drifted.push(String(rel));
+		}
+	}
+	return report;
+}
+
+/** Atomic-write temp files (`*.tmp-<pid>-<ms>`) left behind by an interrupted rename. */
+export async function findStaleTempFiles(root: string, olderThanMs = 10 * 60_000): Promise<string[]> {
+	const cutoff = Date.now() - olderThanMs;
+	const found: string[] = [];
+	const skip = new Set([".git", "node_modules", "models"]);
+	async function walk(dir: string, depth: number): Promise<void> {
+		if (depth > 6 || found.length > 20) return;
+		let entries;
+		try {
+			entries = await readdir(dir, { withFileTypes: true });
+		} catch {
+			return;
+		}
+		for (const entry of entries) {
+			if (entry.isDirectory()) {
+				if (skip.has(entry.name)) continue;
+				await walk(join(dir, entry.name), depth + 1);
+				continue;
+			}
+			if (!entry.name.includes(".tmp-")) continue;
+			const info = await stat(join(dir, entry.name)).catch(() => undefined);
+			if (info && info.mtimeMs < cutoff) found.push(join(dir, entry.name));
+		}
+	}
+	await walk(root, 0);
+	return found;
 }
 
 function within(value: number, min: number, max: number): boolean {
@@ -57,6 +126,7 @@ export async function runDoctor(loaded: LoadedConfig): Promise<DoctorReport> {
 	if (!within(config.lint.duplicateSimilarity, 0, 1)) invalid.push(`lint.duplicateSimilarity=${config.lint.duplicateSimilarity}`);
 	if (config.routing.shardSize < 10 || config.routing.shardSize > 255) invalid.push(`routing.shardSize=${config.routing.shardSize} (must be 10..255)`);
 	if (!["manual", "task", "commit"].includes(config.capture.cadence ?? "manual")) invalid.push(`capture.cadence=${config.capture.cadence}`);
+	if (config.capture.route !== undefined && !["session", "subject"].includes(config.capture.route)) invalid.push(`capture.route=${config.capture.route}`);
 	if (!["auto", "always", "never"].includes(config.search.jev.rerank)) invalid.push(`search.jev.rerank=${config.search.jev.rerank}`);
 	if (!within(config.search.jev.minSufficiency, 0, 1)) invalid.push(`search.jev.minSufficiency=${config.search.jev.minSufficiency}`);
 	if (config.search.jev.maxCandidates < 1 || config.search.jev.maxCandidates > 50) invalid.push(`search.jev.maxCandidates=${config.search.jev.maxCandidates} (1..50)`);
@@ -167,6 +237,25 @@ export async function runDoctor(loaded: LoadedConfig): Promise<DoctorReport> {
 		checks.push(check("review queue", "ok", `${open.length} open item(s)`));
 	}
 
+	// --- raw source integrity -------------------------------------------------
+	const raw = await verifyRawSources(layout);
+	if (raw.total === 0) {
+		checks.push(check("raw sources", "ok", "no indexed raw sources yet"));
+	} else if (raw.missing.length === 0 && raw.drifted.length === 0) {
+		checks.push(check("raw sources", "ok", `${raw.total} indexed; all content hashes match`));
+	} else {
+		const parts: string[] = [];
+		if (raw.missing.length) parts.push(`${raw.missing.length} missing file(s): ${raw.missing.slice(0, 3).join(", ")}`);
+		if (raw.drifted.length) parts.push(`${raw.drifted.length} hash mismatch(es): ${raw.drifted.slice(0, 3).join(", ")}`);
+		checks.push(check("raw sources", "warn", parts.join("; ")));
+	}
+	const staleTemps = await findStaleTempFiles(layout.root);
+	checks.push(
+		staleTemps.length === 0
+			? check("write temp files", "ok", "no stale atomic-write files")
+			: check("write temp files", "warn", `${staleTemps.length} stale *.tmp-* file(s), e.g. ${staleTemps.slice(0, 2).join(", ")} — safe to delete once no writer is active`),
+	);
+
 	// --- git and sync ---------------------------------------------------------
 	if (await isGitRepo(loaded.cwd)) {
 		const head = await headCommit(loaded.cwd);
@@ -180,8 +269,13 @@ export async function runDoctor(loaded: LoadedConfig): Promise<DoctorReport> {
 			checks.push(check("sync baseline", "warn", `${behind.stdout.trim() || "?"} commit(s) behind; run /wiki:sync`));
 		}
 		if (existsSync(loaded.envFilePath)) {
-			const ignored = await git(loaded.cwd, ["check-ignore", "-q", loaded.envFilePath]);
-			checks.push(ignored.code === 0 ? check("env gitignored", "ok", ".env is ignored") : check("env gitignored", "fail", `${loaded.envFilePath} is NOT gitignored — the token could be committed`));
+			const rel = relative(loaded.cwd, loaded.envFilePath);
+			if (rel.startsWith("..") || isAbsolute(rel)) {
+				checks.push(check("env gitignored", "ok", `${loaded.envFilePath} is outside the repository`));
+			} else {
+				const ignored = await git(loaded.cwd, ["check-ignore", "-q", loaded.envFilePath]);
+				checks.push(ignored.code === 0 ? check("env gitignored", "ok", ".env is ignored") : check("env gitignored", "fail", `${loaded.envFilePath} is NOT gitignored — the token could be committed`));
+			}
 		}
 	} else {
 		checks.push(check("git", "warn", "not a repository; change-driven sync and commits are unavailable"));

@@ -56,6 +56,11 @@ export function todayISO(date = new Date()): string {
 	return date.toISOString().slice(0, 10);
 }
 
+/** Normalize CRLF/CR to LF so hashes and stored sources do not depend on the editor. */
+export function normalizeNewlines(text: string): string {
+	return text.replace(/\r\n?/g, "\n");
+}
+
 export function timeStamp(date = new Date()): string {
 	return date.toISOString().slice(11, 16).replace(":", "");
 }
@@ -91,8 +96,16 @@ export async function writeRawSource(
 	body: string,
 ): Promise<string> {
 	const dir = join(layout.rawDir, slugify(topic, 40));
-	const filename = `${todayISO()}-${slugify(slug)}.md`;
-	const path = join(dir, filename);
+	const base = `${todayISO()}-${slugify(slug)}`;
+	let path = join(dir, `${base}.md`);
+	if (existsSync(path)) {
+		// Never overwrite a source: same-day/same-title (or same-minute session) captures
+		// get a content-hash suffix, keeping raw/ append-only.
+		const suffix = (await sha256Hex(body)).slice(0, 8);
+		path = join(dir, `${base}-${suffix}.md`);
+		let counter = 2;
+		while (existsSync(path)) path = join(dir, `${base}-${suffix}-${counter++}.md`);
+	}
 	await writePage(path, data, body);
 	return path;
 }

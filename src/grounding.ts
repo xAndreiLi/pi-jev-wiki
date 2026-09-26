@@ -44,3 +44,68 @@ export function checkLiterals(body: string, evidence: string): LiteralCheck {
 	});
 	return { literals, missing };
 }
+
+function tokens(text: string): Set<string> {
+	return new Set(
+		text
+			.toLowerCase()
+			.split(/[^a-z0-9_]+/)
+			.filter((token) => token.length > 3),
+	);
+}
+
+/** Line excerpts around terms from the claim, so Jev sees the relevant part of a long source. */
+export function excerptAroundTerms(content: string, claimText: string, maxChars: number): string {
+	const lines = content.split(/\r?\n/);
+	const terms = [...new Set(claimText.toLowerCase().split(/[^a-z0-9_]+/).filter((token) => token.length > 3))].slice(0, 12);
+	if (terms.length === 0 || lines.length <= 60) return content.length > maxChars ? `${content.slice(0, maxChars)}\n\n[... truncated ...]` : content;
+	const scored = lines
+		.map((line, index) => ({ index, score: terms.reduce((sum, term) => sum + (line.toLowerCase().includes(term) ? 1 : 0), 0) }))
+		.filter((entry) => entry.score > 0)
+		.sort((a, b) => b.score - a.score)
+		.slice(0, 10);
+	if (scored.length === 0) return content.length > maxChars ? `${content.slice(0, maxChars)}\n\n[... truncated ...]` : content;
+	const chosen = new Set<number>();
+	for (const { index } of scored) {
+		for (let i = Math.max(0, index - 4); i <= Math.min(lines.length - 1, index + 4); i++) chosen.add(i);
+	}
+	const out: string[] = [];
+	let last = -1;
+	for (const index of [...chosen].sort((a, b) => a - b)) {
+		if (last !== -1 && index > last + 1) out.push("  ...");
+		out.push(`${String(index + 1).padStart(4)}| ${lines[index]}`);
+		last = index;
+	}
+	const body = out.join("\n");
+	return body.length > maxChars ? `${body.slice(0, maxChars)}\n\n[... truncated ...]` : body;
+}
+
+export interface ClosestPassage {
+	excerpt: string;
+	overlap: number;
+}
+
+/**
+ * Best-matching paragraph for a claim, with a token-overlap score. Used to explain
+ * `reject_unsupported` verdicts: the closest thing the source actually says.
+ */
+export function closestPassage(source: string, claim: string, maxChars = 320): ClosestPassage | undefined {
+	const claimTokens = tokens(claim);
+	if (claimTokens.size === 0) return undefined;
+	let best: { excerpt: string; overlap: number } | undefined;
+	for (const raw of source.split(/\n{2,}/)) {
+		const segment = raw.replace(/\s+/g, " ").trim();
+		if (!segment) continue;
+		const segmentTokens = tokens(segment);
+		if (segmentTokens.size === 0) continue;
+		let shared = 0;
+		for (const token of claimTokens) if (segmentTokens.has(token)) shared++;
+		const overlap = shared / Math.min(claimTokens.size, segmentTokens.size);
+		if (!best || overlap > best.overlap) best = { excerpt: segment, overlap };
+	}
+	if (!best || best.overlap === 0) return undefined;
+	return {
+		excerpt: best.excerpt.length > maxChars ? `${best.excerpt.slice(0, maxChars)}…` : best.excerpt,
+		overlap: Number(best.overlap.toFixed(2)),
+	};
+}

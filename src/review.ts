@@ -12,7 +12,7 @@ import { withWikiLock } from "./wiki/lock.ts";
 
 export type ReviewKind = "claim_review" | "needs_recheck" | "dispute";
 export type ReviewStatus = "open" | "resolved" | "deferred";
-export type ReviewResolution = "accept" | "reject" | "supersede" | "defer";
+export type ReviewResolution = "accept" | "reject" | "supersede" | "defer" | "out_of_scope";
 
 export interface ReviewItem {
 	id: string;
@@ -117,6 +117,7 @@ export async function applyReviewResolution(
 	item: ReviewItem,
 	resolution: ReviewResolution,
 ): Promise<string> {
+	if (resolution === "out_of_scope") return "out of scope; claim left untouched";
 	if (!item.page) return "no page attached; resolution recorded only";
 	const pagePath = join(layout.wikiDir, item.page);
 	if (!existsSync(pagePath)) return `page not found: ${item.page}`;

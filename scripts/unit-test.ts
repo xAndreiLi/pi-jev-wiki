@@ -4,23 +4,27 @@
  */
 import assert from "node:assert/strict";
 import { existsSync } from "node:fs";
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, relative } from "node:path";
 import type { JevAnswer, JevClient, JevQuestion } from "../src/jev.ts";
 import { decideClaim, chooseTarget, suggestTopic, type ClaimVerdicts } from "../src/pipeline/adjudicate.ts";
 import { resolveWriterMode } from "../src/pipeline/write.ts";
-import { checkLiterals } from "../src/grounding.ts";
+import { checkLiterals, closestPassage } from "../src/grounding.ts";
+import { nearIdenticalClaims } from "../src/lint.ts";
 import { redact } from "../src/redact.ts";
 import { applyReviewResolution, enqueueReview, listOpenReviews, resolveReview } from "../src/review.ts";
 import { fileMatches } from "../src/git.ts";
 import type { LedgerEntry } from "../src/ledger.ts";
 import { buildTriageReport, remedyFor } from "../src/triage.ts";
 import { DEFAULT_CONFIG, resolveCaptureTriggers, type ResolvedConfig } from "../src/config.ts";
-import { ensureLayout, resolveLayout, slugify, writePage } from "../src/wiki/layout.ts";
+import { ensureLayout, normalizeNewlines, resolveLayout, sha256Hex, slugify, writePage, writeRawSource, writeTextAtomic } from "../src/wiki/layout.ts";
 import { updateIndex } from "../src/wiki/toc.ts";
 import { parseFrontmatter, serializeFrontmatter } from "../src/wiki/frontmatter.ts";
+import { verifyRawSources } from "../src/doctor.ts";
 import { isLocked, withWikiLock } from "../src/wiki/lock.ts";
+import { matchRegisteredWikis, projectRootFor, registeredProjectRoots, resolvePageFile, resolveSourceFile, resolveWriteTarget } from "../src/wiki/target.ts";
+import { registerWiki } from "../src/vector/registry.ts";
 
 let failures = 0;
 async function check(name: string, fn: () => Promise<void> | void): Promise<void> {
@@ -263,6 +267,19 @@ try {
 		assert.equal(claims[0].status, "verified");
 		assert.ok(Number(claims[0].support) >= 0.8);
 	});
+	await check("review list honors limit and out_of_scope leaves the claim untouched", async () => {
+		await enqueueReview(layout, { kind: "claim_review", claimText: "Belongs to another project", criticality: 0.3, reason: "test" });
+		const all = await listOpenReviews(layout, 50);
+		assert.ok(all.length >= 1);
+		assert.equal((await listOpenReviews(layout, 1)).length, 1);
+		const item = all.find((entry) => entry.claimText === "Belongs to another project")!;
+		const pagePath = join(layout.wikiDir, "decisions", "test-page.md");
+		const before = await readFile(pagePath, "utf8");
+		const applied = await applyReviewResolution(layout, { ...item, page: "decisions/test-page.md" }, "out_of_scope");
+		assert.match(applied, /out of scope/);
+		assert.equal(await readFile(pagePath, "utf8"), before);
+		await resolveReview(layout, item.id, "out_of_scope", "belongs to home");
+	});
 } finally {
 	await rm(root, { recursive: true, force: true });
 }
@@ -341,6 +358,132 @@ await check("cadence resolves task, commit, and manual triggers", () => {
 	assert.deepEqual(resolveCaptureTriggers({ ...base, capture: { cadence: "manual", onCompact: false } }), { task: false, commit: false, compact: false });
 	assert.deepEqual(resolveCaptureTriggers({ ...base, capture: { cadence: "manual", onCompact: false, onSettle: true } }), { task: true, commit: false, compact: false });
 });
+
+console.log("\ncross-wiki targets");
+{
+	const targetRoot = await mkdtemp(join(tmpdir(), "jev-wiki-target-"));
+	try {
+		const agentDir = join(targetRoot, "agent");
+		const projectA = join(targetRoot, "project-a");
+		const wikiA = join(projectA, "docs", "wiki");
+		const projectB = join(targetRoot, "project-b");
+		const wikiB = join(projectB, "wiki");
+		for (const dir of [wikiA, wikiB, join(projectA, "src"), join(projectB, "src"), join(projectA, "pages"), join(wikiB, "wiki", "pages")]) {
+			await mkdir(dir, { recursive: true });
+		}
+		await mkdir(join(projectA, ".git"), { recursive: true });
+		await writeFile(join(projectA, "src", "note.md"), "note-a");
+		await writeFile(join(projectB, "src", "other.md"), "other-b");
+		await writeFile(join(projectA, "pages", "note.md"), "decoy-in-project-a");
+		await writeFile(join(wikiB, "wiki", "pages", "note.md"), "target-page");
+		await registerWiki(agentDir, wikiA, { name: "alpha" });
+		await registerWiki(agentDir, wikiB, { name: "beta" });
+
+		await check("default target keeps the session wiki", async () => {
+			const target = await resolveWriteTarget({ agentDir, cwd: projectB, wikiRoot: "docs/wiki", stateRoot: ".jev-wiki" });
+			assert.equal(target.name, undefined);
+			assert.equal(target.layout.root, join(projectB, "docs", "wiki"));
+		});
+		await check("named target resolves the registered root", async () => {
+			const target = await resolveWriteTarget({ agentDir, cwd: projectB, wikiRoot: "docs/wiki", stateRoot: ".jev-wiki", wikiName: "alpha" });
+			assert.equal(target.name, "alpha");
+			assert.equal(target.layout.root, wikiA);
+			assert.equal(target.layout.wikiDir, join(wikiA, "wiki"));
+		});
+		await check("unknown wiki name lists registered wikis", async () => {
+			await assert.rejects(
+				() => resolveWriteTarget({ agentDir, cwd: projectB, wikiRoot: "docs/wiki", stateRoot: ".jev-wiki", wikiName: "nope" }),
+				/alpha, beta/,
+			);
+		});
+		await check("cross-wiki pages resolve against the target, not the session cwd", async () => {
+			const target = await resolveWriteTarget({ agentDir, cwd: projectA, wikiRoot: "docs/wiki", stateRoot: ".jev-wiki", wikiName: "beta" });
+			assert.equal(resolvePageFile(target.layout, "pages/note.md"), join(wikiB, "wiki", "pages", "note.md"));
+			assert.equal(resolvePageFile(target.layout, "src/note.md"), undefined, "project A's same-named file must not win");
+			assert.equal(
+				resolvePageFile(target.layout, "pages/note.md", projectA),
+				join(projectA, "pages", "note.md"),
+				"default path resolution still consults the session cwd",
+			);
+		});
+		await check("ingest paths resolve against the target project root", async () => {
+			const target = await resolveWriteTarget({ agentDir, cwd: projectB, wikiRoot: "docs/wiki", stateRoot: ".jev-wiki", wikiName: "alpha" });
+			assert.equal(resolveSourceFile({ root: target.layout.root }, "src/note.md").absolute, join(projectA, "src", "note.md"));
+			const missing = resolveSourceFile({ root: target.layout.root }, "src/absent.md");
+			assert.equal(missing.absolute, undefined);
+			assert.ok(missing.tried.some((item) => item.includes(projectA)));
+		});
+		await check("project root prefers a git ancestor and skips docs/", () => {
+			assert.equal(projectRootFor(wikiA), projectA);
+			assert.equal(projectRootFor(wikiB), projectB);
+		});
+		await check("edited files infer one subject wiki and flag ambiguity", async () => {
+			const single = await matchRegisteredWikis({ agentDir, cwd: projectB, paths: [join(projectA, "src", "note.md")] });
+			assert.deepEqual(single.names, ["alpha"]);
+			assert.equal(single.ambiguous, false);
+			const both = await matchRegisteredWikis({
+				agentDir,
+				cwd: projectB,
+				paths: [join(projectA, "src", "note.md"), join(projectB, "src", "other.md")],
+			});
+			assert.equal(both.ambiguous, true);
+			assert.deepEqual([...both.names].sort(), ["alpha", "beta"]);
+		});
+		await check("evidence refs resolve against other projects' roots", async () => {
+			const bases = (await registeredProjectRoots(agentDir)).map((entry) => entry.root);
+			const match = await matchRegisteredWikis({ agentDir, cwd: projectB, paths: ["src/note.md"], bases });
+			assert.deepEqual(match.names, ["alpha"]);
+		});
+	} finally {
+		await rm(targetRoot, { recursive: true, force: true });
+	}
+}
+
+console.log("\ningest integrity and rejection diagnostics");
+await check("normalizes CRLF/CR before hashing", async () => {
+	assert.equal(normalizeNewlines("a\r\nb\rc"), "a\nb\nc");
+	assert.equal(await sha256Hex(normalizeNewlines("a\r\nb")), await sha256Hex("a\nb"));
+});
+await check("closestPassage finds the panel a synthesised claim came from", () => {
+	const source = "# Routine\n\n### First Pair\n- Pull-up\n- Squat\n\n### Second Pair\n- Dips\n- Row";
+	const passage = closestPassage(source, "Pull-up and Squat are the first pair");
+	assert.ok(passage);
+	assert.match(passage!.excerpt, /First Pair/);
+	assert.ok(passage!.overlap > 0);
+});
+await check("near-identical claims are not contradiction candidates", () => {
+	const a = "Progressions replace external load for the pull-up.";
+	assert.ok(nearIdenticalClaims(a, a));
+	assert.ok(nearIdenticalClaims(a, "For the pull-up, progressions replace external load."));
+	assert.ok(!nearIdenticalClaims(a, "External load is added weekly in 2.5kg steps."));
+});
+{
+	const rawRoot = await mkdtemp(join(tmpdir(), "jev-wiki-raw-"));
+	try {
+		const rawLayout = resolveLayout(rawRoot, "wiki", ".state");
+		await ensureLayout(rawLayout);
+		await check("raw sources never overwrite a same-day name", async () => {
+			const first = await writeRawSource(rawLayout, "notes", "same-title", { title: "One" }, "first body");
+			const second = await writeRawSource(rawLayout, "notes", "same-title", { title: "Two" }, "second body");
+			assert.notEqual(first, second);
+			assert.ok(existsSync(first) && existsSync(second));
+		});
+		await check("doctor re-hashes raw sources and reports drift", async () => {
+			const body = "stable body";
+			const path = await writeRawSource(rawLayout, "notes", "hashed-source", { title: "H" }, body);
+			const rel = relative(rawLayout.root, path).split("\\").join("/");
+			await writeTextAtomic(join(rawLayout.stateDir, "raw-index.json"), `${JSON.stringify({ [await sha256Hex(body)]: rel })}\n`);
+			const clean = await verifyRawSources(rawLayout);
+			assert.deepEqual(clean.drifted, []);
+			assert.deepEqual(clean.missing, []);
+			await writeFile(path, (await readFile(path, "utf8")).replace("stable", "tampered"));
+			const dirty = await verifyRawSources(rawLayout);
+			assert.equal(dirty.drifted.length, 1);
+		});
+	} finally {
+		await rm(rawRoot, { recursive: true, force: true });
+	}
+}
 
 if (failures > 0) {
 	console.error(`\n${failures} check(s) failed`);

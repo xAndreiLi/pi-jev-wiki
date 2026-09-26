@@ -12,6 +12,7 @@ import { CONFIG_DIR_NAME, getAgentDir } from "@earendil-works/pi-coding-agent";
 export type WriterMode = "guided" | "draft" | "auto";
 export type ReviewMode = "agent" | "human";
 export type CaptureCadence = "manual" | "task" | "commit";
+export type CaptureRoute = "session" | "subject";
 
 export interface ProviderPreset {
 	baseUrl: string;
@@ -49,7 +50,7 @@ export interface JevWikiConfig {
 	toc: { maxTokens: number };
 	lint: { orphanMinAgeDays: number; duplicateSimilarity: number };
 	gitCommit: boolean;
-	capture: { cadence: CaptureCadence; onCompact: boolean; onSettle?: boolean };
+	capture: { cadence: CaptureCadence; onCompact: boolean; onSettle?: boolean; route?: CaptureRoute };
 	search: {
 		engine: "auto" | "index" | "bm25" | "vector" | "hybrid" | "qmd";
 		qmdCollection?: string;
@@ -88,7 +89,7 @@ export const DEFAULT_CONFIG: JevWikiConfig = {
 	toc: { maxTokens: 3000 },
 	lint: { orphanMinAgeDays: 7, duplicateSimilarity: 0.72 },
 	gitCommit: false,
-	capture: { cadence: "manual", onCompact: false },
+	capture: { cadence: "manual", onCompact: false, route: "subject" },
 	search: {
 		engine: "auto",
 		vector: {

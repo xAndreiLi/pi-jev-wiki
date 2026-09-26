@@ -3,7 +3,7 @@
  * with the session model, and hand them to the Jev adjudication pipeline.
  */
 import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
-import { parseJsonObject } from "./extract.ts";
+import { normalizeForMatch, parseJsonObject } from "./extract.ts";
 
 export interface CapturedInsight {
 	text: string;
@@ -63,6 +63,25 @@ export function sessionTextFromEntries(entries: unknown[], maxChars = 24_000): s
 	let transcript = lines.join("\n\n");
 	if (transcript.length > maxChars) transcript = transcript.slice(-maxChars);
 	return transcript;
+}
+
+/** Concatenated user-turn text, normalized for checking whether a quote really came from the user. */
+export function userTextFromEntries(entries: unknown[]): string {
+	const lines: string[] = [];
+	for (const raw of entries) {
+		if (!raw || typeof raw !== "object") continue;
+		const entry = raw as { type?: string; message?: { role?: string; content?: unknown } };
+		if (entry.type !== "message" || entry.message?.role !== "user") continue;
+		const text = textFromContent(entry.message.content).trim();
+		if (text) lines.push(text);
+	}
+	return normalizeForMatch(lines.join("\n"));
+}
+
+/** True when a `user`-kind evidence item actually appears verbatim in a user turn. */
+export function userEvidenceSupported(userText: string, item: { quote?: string; ref?: string }): boolean {
+	const needle = normalizeForMatch(item.quote ?? item.ref ?? "");
+	return needle.length >= 12 && userText.includes(needle);
 }
 
 export async function extractInsights(

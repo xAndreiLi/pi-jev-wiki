@@ -20,11 +20,12 @@ import { readMetrics, recordMetric, summarizeMetrics } from "./metrics.ts";
 import { renderDoctor, runDoctor } from "./doctor.ts";
 import { withWikiLock } from "./wiki/lock.ts";
 import { applyReinforcement, applySupersession, bestCandidatePage } from "./provenance.ts";
+import { closestPassage, excerptAroundTerms } from "./grounding.ts";
 import { redact } from "./redact.ts";
 import { appendSessionLog, promoteRecurring } from "./sessionlog.ts";
 import { renderStructure, scanStructure } from "./structure.ts";
 import { buildTriageReport, renderTriage } from "./triage.ts";
-import { extractInsights, sessionTextFromEntries } from "./pipeline/capture.ts";
+import { extractInsights, sessionTextFromEntries, userEvidenceSupported, userTextFromEntries } from "./pipeline/capture.ts";
 import {
 	applyReviewResolution,
 	enqueueReview,
@@ -47,12 +48,14 @@ import {
 	sha256Hex,
 	slugify,
 	todayISO,
+	normalizeNewlines,
 	writePage,
 	writeRawSource,
 	writeTextAtomic,
 	type WikiLayout,
 } from "./wiki/layout.ts";
 import { extractMarkdownLinks } from "./wiki/links.ts";
+import { matchRegisteredWikis, projectRootFor, registeredProjectRoots, resolvePageFile, resolveSourceFile, resolveWriteTarget } from "./wiki/target.ts";
 import { appendLog, entryFromPage, isWikiMetaFile, parseIndex, readIndex, readRecentLog, renderCompactToc, renderIndex, topicSlug, updateIndex, upsertEntries, writeIndex, type TocEntry } from "./wiki/toc.ts";
 import { createSearchEngine, VectorSearchEngine, type SearchResult } from "./wiki/search.ts";
 import { forgetWikiIndex, hasWarmIndex, indexExists, indexWiki, vectorStatus } from "./vector/index.ts";
@@ -74,6 +77,24 @@ interface Runtime {
 function runtimeFor(ctx: ExtensionContext): Runtime {
 	const loaded = loadConfig(ctx.cwd);
 	return { loaded, layout: resolveLayout(ctx.cwd, loaded.config.wikiRoot, loaded.config.stateRoot) };
+}
+
+/** Write-tool runtime: a registered wiki by name, or the session wiki (default). */
+async function runtimeForTarget(ctx: ExtensionContext, wikiName?: string): Promise<Runtime> {
+	const loaded = loadConfig(ctx.cwd);
+	const target = await resolveWriteTarget({
+		agentDir: loaded.agentDir,
+		cwd: ctx.cwd,
+		wikiRoot: loaded.config.wikiRoot,
+		stateRoot: loaded.config.stateRoot,
+		wikiName,
+	});
+	return { loaded, layout: target.layout };
+}
+
+/** Optional `wiki` parameter shared by every write tool. */
+function wikiParam() {
+	return Type.Optional(Type.String({ description: "Registered wiki name to target (defaults to the current wiki)" }));
 }
 
 async function requireClient(loaded: LoadedConfig, ctx: ExtensionContext): Promise<JevClient> {
@@ -139,6 +160,7 @@ function modelProgressSink(ctx: ExtensionContext): { onProgress: (message: strin
 async function buildInsightEvidence(
 	insight: { text: string; evidence?: Array<{ kind: string; ref: string; quote?: string }> },
 	cwd: string,
+	userTurns: string,
 ): Promise<{ evidenceText: string; files: string[] }> {
 	const files: string[] = [];
 	const parts: string[] = [];
@@ -156,7 +178,8 @@ async function buildInsightEvidence(
 			const detail = await git(cwd, ["show", "--no-color", "--stat", "--format=%s%n%b", item.ref, "--"]);
 			parts.push(`commit: ${item.ref}\n${truncate(detail.stdout || "(commit not found)", 2000)}`);
 		} else if (item.kind === "user") {
-			parts.push(`user statement: "${item.quote ?? item.ref}"`);
+			const supported = userEvidenceSupported(userTurns, item);
+			parts.push(`${supported ? "user statement" : "agent-stated (unverified)"}: "${item.quote ?? item.ref}"`);
 		} else if (item.kind === "source") {
 			parts.push(`source: ${item.ref}${item.quote ? `\nquote: "${item.quote}"` : ""}`);
 		} else {
@@ -167,29 +190,6 @@ async function buildInsightEvidence(
 }
 
 /** Line excerpts around terms from the claim, so Jev sees the relevant code, not the whole file. */
-function excerptAroundTerms(content: string, claimText: string, maxChars: number): string {
-	const lines = content.split(/\r?\n/);
-	const terms = [...new Set(claimText.toLowerCase().split(/[^a-z0-9_]+/).filter((token) => token.length > 3))].slice(0, 12);
-	if (terms.length === 0 || lines.length <= 60) return truncate(content, maxChars);
-	const scored = lines
-		.map((line, index) => ({ index, score: terms.reduce((sum, term) => sum + (line.toLowerCase().includes(term) ? 1 : 0), 0) }))
-		.filter((entry) => entry.score > 0)
-		.sort((a, b) => b.score - a.score)
-		.slice(0, 10);
-	if (scored.length === 0) return truncate(content, maxChars);
-	const chosen = new Set<number>();
-	for (const { index } of scored) {
-		for (let i = Math.max(0, index - 4); i <= Math.min(lines.length - 1, index + 4); i++) chosen.add(i);
-	}
-	const out: string[] = [];
-	let last = -1;
-	for (const index of [...chosen].sort((a, b) => a - b)) {
-		if (last !== -1 && index > last + 1) out.push("  ...");
-		out.push(`${String(index + 1).padStart(4)}| ${lines[index]}`);
-		last = index;
-	}
-	return truncate(out.join("\n"), maxChars);
-}
 
 // ---------------------------------------------------------------------------
 // Candidate collection
@@ -281,6 +281,7 @@ interface ClaimReport {
 	target?: string;
 	mergeInto?: string;
 	newPage: boolean;
+	closest?: { excerpt: string; overlap: number };
 }
 
 /** Best matching existing claim for a reinforcement, used when page placement abstains. */
@@ -326,7 +327,12 @@ async function resolveTargetWiki(agentDir: string, currentRoot: string, name?: s
 	return { name: registration.name, root: registration.root };
 }
 
-function renderBrief(title: string, reports: ClaimReport[], extras: string[] = [], options?: { guided?: boolean }): string {
+function renderBrief(
+	title: string,
+	reports: ClaimReport[],
+	extras: string[] = [],
+	options?: { guided?: boolean; notes?: string[]; compact?: boolean },
+): string {
 	const filed = reports.filter((report) => report.action === "file" || report.action === "file_user_stated");
 	const reinforced = reports.filter((report) => report.action === "reinforce");
 	const review = reports.filter((report) => report.action === "review");
@@ -337,6 +343,7 @@ function renderBrief(title: string, reports: ClaimReport[], extras: string[] = [
 		`Claims: ${reports.length} · file ${filed.length} · reinforce ${reinforced.length} · review ${review.length} · advised against ${rejected.length}`,
 		"",
 	);
+	if (options?.notes?.length) lines.push(...options.notes, "");
 	if (filed.length > 0) {
 		lines.push("### File into wiki");
 		for (const report of filed) {
@@ -345,10 +352,13 @@ function renderBrief(title: string, reports: ClaimReport[], extras: string[] = [
 				: `new page (${report.pageType ?? "concept"}${report.topic ? `, topic \`${report.topic}\`${report.topicIsNew ? " (new, suggested)" : ""}` : ""})`;
 			const trust = report.action === "file_user_stated" ? " [user-stated: use `status: user-stated`]" : "";
 			const files = report.files.length > 0 ? ` (files: ${report.files.map((file) => `\`${file}\``).join(", ")})` : "";
-			lines.push(`- ${where} — ${report.text}${trust}${files}`);
-			lines.push(
-				`  grounded ${report.grounded.toFixed(2)} · derivable ${report.derivable.toFixed(2)} · importance ${report.importanceNorm.toFixed(2)} · criticality ${report.criticalityNorm.toFixed(2)}`,
-			);
+			const text = options?.compact && report.text.length > 160 ? `${report.text.slice(0, 160)}…` : report.text;
+			lines.push(`- ${where} — ${text}${trust}${files}`);
+			if (!options?.compact) {
+				lines.push(
+					`  grounded ${report.grounded.toFixed(2)} · derivable ${report.derivable.toFixed(2)} · importance ${report.importanceNorm.toFixed(2)} · criticality ${report.criticalityNorm.toFixed(2)}`,
+				);
+			}
 		}
 		lines.push("");
 	}
@@ -370,8 +380,14 @@ function renderBrief(title: string, reports: ClaimReport[], extras: string[] = [
 	}
 	if (rejected.length > 0) {
 		lines.push("### Suggested not to add (Jev's reminders)");
-		for (const report of rejected) {
-			lines.push(`- [${report.action.replace("reject_", "")}] ${report.text} — ${report.reasons.join("; ")}`);
+		const shown = options?.compact ? rejected.slice(0, 5) : rejected;
+		for (const report of shown) {
+			const closest = report.closest ? `\n  closest passage (overlap ${report.closest.overlap}): "${report.closest.excerpt}"` : "";
+			lines.push(`- [${report.action.replace("reject_", "")}] ${report.text} — ${report.reasons.join("; ")}${closest}`);
+		}
+		if (options?.compact && rejected.length > shown.length) lines.push(`- … ${rejected.length - shown.length} more rejection(s)`);
+		if (rejected.length >= 3) {
+			lines.push(`- ${rejected.length} rejections this run — run \`wiki_triage\` for score ranges and the concrete fix for each.`);
 		}
 		lines.push("");
 	}
@@ -395,14 +411,14 @@ function renderBrief(title: string, reports: ClaimReport[], extras: string[] = [
 async function ingestSource(
 	runtime: Runtime,
 	ctx: ExtensionContext,
-	input: { text: string; title: string; topic: string; source?: string },
+	input: { text: string; title: string; topic: string; source?: string; sourcePath?: string; compact?: boolean },
 ): Promise<{ brief: string; details: Record<string, unknown>; rawPath: string; duplicateOf?: string }> {
 	const { loaded, layout } = runtime;
 	const client = await requireClient(loaded, ctx);
 	const config = loaded.config;
 
 	await ensureLayout(layout);
-	const redaction = redact(input.text);
+	const redaction = redact(normalizeNewlines(input.text));
 	if (redaction.findings.length > 0) {
 		await appendLedger(layout, {
 			actor: "code",
@@ -449,7 +465,7 @@ async function ingestSource(
 	const topics = await existingTopics(layout);
 
 	const perClaim = await mapLimitLocal(extraction.claims, 4, async (claim) => {
-		const evidenceText = claim.quote ?? safeText.slice(0, 6000);
+		const evidenceText = claim.quote ?? excerptAroundTerms(safeText, claim.text, 6000);
 		const adjudication = await adjudicateClaim(
 			client,
 			{ text: claim.text, kind: claim.kind, quote: claim.quote, files: claim.files, evidenceText },
@@ -537,17 +553,32 @@ async function ingestSource(
 		target: verdicts.target,
 		mergeInto: verdicts.mergeInto,
 		newPage: verdicts.newPage,
+		closest: decision.action === "reject_unsupported" ? closestPassage(safeText, claim.text) : undefined,
 	}));
 
+	const rawRel = relative(layout.root, rawPath).split("\\").join("/");
 	await appendLog(layout, "ingest", input.title, [
-		`Raw: ${relative(layout.root, rawPath).split("\\").join("/")}`,
+		`Raw: ${rawRel}`,
 		`Claims: ${reports.length} (filed ${reports.filter((r) => r.action === "file").length}, reinforced ${reports.filter((r) => r.action === "reinforce").length})`,
 	]);
 
-	const brief = renderBrief(input.title, reports, [
-		`Raw source: \`${relative(layout.root, rawPath).split("\\").join("/")}\`${sourceTruncated ? " (truncated during extraction)" : ""}`,
-		`Full text kept at the raw path for citation.`,
-	]);
+	const notes = [
+		`**Managed raw copy:** \`${rawRel}\`${input.sourcePath ? ` — \`${input.sourcePath}\` was copied, not moved${basename(input.sourcePath) !== basename(rawPath) ? " (the managed name comes from the document title)" : ""}.` : ""}`,
+	];
+	const brief = renderBrief(
+		input.title,
+		reports,
+		[
+			`Full text kept at the raw path for citation.`,
+			...(sourceTruncated ? [`Extraction was truncated to the first 40k characters.`] : []),
+			...(input.text.length > 10_000
+				? [
+					`Cost: source ${input.text.length.toLocaleString("en-US")} chars ≈ ${Math.ceil(input.text.length / 4).toLocaleString("en-US")} input tokens; each extracted claim costs up to 2 Jev calls (adjudication + placement).`,
+				]
+				: []),
+		],
+		{ notes, compact: input.compact },
+	);
 	return {
 		brief,
 		details: {
@@ -582,6 +613,8 @@ async function mapLimitLocal<T, R>(items: T[], limit: number, fn: (item: T) => P
 interface ProcessInsightsOptions {
 	source: "tool" | "compact" | "settled" | "commit";
 	mode?: WriterMode;
+	/** Visible routing note prepended to the brief (auto-capture only). */
+	routingNote?: string;
 }
 
 interface ProcessInsightsResult {
@@ -604,10 +637,11 @@ async function processInsights(
 	const candidateClaims = await collectCandidateClaims(layout);
 	const topics = await existingTopics(layout);
 	const stamp = new Date();
-	const slug = `session-${todayISO(stamp)}-${String(stamp.getHours()).padStart(2, "0")}${String(stamp.getMinutes()).padStart(2, "0")}`;
+	const slug = `session-${todayISO(stamp)}-${String(stamp.getHours()).padStart(2, "0")}${String(stamp.getMinutes()).padStart(2, "0")}${String(stamp.getSeconds()).padStart(2, "0")}`;
 
+	const userTurns = userTextFromEntries(ctx.sessionManager.getBranch());
 	const perInsight = await mapLimitLocal(insights, 4, async (insight) => {
-		const { evidenceText, files } = await buildInsightEvidence(insight, ctx.cwd);
+		const { evidenceText, files } = await buildInsightEvidence(insight, ctx.cwd, userTurns);
 		const evidenceLines = evidenceText.split("\n\n").slice(0, 8);
 		const adjudication = await adjudicateClaim(
 			client,
@@ -834,7 +868,7 @@ async function processInsights(
 			...(writeResult.written.length > 0 ? [`Written automatically (${writeResult.mode}): ${writeResult.written.join(", ")}`] : []),
 			...(writeResult.drafted.length > 0 ? [`Drafts written (${writeResult.mode}): ${writeResult.drafted.join(", ")}`] : []),
 		],
-		{ guided: writeResult.mode === "guided" },
+		{ guided: writeResult.mode === "guided", notes: options.routingNote ? [options.routingNote] : [] },
 	);
 	const accepted = reports.filter((report) => ["file", "file_user_stated", "reinforce"].includes(report.action)).length;
 	return {
@@ -1159,13 +1193,23 @@ export default function (pi: ExtensionAPI) {
 			topic: Type.Optional(Type.String({ description: "Topic directory override" })),
 			source: Type.Optional(Type.String({ description: "Origin URL or description" })),
 			mode: Type.Optional(StringEnum(["guided", "draft", "auto"] as const, { description: "Writer mode override; critical claims downgrade automatically" })),
+			compact: Type.Optional(Type.Boolean({ description: "Short brief: targets and counts without per-claim score lines" })),
+			wiki: wikiParam(),
 		}),
 		async execute(_id, params, _signal, onUpdate, ctx) {
-			const runtime = runtimeFor(ctx);
+			const runtime = await runtimeForTarget(ctx, params.wiki);
 			let text = params.text ?? "";
 			let title = params.title;
 			if (params.path) {
-				const abs = isAbsolute(params.path) ? params.path : resolve(ctx.cwd, params.path);
+				const source = params.wiki
+					? resolveSourceFile({ root: runtime.layout.root }, params.path)
+					: { absolute: isAbsolute(params.path) ? params.path : resolve(ctx.cwd, params.path), tried: [] as string[] };
+				if (!source.absolute) {
+					throw new Error(
+						`Source not found: ${params.path}. Tried: ${source.tried.join(", ")} — with \`wiki\`, relative paths resolve against the target project root; pass an absolute path for a file elsewhere.`,
+					);
+				}
+				const abs = source.absolute;
 				text = await readFile(abs, "utf8");
 				if (!title) {
 					const heading = text.match(/^#\s+(.+)$/m);
@@ -1176,8 +1220,9 @@ export default function (pi: ExtensionAPI) {
 			if (text.length > 2_000_000) throw new Error("Source is larger than the 2MB ingest cap; split it or trim it first.");
 			title = title ?? "Untitled source";
 			const topic = params.topic ?? slugify(title.split(/\s+/).slice(0, 3).join("-"), 30);
-			onUpdate?.({ content: [{ type: "text", text: `Staging "${title}"…` }], details: {} });
-			const result = await ingestSource(runtime, ctx, { text, title, topic, source: params.source });
+			const costEstimate = text.length > 10_000 ? ` · ~${Math.ceil(text.length / 4).toLocaleString("en-US")} input tokens, up to 2 Jev calls per extracted claim` : "";
+			onUpdate?.({ content: [{ type: "text", text: `Staging "${title}"${costEstimate}…` }], details: {} });
+			const result = await ingestSource(runtime, ctx, { text, title, topic, source: params.source, sourcePath: params.path, compact: params.compact });
 			const requestedMode = params.mode ?? runtime.loaded.config.writer.mode;
 			let brief = result.brief;
 			if (requestedMode !== "guided") {
@@ -1253,9 +1298,10 @@ export default function (pi: ExtensionAPI) {
 				}),
 			),
 			mode: Type.Optional(StringEnum(["guided", "draft", "auto"] as const, { description: "Writer mode override; critical claims downgrade automatically" })),
+			wiki: wikiParam(),
 		}),
 		async execute(_id, params, _signal, onUpdate, ctx) {
-			const runtime = runtimeFor(ctx);
+			const runtime = await runtimeForTarget(ctx, params.wiki);
 			const { loaded, layout } = runtime;
 			const client = await requireClient(loaded, ctx);
 			await ensureLayout(layout);
@@ -1281,6 +1327,7 @@ export default function (pi: ExtensionAPI) {
 		parameters: Type.Object({
 			pages: Type.Array(Type.String({ description: "Page paths (relative to the project or the wiki root)" })),
 			note: Type.Optional(Type.String({ description: "Short note for the log" })),
+			wiki: wikiParam(),
 			overrides: Type.Optional(
 				Type.Array(
 					Type.Object({
@@ -1292,11 +1339,11 @@ export default function (pi: ExtensionAPI) {
 			),
 		}),
 		async execute(_id, params, _signal, _onUpdate, ctx) {
-			const { loaded, layout } = runtimeFor(ctx);
+			const { loaded, layout } = await runtimeForTarget(ctx, params.wiki);
 			const updates: TocEntry[] = [];
 			const broken: string[] = [];
 			for (const page of params.pages) {
-				const absolute = await resolvePagePath(layout, ctx.cwd, page);
+				const absolute = resolvePageFile(layout, page, params.wiki ? undefined : ctx.cwd);
 				if (!absolute) {
 					broken.push(`${page} (missing)`);
 					continue;
@@ -1391,12 +1438,14 @@ export default function (pi: ExtensionAPI) {
 		parameters: Type.Object({
 			baseline: Type.Optional(Type.String({ description: "Git ref to diff from (default: last synced commit)" })),
 			dryRun: Type.Optional(Type.Boolean({ description: "Report impacts without changing pages or the baseline" })),
+			wiki: wikiParam(),
 		}),
 		async execute(_id, params, signal, onUpdate, ctx) {
-			const { loaded, layout } = runtimeFor(ctx);
+			const { loaded, layout } = await runtimeForTarget(ctx, params.wiki);
 			const client = await requireClient(loaded, ctx);
 			onUpdate?.({ content: [{ type: "text", text: "Checking code changes since the last wiki sync…" }], details: {} });
-			const report = await syncWiki(layout, client, loaded.config, ctx.cwd, {
+			const repoCwd = params.wiki ? projectRootFor(layout.root) : ctx.cwd;
+			const report = await syncWiki(layout, client, loaded.config, repoCwd, {
 				baseline: params.baseline,
 				dryRun: params.dryRun,
 				signal: ctx.signal,
@@ -1439,23 +1488,31 @@ export default function (pi: ExtensionAPI) {
 		promptSnippet: "List or resolve wiki review items",
 		promptGuidelines: [
 			"When the user asks to review the wiki, call wiki_review with action=list, read the referenced pages to gather evidence, then resolve each item.",
-			"Resolve items with accept (claim confirmed), reject (claim wrong), supersede (newer knowledge exists), or defer (leave open).",
+			"Resolve items with accept (claim confirmed), reject (claim wrong), supersede (newer knowledge exists), defer (leave open), or out_of_scope (correct claim that belongs to another wiki — record the destination in target/note).",
 		],
 		parameters: Type.Object({
 			action: StringEnum(["list", "resolve"] as const),
 			id: Type.Optional(Type.String({ description: "Review item id (for resolve)" })),
 			ids: Type.Optional(Type.Array(Type.String({ description: "Review item ids to resolve in one call (bulk resolve)" }))),
-			resolution: Type.Optional(StringEnum(["accept", "reject", "supersede", "defer"] as const)),
+			resolution: Type.Optional(StringEnum(["accept", "reject", "supersede", "defer", "out_of_scope"] as const)),
+			target: Type.Optional(Type.String({ description: "Where an out_of_scope claim belongs (registered wiki or page), recorded with the resolution" })),
+			limit: Type.Optional(Type.Number({ description: "action=list: max items to show (default 50)" })),
 			note: Type.Optional(Type.String({ description: "Reasoning or evidence for the resolution (applies to every resolved id)" })),
+			wiki: wikiParam(),
 		}),
 		async execute(_id, params, _signal, _onUpdate, ctx) {
-			const { loaded, layout } = runtimeFor(ctx);
+			const { loaded, layout } = await runtimeForTarget(ctx, params.wiki);
 			if (params.action === "list") {
-				const open = await listOpenReviews(layout, loaded.config.review.maxPerSession);
+				const limit = Math.max(1, Math.min(params.limit ?? 50, 200));
+				const open = await listOpenReviews(layout, limit);
+				const total = await openReviewCount(layout);
 				if (open.length === 0) {
-					return { content: [{ type: "text", text: "Review queue is empty." }], details: { items: [] } };
+					return { content: [{ type: "text", text: "Review queue is empty." }], details: { items: [], total: 0 } };
 				}
-				const lines = [`## Wiki review queue (${open.length} open)`, ""];
+				const lines = [
+					`## Wiki review queue (${total} open${open.length < total ? ` · showing ${open.length} — raise \`limit\` for more` : ""})`,
+					"",
+				];
 				for (const item of open) {
 					lines.push(
 						`- \`${item.id}\` · **${item.kind}** · criticality ${item.criticality.toFixed(2)}`,
@@ -1464,8 +1521,8 @@ export default function (pi: ExtensionAPI) {
 						item.reason ? `  reason: ${item.reason}` : "",
 					);
 				}
-				lines.push("", "Read the referenced pages, then resolve each with action=resolve, id=<id>, resolution=accept|reject|supersede|defer.");
-				return { content: [{ type: "text", text: lines.filter(Boolean).join("\n") }], details: { items: open } };
+				lines.push("", "Read the referenced pages, then resolve each with action=resolve, id=<id>, resolution=accept|reject|supersede|defer|out_of_scope.");
+				return { content: [{ type: "text", text: lines.filter(Boolean).join("\n") }], details: { items: open, total } };
 			}
 
 			const ids = params.ids && params.ids.length > 0 ? params.ids : params.id ? [params.id] : [];
@@ -1515,7 +1572,7 @@ export default function (pi: ExtensionAPI) {
 					action: params.resolution,
 					reason: params.note ?? item.reason,
 					outcome: applied,
-					verdict: { kind: item.kind, criticality: item.criticality, escalated: critical },
+					verdict: { kind: item.kind, criticality: item.criticality, escalated: critical, ...(params.target ? { target: params.target } : {}) },
 				});
 				results.push({ id, resolution: params.resolution, applied });
 			}
@@ -1542,9 +1599,10 @@ export default function (pi: ExtensionAPI) {
 		parameters: Type.Object({
 			autoFix: Type.Optional(Type.Boolean({ description: "Apply safe fixes (TOC entries, dispute marking); default true" })),
 			contradictions: Type.Optional(Type.Boolean({ description: "Run Jev contradiction checks; default true" })),
+			wiki: wikiParam(),
 		}),
 		async execute(_id, params, signal, onUpdate, ctx) {
-			const { loaded, layout } = runtimeFor(ctx);
+			const { loaded, layout } = await runtimeForTarget(ctx, params.wiki);
 			const client = await requireClient(loaded, ctx);
 			onUpdate?.({ content: [{ type: "text", text: "Linting the wiki…" }], details: {} });
 			const report = await lintWiki(layout, client, loaded.config, {
@@ -1591,13 +1649,14 @@ export default function (pi: ExtensionAPI) {
 		parameters: Type.Object({
 			pages: Type.Array(Type.String({ description: "Page paths relative to the project or wiki root" })),
 			reason: Type.String({ description: "Why these pages are being removed" }),
+			wiki: wikiParam(),
 		}),
 		async execute(_id, params, _signal, _onUpdate, ctx) {
-			const { layout } = runtimeFor(ctx);
+			const { layout } = await runtimeForTarget(ctx, params.wiki);
 			const removed: string[] = [];
 			const refused: string[] = [];
 			for (const page of params.pages) {
-				const absolute = await resolvePagePath(layout, ctx.cwd, page);
+				const absolute = resolvePageFile(layout, page, params.wiki ? undefined : ctx.cwd);
 				if (!absolute) {
 					refused.push(`${page} (missing)`);
 					continue;
@@ -2099,6 +2158,7 @@ export default function (pi: ExtensionAPI) {
 	});
 
 	pi.on("session_start", async (_event, ctx) => {
+		editedFiles.clear();
 		const loaded = loadConfig(ctx.cwd);
 		if (!loaded.apiKey) {
 			ctx.ui.notify(`jev-wiki: no Jev token found (expected JEV_TOKEN in ${loaded.envFilePath})`, "warning");
@@ -2123,17 +2183,83 @@ export default function (pi: ExtensionAPI) {
 
 	// --- automatic capture ------------------------------------------------------
 
+	const editedFiles = new Set<string>();
 	let autoCaptureInFlight = false;
 	let lastAutoCaptureAt = 0;
 	let lastAutoCaptureMessageCount = 0;
 	let lastCommitSeen: string | undefined;
+
+	// Tracks files the session actually edits (not reads) so auto-capture can route
+	// knowledge to the project it belongs to.
+	pi.on("tool_call", async (event) => {
+		if (event.toolName !== "edit" && event.toolName !== "write") return;
+		const path = event.input.path;
+		if (typeof path === "string" && path.trim()) editedFiles.add(path);
+	});
+
+	/** Default capture routing: the session wiki, unless the session's edits unambiguously belong to another registered wiki. */
+	async function resolveCaptureRuntime(
+		ctx: ExtensionContext,
+		loaded: LoadedConfig,
+		sessionRuntime: Runtime,
+		insights: Array<{ evidence?: Array<{ kind: string; ref: string }> }>,
+	): Promise<{ runtime: Runtime; note?: string }> {
+		if ((loaded.config.capture.route ?? "subject") === "session") return { runtime: sessionRuntime };
+		const { registration: sessionWiki } = await registerWiki(loaded.agentDir, sessionRuntime.layout.root);
+		const edited = await matchRegisteredWikis({ agentDir: loaded.agentDir, cwd: ctx.cwd, paths: [...editedFiles] });
+		if (!edited.ambiguous && edited.names.length === 1 && edited.names[0] !== sessionWiki.name) {
+			const name = edited.names[0];
+			const target = await resolveWriteTarget({
+				agentDir: loaded.agentDir,
+				cwd: ctx.cwd,
+				wikiRoot: loaded.config.wikiRoot,
+				stateRoot: loaded.config.stateRoot,
+				wikiName: name,
+			});
+			const example = edited.matches.get(name);
+			const note = `Routed to \`${name}\`${example ? ` (edited \`${example}\`)` : ""} — the session's work belongs to that project rather than \`${sessionWiki.name}\`.`;
+			await appendLedger(target.layout, {
+				actor: "code",
+				op: "capture.route",
+				action: "routed",
+				subject: `capture → ${name}`,
+				reason: note,
+				verdict: { from: sessionWiki.name, to: name, edited: [...editedFiles].slice(0, 10) },
+			});
+			return { runtime: { loaded, layout: target.layout }, note };
+		}
+		const evidencePaths = insights.flatMap((insight) => (insight.evidence ?? []).filter((item) => item.kind === "file").map((item) => item.ref));
+		const bases = (await registeredProjectRoots(loaded.agentDir)).map((entry) => entry.root);
+		const evidence = await matchRegisteredWikis({ agentDir: loaded.agentDir, cwd: ctx.cwd, paths: evidencePaths, bases });
+		const others = evidence.names.filter((name) => name !== sessionWiki.name);
+		if (others.length > 0) {
+			const note = `⚠ Capture evidence points at \`${others.join("`, `")}\` while this capture files into \`${sessionWiki.name}\`${edited.ambiguous ? " (edited files span several projects)" : ""}. Re-submit with wiki=<name> if it belongs there.`;
+			await appendLedger(sessionRuntime.layout, {
+				actor: "code",
+				op: "capture.route",
+				action: "warned",
+				subject: `capture into ${sessionWiki.name}`,
+				reason: note,
+				verdict: { evidence: others, ambiguous: edited.ambiguous || evidence.ambiguous },
+			});
+			return { runtime: sessionRuntime, note };
+		}
+		await appendLedger(sessionRuntime.layout, {
+			actor: "code",
+			op: "capture.route",
+			action: "session",
+			subject: `capture into ${sessionWiki.name}`,
+			verdict: { edited: edited.names, evidence: evidence.names },
+		});
+		return { runtime: sessionRuntime };
+	}
 
 	async function autoCapture(
 		ctx: ExtensionContext,
 		source: "compact" | "settled" | "commit",
 		entries?: unknown[],
 		options?: { minIntervalMs?: number },
-	): Promise<{ accepted: number; brief: string } | undefined> {
+	): Promise<{ accepted: number; brief: string; layout: WikiLayout } | undefined> {
 		const loaded = loadConfig(ctx.cwd);
 		if (!loaded.apiKey) return undefined;
 		const branch = entries ?? ctx.sessionManager.getBranch();
@@ -2148,11 +2274,11 @@ export default function (pi: ExtensionAPI) {
 		autoCaptureInFlight = true;
 		try {
 			const transcript = sessionTextFromEntries(branch);
-			const runtime: Runtime = {
+			const sessionRuntime: Runtime = {
 				loaded,
 				layout: resolveLayout(ctx.cwd, loaded.config.wikiRoot, loaded.config.stateRoot),
 			};
-			await ensureLayout(runtime.layout);
+			await ensureLayout(sessionRuntime.layout);
 			const client = await requireClient(loaded, ctx);
 
 			// Cheap Jev pre-screen: only pay for extraction when the session likely holds durable knowledge.
@@ -2167,7 +2293,7 @@ export default function (pi: ExtensionAPI) {
 				{ signal: ctx.signal },
 			);
 			const worth = screen.answers.worth_capturing?.type === "noul" ? screen.answers.worth_capturing.noul : 0;
-			await appendLedger(runtime.layout, {
+			await appendLedger(sessionRuntime.layout, {
 				actor: "jev",
 				op: "capture.screen",
 				subject: source,
@@ -2178,19 +2304,24 @@ export default function (pi: ExtensionAPI) {
 			if (worth < 0.6) {
 				lastAutoCaptureAt = Date.now();
 				lastAutoCaptureMessageCount = messageCount;
-				return { accepted: 0, brief: `Pre-screen skipped extraction (worth capturing ${worth.toFixed(2)}).` };
+				return { accepted: 0, brief: `Pre-screen skipped extraction (worth capturing ${worth.toFixed(2)}).`, layout: sessionRuntime.layout };
 			}
 
 			const insights = await extractInsights(ctx, transcript);
 			if (insights.length === 0) {
 				lastAutoCaptureAt = Date.now();
 				lastAutoCaptureMessageCount = messageCount;
-				return { accepted: 0, brief: "No durable insights found." };
+				return { accepted: 0, brief: "No durable insights found.", layout: sessionRuntime.layout };
 			}
-			const result = await processInsights(runtime, ctx, client, insights, { source, mode: loaded.config.writer.mode });
+			const routed = await resolveCaptureRuntime(ctx, loaded, sessionRuntime, insights);
+			const result = await processInsights(routed.runtime, ctx, client, insights, {
+				source,
+				mode: loaded.config.writer.mode,
+				routingNote: routed.note,
+			});
 			lastAutoCaptureAt = Date.now();
 			lastAutoCaptureMessageCount = messageCount;
-			return { accepted: result.accepted, brief: result.brief };
+			return { accepted: result.accepted, brief: result.brief, layout: routed.runtime.layout };
 		} catch {
 			return undefined;
 		} finally {
@@ -2214,8 +2345,7 @@ export default function (pi: ExtensionAPI) {
 			}
 			const result = await autoCapture(ctx, source, undefined, { minIntervalMs: source === "commit" ? 0 : undefined });
 			if (!result || result.accepted === 0) return;
-			const layout = resolveLayout(ctx.cwd, loaded.config.wikiRoot, loaded.config.stateRoot);
-			await writeTextAtomic(join(layout.stateDir, "pending-capture.md"), `# Pending capture\n\n${result.brief}\n\nWrite or merge the accepted pages following the llm-wiki skill, then call wiki_finalize.\n`);
+			await writeTextAtomic(join(result.layout.stateDir, "pending-capture.md"), `# Pending capture\n\n${result.brief}\n\nWrite or merge the accepted pages following the llm-wiki skill, then call wiki_finalize.\n`);
 			if (ctx.hasUI) {
 				pi.sendMessage(
 					{
@@ -2238,8 +2368,7 @@ export default function (pi: ExtensionAPI) {
 			const preparation = (event as { preparation?: { messagesToSummarize?: unknown[] } }).preparation;
 			const result = await autoCapture(ctx, "compact", preparation?.messagesToSummarize);
 			if (!result || result.accepted === 0) return;
-			const layout = resolveLayout(ctx.cwd, loaded.config.wikiRoot, loaded.config.stateRoot);
-			await writeTextAtomic(join(layout.stateDir, "pending-capture.md"), `# Pending capture (pre-compaction)\n\n${result.brief}\n\nWrite or merge the accepted pages following the llm-wiki skill, then call wiki_finalize.\n`);
+			await writeTextAtomic(join(result.layout.stateDir, "pending-capture.md"), `# Pending capture (pre-compaction)\n\n${result.brief}\n\nWrite or merge the accepted pages following the llm-wiki skill, then call wiki_finalize.\n`);
 			if (ctx.hasUI) {
 				pi.sendMessage(
 					{
@@ -2259,15 +2388,3 @@ export default function (pi: ExtensionAPI) {
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
-
-async function resolvePagePath(layout: WikiLayout, cwd: string, page: string): Promise<string | undefined> {
-	const candidates = [
-		isAbsolute(page) ? page : resolve(cwd, page),
-		resolve(layout.wikiDir, page),
-		resolve(layout.root, page),
-	];
-	for (const candidate of candidates) {
-		if (existsSync(candidate)) return candidate;
-	}
-	return undefined;
-}
