@@ -9,6 +9,8 @@ import { existsSync } from "node:fs";
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { enqueueReview } from "../src/review.ts";
+import { resolveLayout } from "../src/wiki/layout.ts";
 
 let failures = 0;
 async function check(name: string, fn: () => Promise<void> | void): Promise<void> {
@@ -107,8 +109,13 @@ try {
 	await writeFile(join(wikiA, "wiki", "decisions", "decoy.md"), frontmatter("Session decoy", "# Session decoy"));
 
 	const finalize = tools.get("wiki_finalize");
+	const review = tools.get("wiki_review");
+	const remove = tools.get("wiki_remove");
 	assert.ok(finalize, "wiki_finalize is registered");
+	assert.ok(review && remove, "wiki_review and wiki_remove are registered");
 	const run = (params: Record<string, unknown>) => finalize!.execute("test", params, undefined, undefined, ctx);
+	const runReview = (params: Record<string, unknown>) => review!.execute("test", params, undefined, undefined, ctx);
+	const runRemove = (params: Record<string, unknown>) => remove!.execute("test", params, undefined, undefined, ctx);
 
 	await check("cross-wiki finalize writes only the target wiki", async () => {
 		const result = await run({ pages: ["decisions/smoke.md"], note: "cross-wiki smoke", wiki: "beta" });
@@ -135,6 +142,33 @@ try {
 
 	await check("unknown target lists the registered wikis", async () => {
 		await assert.rejects(() => run({ pages: ["decisions/decoy.md"], wiki: "nope" }), /alpha, beta/);
+	});
+
+	await check("review listing honors the target wiki", async () => {
+		await enqueueReview(resolveLayout(wikiB, ".", ".jev-wiki"), {
+			kind: "claim_review",
+			claimText: "beta-only item",
+			criticality: 0.3,
+			reason: "integration",
+		});
+		await enqueueReview(resolveLayout(wikiA, "docs/wiki", ".jev-wiki"), {
+			kind: "claim_review",
+			claimText: "alpha-only item",
+			criticality: 0.3,
+			reason: "integration",
+		});
+		const result = await runReview({ action: "list", wiki: "beta" });
+		assert.match(result.content[0].text, /beta-only item/);
+		assert.doesNotMatch(result.content[0].text, /alpha-only item/, "session wiki queue must not leak into the target listing");
+	});
+
+	await check("cross-wiki remove deletes only the target page", async () => {
+		await writeFile(join(wikiB, "wiki", "decisions", "gone.md"), frontmatter("Gone", "# Gone"));
+		await writeFile(join(wikiA, "wiki", "decisions", "gone.md"), frontmatter("Decoy", "# Decoy"));
+		const result = await runRemove({ pages: ["decisions/gone.md"], reason: "integration", wiki: "beta" });
+		assert.match(result.content[0].text, /Removed 1 page/);
+		assert.ok(!existsSync(join(wikiB, "wiki", "decisions", "gone.md")), "target page removed");
+		assert.ok(existsSync(join(wikiA, "wiki", "decisions", "gone.md")), "session decoy survives");
 	});
 } finally {
 	await rm(root, { recursive: true, force: true });

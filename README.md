@@ -47,6 +47,11 @@ the agent decides and writes, with the final say, and code owns every threshold.
 5. **Upkeep** — file-linked claims are re-verified against commits (`wiki_sync`), lint catches
    stale, orphaned, or unbacked claims, and superseded knowledge is linked, never deleted.
 
+**Jev is the cheap resource.** A Jev call costs a fraction of the model context it replaces, so the
+pipeline asks Jev before guessing: placement, retrieval relevance and sufficiency, contradiction and
+duplicate checks, sync impact, and rejection triage all run through Jev whenever they apply. Model
+tokens are the scarce budget — `skills/llm-wiki/SKILL.md` says so explicitly for agents.
+
 ## What it does
 
 | Tool | Purpose |

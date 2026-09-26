@@ -21,6 +21,10 @@
   score, and briefs with 3+ rejections point at `wiki_triage`.
 - `wiki_doctor` re-hashes indexed raw sources against `.jev-wiki/raw-index.json` and reports stale
   `*.tmp-*` files left by interrupted atomic writes.
+- An offline integration test (`scripts/integration-test.ts`, part of `test:all`) drives the real
+  tool handlers through the extension with a sandboxed `PI_CODING_AGENT_DIR` registry, asserting
+  that cross-wiki finalize/remove/review calls affect only the target wiki and cannot fall back to
+  the session workspace.
 
 ### Changed
 
@@ -37,6 +41,8 @@
 - Contradiction checks skip near-identical claim pairs (two revisions of one source) before
   spending a Jev call.
 - `wiki_doctor` no longer fails the env-file check when the key file lives outside the repository.
+- Capture evidence validation uses the transcript of the entries the capture actually read (compact
+  captures summarize a subset), and edited-file tracking is capped per session.
 
 ### Docs
 
@@ -44,6 +50,8 @@
   brief, and frontmatter re-serialization on write (`support: "0.90"` → `support: 0.90`;
   re-read a page after any tool write before editing it).
 - `README.md`: write- and capture-side cross-wiki story; tool table refreshed.
+- `SKILL.md` + README: **use Jev liberally** — Jev tokens are cheap relative to model context, so
+  prefer an extra Jev call (placement, relevance, contradiction, sync, triage) over a guess.
 
 ## 0.7.1 — 2026-09-26
 

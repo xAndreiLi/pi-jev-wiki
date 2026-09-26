@@ -615,6 +615,8 @@ interface ProcessInsightsOptions {
 	mode?: WriterMode;
 	/** Visible routing note prepended to the brief (auto-capture only). */
 	routingNote?: string;
+	/** User-turn text of the entries the capture actually read (compact captures summarize a subset). */
+	userTurns?: string;
 }
 
 interface ProcessInsightsResult {
@@ -639,7 +641,7 @@ async function processInsights(
 	const stamp = new Date();
 	const slug = `session-${todayISO(stamp)}-${String(stamp.getHours()).padStart(2, "0")}${String(stamp.getMinutes()).padStart(2, "0")}${String(stamp.getSeconds()).padStart(2, "0")}`;
 
-	const userTurns = userTextFromEntries(ctx.sessionManager.getBranch());
+	const userTurns = options.userTurns ?? userTextFromEntries(ctx.sessionManager.getBranch());
 	const perInsight = await mapLimitLocal(insights, 4, async (insight) => {
 		const { evidenceText, files } = await buildInsightEvidence(insight, ctx.cwd, userTurns);
 		const evidenceLines = evidenceText.split("\n\n").slice(0, 8);
@@ -2194,7 +2196,7 @@ export default function (pi: ExtensionAPI) {
 	pi.on("tool_call", async (event) => {
 		if (event.toolName !== "edit" && event.toolName !== "write") return;
 		const path = event.input.path;
-		if (typeof path === "string" && path.trim()) editedFiles.add(path);
+		if (typeof path === "string" && path.trim() && editedFiles.size < 200) editedFiles.add(path);
 	});
 
 	/** Default capture routing: the session wiki, unless the session's edits unambiguously belong to another registered wiki. */
@@ -2318,6 +2320,7 @@ export default function (pi: ExtensionAPI) {
 				source,
 				mode: loaded.config.writer.mode,
 				routingNote: routed.note,
+				userTurns: userTextFromEntries(branch),
 			});
 			lastAutoCaptureAt = Date.now();
 			lastAutoCaptureMessageCount = messageCount;
