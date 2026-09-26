@@ -321,3 +321,46 @@
 - Raw: raw/sessions/2026-09-26-session-2026-09-26-2250.md
 - Filed 0 · reinforced 2 · review 1 · rejected 5
 
+## [2026-09-26] capture | 2 insights (tool)
+- Raw: raw/sessions/2026-09-26-session-2026-09-26-2307.md
+- Filed 1 · reinforced 0 · review 0 · rejected 1
+
+## [2026-09-26] finalize | File the one-install-source gotcha (dropped from the 2026-09-26 home-session capture) into the repo wiki with README + commit evidence
+- Updated: pi/one-install-source.md
+
+## [2026-09-26] capture | 7 insights (settled)
+- Raw: raw/sessions/2026-09-26-session-2026-09-26-2308.md
+- Filed 2 · reinforced 2 · review 0 · rejected 3
+
+## [2026-09-26] finalize | Task-cadence capture from the 2026-09-26 report session: filed the cwd-relative evidence-resolution gotcha (c1) plus the quote/tool-result fallback gap (c2); corroborated the one-install-source claim. Declined two reinforce proposals: the c4 adjudication anecdote (policy already covered by adjudication-policy.md) and the wiki-layout routing rationale (decision pending, wrong page).
+- Updated: architecture/gotcha-capture-evidence-resolution.md
+- Updated: pi/one-install-source.md
+
+## [2026-09-26] ingest | Session capture 2026-09-26 (home session, moved from the life wiki)
+- Raw: raw/session-capture-2026-09-26/2026-09-26-session-capture-2026-09-26-home-session-moved-from-the-life.md
+- Claims: 21 (filed 2, reinforced 4)
+
+## [2026-09-26] finalize | Move-in of the two repo-specific life-wiki pages (home session capture 2026-09-26, ingested as raw/session-capture-2026-09-26/…): capture routing/gating invariant (cwd targeting + 0.6 pre-screen) and extension load timing. Corrected the moved page's generalization: config values are re-read per event, only plugin code is frozen at session start. Declined the forward-compat onSettle extrapolation and the standalone smoke-run observation (evidence, not a claim).
+- Updated: invariants/capture-routing-and-gating.md
+- Updated: invariants/extension-loads-at-session-start.md
+
+## [2026-09-26] lint | 0 added, 0 broken links, 0 unbacked claims
+- Pages: 30
+- TOC updated: 0 · missing files: 0
+- Orphans: 0 · raw backlog: 0
+- Contradiction checks: 8 · duplicate candidates: 1
+
+## [2026-09-26] capture | 3 insights (tool)
+- Raw: raw/sessions/2026-09-26-session-2026-09-26-2317.md
+- Filed 1 · reinforced 0 · review 1 · rejected 1
+
+## [2026-09-26] finalize | File the embedding-progress gotcha (182 events on a cached load; progress now goes to a throttled footer status) and record shard pruning as table-of-contents.md#c8. The progress-sink policy detail stays in the gotcha body, not as a separate claim (derivable from code).
+- Updated: architecture/gotcha-embedding-progress-events.md
+- Updated: architecture/table-of-contents.md
+
+## [2026-09-26] lint | 0 added, 0 broken links, 0 unbacked claims
+- Pages: 31
+- TOC updated: 0 · missing files: 0
+- Orphans: 0 · raw backlog: 0
+- Contradiction checks: 8 · duplicate candidates: 1
+

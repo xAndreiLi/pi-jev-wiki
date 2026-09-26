@@ -5,7 +5,7 @@ topic: architecture
 summary: "The wiki maintains coordinated catalog artifacts: index.md is the complete machine catalog, toc.md plus toc/<topic>.md the compact agent-facing view, and .jev-wiki/toc.json the derived machine manifest — all written by one locked writer, with a cross-wiki catalog over the registry."
 tags: [toc, index, manifest, catalog, registry, architecture]
 updated: 2026-09-26
-sources: [raw/sessions/2026-09-19-session-2026-09-19-1921.md, raw/knowledge-pipeline-current/2026-09-26-knowledge-pipeline-current-state.md]
+sources: [raw/sessions/2026-09-19-session-2026-09-19-1921.md, raw/knowledge-pipeline-current/2026-09-26-knowledge-pipeline-current-state.md, raw/sessions/2026-09-26-session-2026-09-26-2317.md]
 claims:
   - id: c1
     text: "The agent-facing table of contents is hierarchical: index.md stays the complete machine catalog while toc.md holds the compact view with per-topic tables, keeping the agent-facing TOC about a kilobyte at a thousand pages."
@@ -54,6 +54,13 @@ claims:
     evidence: [raw/knowledge-pipeline-current/2026-09-26-knowledge-pipeline-current-state.md]
     reviewed: 2026-09-26
     last_checked: 2026-09-26
+  - id: c8
+    text: "writeIndex prunes toc/<topic>.md shards for topics with no entries left, so removing the last page of a topic cannot leave a stale agent-facing TOC shard behind."
+    status: verified
+    support: 0.9
+    evidence: [raw/sessions/2026-09-26-session-2026-09-26-2317.md, src/wiki/toc.ts, scripts/unit-test.ts]
+    reviewed: 2026-09-26
+    last_checked: 2026-09-26
 files: [src/wiki/toc.ts, src/wiki/manifest.ts, src/vector/catalog.ts, src/vector/registry.ts]
 ---
 
@@ -76,6 +83,7 @@ files: [src/wiki/toc.ts, src/wiki/manifest.ts, src/vector/catalog.ts, src/vector
 - The human TOC (`index.md`, `toc/<topic>.md`) and the machine manifest (`.jev-wiki/toc.json`) are written by the same single writer under the wiki lock (`updateIndex`), so they cannot drift silently.
 - `wiki_toc scope=all` is the cross-wiki catalog: pages, topics, chunks, model, last indexed, and staleness flags (`toc-stale`, `index-stale`, `root-missing`, `never-indexed`, `model-mismatch`), paged and failure-isolated.
 - Staleness is computed from current page mtimes, never guessed; `npm run toc:refresh` migrates wikis created before manifests existed.
+- `writeIndex` writes the topic shards for topics with entries and prunes shards whose topic emptied, so a removal cannot leave a stale `toc/<topic>.md` behind.
 - The registry at `~/.pi/agent/jev-wiki/wikis.json` is the source of wiki membership; discovery (`wiki_index action=discover`) finds wikis on disk (home + WSL) and can adopt them.
 
 ## Invariants

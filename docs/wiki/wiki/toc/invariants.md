@@ -2,6 +2,8 @@
 
 | Page | Type | Tags | Summary | Updated |
 |------|------|------|---------|---------|
+| [Capture routing and gating](invariants/capture-routing-and-gating.md) | invariant | capture routing gating cadence jev | Automatic capture targets the wiki of the session's working directory, and task-cadence captures pass a Jev pre-screen that extracts only sessions scoring at least 0.6 on worth_capturing. | 2026-09-26 |
+| [Extension loads at session start](invariants/extension-loads-at-session-start.md) | invariant | extension lifecycle reload configuration capture | The extension is loaded when a session starts, so a plugin upgrade or a capture feature the running version lacks needs /reload or a new session; config files are re-read per event, so cadence edits apply on the next settle. | 2026-09-26 |
 | [Filing boundaries](invariants/filing-boundaries.md) | invariant | adjudication boundaries sensitive injection contradictions | Two boundaries are absolute even though Jev verdicts are advisory: sensitive content and injected instructions are never filed, and contradictions are never resolved silently. | 2026-09-26 |
 | [Generated files are never hand-edited](invariants/generated-files.md) | invariant | generated toc log | wiki/index.md and wiki/log.md are generated files and must never be hand-edited. | 2026-09-19 |
 | [Jev returns typed decisions, never text](invariants/jev-typed-decisions.md) | invariant | jev types api | The Jev decision model must return typed decisions (noul, choice, score) rather than free-form text. | 2026-09-19 |
