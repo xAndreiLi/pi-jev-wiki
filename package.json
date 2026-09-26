@@ -44,8 +44,9 @@
     "test:paging": "jiti scripts/paging-test.ts",
     "test:scale": "jiti scripts/scale-test.ts",
     "test:unit": "jiti scripts/unit-test.ts",
+    "test:integration": "jiti scripts/integration-test.ts",
     "test:vector": "jiti scripts/vector-test.ts",
-    "test:all": "tsc --noEmit && jiti scripts/unit-test.ts && jiti scripts/scale-test.ts && jiti scripts/vector-test.ts",
+    "test:all": "tsc --noEmit && jiti scripts/unit-test.ts && jiti scripts/integration-test.ts && jiti scripts/scale-test.ts && jiti scripts/vector-test.ts",
     "release": "jiti scripts/release.ts",
     "toc:refresh": "jiti scripts/refresh-toc.ts",
     "prepublishOnly": "npm run test:all"
