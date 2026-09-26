@@ -416,7 +416,18 @@ Global `~/.pi/agent/jev-wiki.json`, project `<cwd>/.pi/jev-wiki.json` (project t
   "toc": { "maxTokens": 3000 },
   "gitCommit": false,
   "capture": { "onCompact": false, "onSettle": false },
-  "search": { "engine": "index", "qmdCollection": null }
+  "search": {
+    "engine": "auto",
+    "qmdCollection": null,
+    "vector": {
+      "enabled": true,
+      "db": "embedded",
+      "model": "performance",
+      "chunk": { "pageSections": true, "maxTokens": 1200, "overlap": 160 },
+      "sync": { "onFinalize": true },
+      "fusion": { "rrfK": 60, "candidateMultiplier": 3 }
+    }
+  }
 }
 ```
 

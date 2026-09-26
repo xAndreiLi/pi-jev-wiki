@@ -516,7 +516,17 @@ This is the calibration and audit substrate: per-wiki precision of auto-accepts,
   "capture": { "onCompact": false, "onSettle": false },
   "toc": { "maxTokens": 3000 },
   "gitCommit": false,
-  "search": { "engine": "index" }                  // index | bm25 | qmd
+  "search": {                                   // auto | index | bm25 | vector | hybrid | qmd
+    "engine": "auto",
+    "vector": {
+      "enabled": true,
+      "db": "embedded",                         // PGlite + pgvector (server Postgres: P4)
+      "model": "performance",                    // performance (EmbeddingGemma) | quality (Qwen3)
+      "chunk": { "pageSections": true, "maxTokens": 1200, "overlap": 160 },
+      "sync": { "onFinalize": true },
+      "fusion": { "rrfK": 60, "candidateMultiplier": 3 }
+    }
+  }
 }
 ```
 

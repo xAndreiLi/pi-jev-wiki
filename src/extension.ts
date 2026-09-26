@@ -54,7 +54,10 @@ import {
 } from "./wiki/layout.ts";
 import { extractMarkdownLinks } from "./wiki/links.ts";
 import { appendLog, entryFromPage, isWikiMetaFile, parseIndex, readIndex, readRecentLog, renderCompactToc, renderIndex, topicSlug, updateIndex, upsertEntries, writeIndex, type TocEntry } from "./wiki/toc.ts";
-import { createSearchEngine } from "./wiki/search.ts";
+import { createSearchEngine, VectorSearchEngine, type SearchResult } from "./wiki/search.ts";
+import { forgetWikiIndex, indexWiki, vectorStatus } from "./vector/index.ts";
+import { vectorEnabled, vectorSearch } from "./vector/query.ts";
+import { enabledWikiNames, readRegistry, registerWiki, setWikiEnabled, unregisterWiki } from "./vector/registry.ts";
 
 interface Runtime {
 	loaded: LoadedConfig;
@@ -255,6 +258,18 @@ function bestCandidateClaim(text: string, candidates: CandidateClaim[]): Candida
 		if (!best || score > best.score) best = { candidate, score };
 	}
 	return best && best.score >= 0.3 ? best.candidate : undefined;
+}
+
+/** Resolve a wiki by registered name, or auto-register the current wiki root. */
+async function resolveTargetWiki(agentDir: string, currentRoot: string, name?: string): Promise<{ name: string; root: string }> {
+	if (name) {
+		const registry = await readRegistry(agentDir);
+		const entry = registry.wikis.find((candidate) => candidate.name === name);
+		if (!entry) throw new Error(`Wiki "${name}" is not registered. Run wiki_index action=status to list wikis.`);
+		return { name: entry.name, root: entry.root };
+	}
+	const { registration } = await registerWiki(agentDir, currentRoot);
+	return { name: registration.name, root: registration.root };
 }
 
 function renderBrief(title: string, reports: ClaimReport[], extras: string[] = [], options?: { guided?: boolean }): string {
@@ -895,27 +910,72 @@ export default function (pi: ExtensionAPI) {
 		parameters: Type.Object({
 			query: Type.String({ description: "What you need to know" }),
 			limit: Type.Optional(Type.Number({ description: "Max pages to return (default 5)" })),
+			scope: Type.Optional(StringEnum(["local", "all"] as const, { description: "Semantic scope: current wiki (default) or all registered wikis" })),
+			wikis: Type.Optional(Type.Array(Type.String({ description: "Explicit registered wiki names to search (semantic mode)" }))),
+			search: Type.Optional(StringEnum(["auto", "keyword", "semantic", "hybrid"] as const, { description: "Retrieval mode; defaults to the configured search.engine" })),
 		}),
 		async execute(_id, params, _signal, _onUpdate, ctx) {
 			const { loaded, layout } = runtimeFor(ctx);
-			const engine = createSearchEngine(loaded.config, layout, globalLayoutFor(loaded));
 			const limit = Math.max(1, Math.min(params.limit ?? 5, 10));
-			const results = await engine.search({ query: params.query, limit });
+			const notes: string[] = [];
+			let vectorEngine: VectorSearchEngine | undefined;
+			if (vectorEnabled(loaded.config) && params.search !== "keyword") {
+				try {
+					const { registration } = await registerWiki(loaded.agentDir, layout.root);
+					const registry = await readRegistry(loaded.agentDir);
+					const wikis = params.wikis && params.wikis.length > 0
+						? params.wikis
+						: params.scope === "all"
+							? enabledWikiNames(registry)
+							: [registration.name];
+					vectorEngine = new VectorSearchEngine((query, count) =>
+						vectorSearch(loaded.agentDir, loaded.config, query, { limit: count, wikis }),
+					);
+				} catch (error) {
+					notes.push(`Semantic search unavailable: ${(error as Error).message}`);
+				}
+			}
+			const mode = params.search;
+			const engineName = mode === "keyword" ? "index" : mode === "semantic" ? "vector" : mode === "hybrid" ? "hybrid" : loaded.config.search.engine;
+			const engine = createSearchEngine(
+				{ ...loaded.config, search: { ...loaded.config.search, engine: engineName } },
+				layout,
+				globalLayoutFor(loaded),
+				vectorEngine,
+			);
+			let results: SearchResult[];
+			try {
+				results = await engine.search({ query: params.query, limit });
+			} catch (error) {
+				notes.push(`Semantic search failed (${(error as Error).message}); used keyword search instead.`);
+				const fallback = createSearchEngine(
+					{ ...loaded.config, search: { ...loaded.config.search, engine: "index" } },
+					layout,
+					globalLayoutFor(loaded),
+				);
+				results = await fallback.search({ query: params.query, limit });
+			}
+			if (mode === "semantic" && !vectorEngine) {
+				notes.push("Semantic mode requested but no vector engine is available; results are keyword-based. Run wiki_index status.");
+			}
 			if (results.length === 0) {
 				return {
-					content: [{ type: "text", text: `No wiki pages match (engine: ${engine.name}). The wiki may not cover this yet.` }],
+					content: [{ type: "text", text: [`No wiki pages match (engine: ${engine.name}). The wiki may not cover this yet.`, ...notes].join("\n") }],
 					details: { matches: 0, engine: engine.name },
 				};
 			}
 			const text = results
 				.map((result) => {
-					const scope = result.source === "global" ? " [global vault]" : "";
-					return [`### ${result.path}${scope} (score ${result.score})`, result.excerpt].join("\n");
+					const scope = result.source === "global" ? " [global vault]" : result.wiki ? ` [${result.wiki}]` : "";
+					const anchor = result.anchor ? `#${result.anchor}` : "";
+					const meta = [result.kind, result.status].filter(Boolean).join(" · ");
+					return [`### ${result.path}${anchor}${scope} (score ${result.score.toFixed(3)}${meta ? ` · ${meta}` : ""})`, result.excerpt].join("\n");
 				})
 				.join("\n\n");
-			const pages = results.map((result) => result.path);
+			const pages = results.map((result) => (result.wiki ? `${result.wiki}/${result.path}` : result.path));
 			await recordMetric(layout, { op: "ask", query: params.query, pages, detail: { engine: engine.name } });
-			return { content: [{ type: "text", text }], details: { matches: results.length, pages, engine: engine.name } };
+			const output = notes.length > 0 ? `${text}\n\nNotes: ${notes.join(" ")}` : text;
+			return { content: [{ type: "text", text: output }], details: { matches: results.length, pages, engine: engine.name } };
 		},
 	});
 
@@ -1069,7 +1129,7 @@ export default function (pi: ExtensionAPI) {
 			),
 		}),
 		async execute(_id, params, _signal, _onUpdate, ctx) {
-			const { layout } = runtimeFor(ctx);
+			const { loaded, layout } = runtimeFor(ctx);
 			const updates: TocEntry[] = [];
 			const broken: string[] = [];
 			for (const page of params.pages) {
@@ -1117,7 +1177,26 @@ export default function (pi: ExtensionAPI) {
 				`Updated TOC for ${updates.length} page(s): ${updates.map((entry) => `\`${entry.path}\``).join(", ") || "(none)"}`,
 				broken.length ? `Broken links:\n${broken.map((item) => `- ${item}`).join("\n")}` : "No broken links found.",
 			];
+			let reindexNote: string | undefined;
+			const vector = loaded.config.search.vector;
+			if (vector.enabled && vector.sync.onFinalize && updates.length > 0) {
+				try {
+					const { registration } = await registerWiki(loaded.agentDir, layout.root);
+					const report = await indexWiki({
+						agentDir: loaded.agentDir,
+						wiki: registration.name,
+						root: layout.root,
+						model: vector.model,
+						...(vector.dimensions ? { dimensions: vector.dimensions } : {}),
+						paths: updates.map((entry) => entry.path),
+					});
+					reindexNote = `Reindexed ${report.embedded} chunk(s), ${report.skipped} unchanged (${report.total} total).`;
+				} catch (error) {
+					reindexNote = `Semantic reindex skipped: ${(error as Error).message}`;
+				}
+			}
 			if (overrides.length > 0) lines.push(`Recorded ${overrides.length} override(s) against Jev's advice.`);
+			if (reindexNote) lines.push(reindexNote);
 			return {
 				content: [{ type: "text", text: lines.join("\n") }],
 				details: { updated: updates.map((entry) => entry.path), broken, overrides: overrides.map((override) => override.text.slice(0, 120)) },
@@ -1389,6 +1468,75 @@ export default function (pi: ExtensionAPI) {
 			const { layout } = runtimeFor(ctx);
 			const report = await scanStructure(ctx.cwd, layout);
 			return { content: [{ type: "text", text: renderStructure(report) }], details: report };
+		},
+	});
+
+	pi.registerTool({
+		name: "wiki_index",
+		label: "Manage the Semantic Index",
+		description:
+			"Manage the cross-wiki semantic search index (PGlite + pgvector): status, rebuild a wiki, add/remove registered wikis, or enable/disable indexing.",
+		promptSnippet: "Manage the cross-wiki semantic index",
+		promptGuidelines: [
+			"Use wiki_index status to check index health; rebuild after changing search.vector.model or when doctor reports a stale index.",
+			"The semantic index is a derived cache — a model change re-embeds the whole wiki.",
+		],
+		parameters: Type.Object({
+			action: StringEnum(["status", "rebuild", "add", "remove", "enable", "disable"] as const),
+			wiki: Type.Optional(Type.String({ description: "Registered wiki name (defaults to the current wiki)" })),
+			path: Type.Optional(Type.String({ description: "Wiki root path for action=add (defaults to the current wiki root)" })),
+		}),
+		async execute(_id, params, _signal, _onUpdate, ctx) {
+			const { loaded, layout } = runtimeFor(ctx);
+			const vector = loaded.config.search.vector;
+			if (params.action === "status") {
+				const status = await vectorStatus(loaded.agentDir, vector.model, vector.dimensions ?? undefined);
+				const lines = [
+					"# Semantic index",
+					`- preset: ${vector.model} (${status.repo}), ${status.dimensions}d, ~${Math.round(status.downloadBytes / 1_000_000)} MB download`,
+					`- models dir: ${status.modelsDir}`,
+					`- database: ${status.dbAvailable ? "ok" : `unavailable — ${status.error}`}`,
+					"",
+					`Registered wikis (${status.registry.wikis.length}):`,
+					...status.registry.wikis.map((entry) => {
+						const state = status.states.find((candidate) => candidate.name === entry.name);
+						const detail = state ? `${state.chunks} chunks, ${state.model} ${state.dim}d, updated ${state.updatedAt}` : "not indexed yet";
+						return `- ${entry.name}${entry.enabled ? "" : " (disabled)"} — ${entry.root} — ${detail}`;
+					}),
+				];
+				return { content: [{ type: "text", text: lines.join("\n") }], details: status };
+			}
+			if (params.action === "rebuild") {
+				const target = await resolveTargetWiki(loaded.agentDir, layout.root, params.wiki);
+				const report = await indexWiki({
+					agentDir: loaded.agentDir,
+					wiki: target.name,
+					root: target.root,
+					model: vector.model,
+					...(vector.dimensions ? { dimensions: vector.dimensions } : {}),
+				});
+				return {
+					content: [{ type: "text", text: `Indexed \`${target.name}\`: ${report.embedded} embedded, ${report.skipped} unchanged, ${report.removed} removed, ${report.total} chunks in ${report.milliseconds}ms.` }],
+					details: report,
+				};
+			}
+			if (params.action === "add") {
+				const root = params.path ? resolve(ctx.cwd, params.path) : layout.root;
+				const { registration, created } = await registerWiki(loaded.agentDir, root, { name: params.wiki });
+				return {
+					content: [{ type: "text", text: `${created ? "Registered" : "Already registered"} wiki \`${registration.name}\` → ${registration.root}` }],
+					details: registration,
+				};
+			}
+			if (params.action === "remove") {
+				const target = await resolveTargetWiki(loaded.agentDir, layout.root, params.wiki);
+				await forgetWikiIndex(loaded.agentDir, target.name);
+				await unregisterWiki(loaded.agentDir, target.name);
+				return { content: [{ type: "text", text: `Removed \`${target.name}\` from the index and registry.` }], details: target };
+			}
+			const target = await resolveTargetWiki(loaded.agentDir, layout.root, params.wiki);
+			const updated = await setWikiEnabled(loaded.agentDir, target.name, params.action === "enable");
+			return { content: [{ type: "text", text: `${updated?.enabled ? "Enabled" : "Disabled"} \`${target.name}\`.` }], details: updated };
 		},
 	});
 

@@ -21,6 +21,12 @@ export interface SearchResult {
 	score: number;
 	excerpt: string;
 	source?: "project" | "global";
+	/** Registered wiki name for cross-wiki (vector) results. */
+	wiki?: string;
+	/** Claim id or chunk key inside the page, when known. */
+	anchor?: string;
+	kind?: string;
+	status?: string;
 }
 
 export interface SearchOptions {
@@ -241,10 +247,29 @@ export class QmdSearchEngine implements SearchEngine {
 	}
 }
 
-export function createSearchEngine(config: ResolvedConfig, layout: WikiLayout, globalLayout?: WikiLayout): SearchEngine {
+export function createSearchEngine(
+	config: ResolvedConfig,
+	layout: WikiLayout,
+	globalLayout?: WikiLayout,
+	vector?: SearchEngine,
+): SearchEngine {
+	const requested = config.search.engine;
+	const lexical = createLexicalEngine(config, layout, globalLayout, requested);
+	const rrfK = config.search.vector?.fusion?.rrfK ?? 60;
+	if (requested === "vector") return vector ?? lexical;
+	if ((requested === "hybrid" || requested === "auto") && vector) return new HybridSearchEngine(lexical, vector, rrfK);
+	return lexical;
+}
+
+function createLexicalEngine(
+	config: ResolvedConfig,
+	layout: WikiLayout,
+	globalLayout: WikiLayout | undefined,
+	requested: ResolvedConfig["search"]["engine"],
+): SearchEngine {
 	const engines: SearchEngine[] = [];
-	if (config.search.engine === "qmd") engines.push(new QmdSearchEngine(layout, config.search.qmdCollection));
-	if (config.search.engine === "bm25") engines.push(new Bm25SearchEngine(layout));
+	if (requested === "qmd") engines.push(new QmdSearchEngine(layout, config.search.qmdCollection));
+	if (requested === "bm25" || requested === "hybrid" || requested === "auto") engines.push(new Bm25SearchEngine(layout));
 	if (engines.length === 0) engines.push(new IndexSearchEngine(layout));
 	if (globalLayout && existsSync(globalLayout.wikiDir)) engines.push(new Bm25SearchEngine(globalLayout));
 	const primary = engines[0];
@@ -260,4 +285,52 @@ export function createSearchEngine(config: ResolvedConfig, layout: WikiLayout, g
 			return results.sort((a, b) => b.score - a.score).slice(0, options.limit ?? 5);
 		},
 	};
+}
+
+/** Wrap a query function (embed + KNN) as a search engine. */
+export class VectorSearchEngine implements SearchEngine {
+	name = "vector";
+
+	constructor(private readonly query: (query: string, limit: number) => Promise<SearchResult[]>) {}
+
+	async search(options: SearchOptions): Promise<SearchResult[]> {
+		return this.query(options.query, options.limit ?? 5);
+	}
+}
+
+/**
+ * Reciprocal Rank Fusion of independently ranked result lists. Ranks are fused,
+ * not scores — which is what makes lexical (BM25) and vector scores comparable.
+ */
+export function rrfFuse(rankings: SearchResult[][], k = 60): SearchResult[] {
+	const fused = new Map<string, { result: SearchResult; score: number }>();
+	for (const ranking of rankings) {
+		ranking.forEach((result, index) => {
+			const key = `${result.wiki ?? ""}\u0000${result.path}\u0000${result.anchor ?? ""}`;
+			const entry = fused.get(key) ?? { result, score: 0 };
+			entry.score += 1 / (k + index + 1);
+			if (!entry.result.wiki && result.wiki) entry.result = result;
+			fused.set(key, entry);
+		});
+	}
+	return [...fused.values()].sort((a, b) => b.score - a.score).map((entry) => ({ ...entry.result, score: entry.score }));
+}
+
+/** BM25/index results plus semantic results, fused by rank. */
+export class HybridSearchEngine implements SearchEngine {
+	name: string;
+
+	constructor(private readonly lexical: SearchEngine, private readonly vector: SearchEngine, private readonly rrfK = 60) {
+		this.name = `${lexical.name}+vector`;
+	}
+
+	async search(options: SearchOptions): Promise<SearchResult[]> {
+		const limit = options.limit ?? 5;
+		const candidateLimit = Math.max(limit, limit * 3);
+		const [lexical, semantic] = await Promise.all([
+			this.lexical.search({ ...options, limit: candidateLimit }).catch(() => [] as SearchResult[]),
+			this.vector.search({ ...options, limit: candidateLimit }).catch(() => [] as SearchResult[]),
+		]);
+		return rrfFuse([lexical, semantic], this.rrfK).slice(0, limit);
+	}
 }

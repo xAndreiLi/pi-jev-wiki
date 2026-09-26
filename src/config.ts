@@ -49,7 +49,21 @@ export interface JevWikiConfig {
 	lint: { orphanMinAgeDays: number; duplicateSimilarity: number };
 	gitCommit: boolean;
 	capture: { onCompact: boolean; onSettle: boolean };
-	search: { engine: "index" | "bm25" | "qmd"; qmdCollection?: string };
+	search: {
+		engine: "auto" | "index" | "bm25" | "vector" | "hybrid" | "qmd";
+		qmdCollection?: string;
+		vector: {
+			enabled: boolean;
+			db: "embedded";
+			url?: string | null;
+			model: string;
+			dtype?: string | null;
+			dimensions?: number | null;
+			chunk: { pageSections: boolean; maxTokens: number; overlap: number };
+			sync: { onFinalize: boolean };
+			fusion: { rrfK: number; candidateMultiplier: number };
+		};
+	};
 }
 
 export interface ResolvedConfig extends Omit<JevWikiConfig, "baseUrl" | "model"> {
@@ -72,7 +86,17 @@ export const DEFAULT_CONFIG: JevWikiConfig = {
 	lint: { orphanMinAgeDays: 7, duplicateSimilarity: 0.72 },
 	gitCommit: false,
 	capture: { onCompact: false, onSettle: false },
-	search: { engine: "index" },
+	search: {
+		engine: "auto",
+		vector: {
+			enabled: true,
+			db: "embedded",
+			model: "performance",
+			chunk: { pageSections: true, maxTokens: 1200, overlap: 160 },
+			sync: { onFinalize: true },
+			fusion: { rrfK: 60, candidateMultiplier: 3 },
+		},
+	},
 };
 
 export interface LoadedConfig {

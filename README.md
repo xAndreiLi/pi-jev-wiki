@@ -22,7 +22,8 @@ the agent decides and writes, with the final say. Code owns every threshold.
 | Tool | Purpose |
 |---|---|
 | `wiki_toc` | the wiki table of contents (compact above 60 pages, per-topic tables) |
-| `wiki_ask` | find pages and excerpts (index / BM25 / qmd engine) |
+| `wiki_ask` | find pages and excerpts (auto / index / BM25 / vector / hybrid / qmd) |
+| `wiki_index` | manage the cross-wiki semantic index (PGlite + pgvector) |
 | `wiki_ingest` | ingest a document: raw source → claims → Jev verdicts → placement brief |
 | `wiki_insights` | capture agent insights, Jev-filtered and placed |
 | `wiki_finalize` | update TOC/log after writing pages, check links |
@@ -96,9 +97,17 @@ Optional overrides in `~/.pi/agent/jev-wiki.json` or project `.pi/jev-wiki.json`
   "globalWikiRoot": null,
   "writer": { "mode": "guided" },
   "review": { "autoAcceptUserStated": true },
-  "thresholds": { "autoAccept": 0.8, "minDerivable": 0.5 }
+  "thresholds": { "autoAccept": 0.8, "minDerivable": 0.5 },
+  "search": { "engine": "auto", "vector": { "enabled": true, "model": "performance" } }
 }
 ```
+
+Semantic search is optional and local: with `@electric-sql/pglite` + `@electric-sql/pglite-pgvector`
+and `@huggingface/transformers` installed (optional dependencies), `wiki_ask` fuses BM25 and vector
+results and can search **all registered wikis** (`scope: all`). `search.vector.model` selects the
+preset — `performance` (EmbeddingGemma-300M, ~309 MB download, 768d) or `quality`
+(Qwen3-Embedding-0.6B, ~614 MB, 1024d). The index is a derived cache at `<agent dir>/jev-wiki/`;
+manage it with `wiki_index` (`status`, `rebuild`, `add`, `remove`, `enable`, `disable`).
 
 The optional `globalWikiRoot` adds a read-only cross-project vault: `wiki_ask` also searches that
 wiki and tags its results `[global vault]`. It resolves against the pi agent dir when relative.

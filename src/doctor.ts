@@ -13,6 +13,8 @@ import { git, headCommit, isGitRepo } from "./git.ts";
 import { readLedger } from "./ledger.ts";
 import { readReviews } from "./review.ts";
 import { readSyncState } from "./sync.ts";
+import { MODEL_PRESETS } from "./vector/embed.ts";
+import { readRegistry } from "./vector/registry.ts";
 import { listMarkdownFiles, resolveLayout, type WikiLayout } from "./wiki/layout.ts";
 import { isLocked } from "./wiki/lock.ts";
 
@@ -53,7 +55,14 @@ export async function runDoctor(loaded: LoadedConfig): Promise<DoctorReport> {
 	if (!within(config.review.escalateCriticality, 0, 1)) invalid.push(`review.escalateCriticality=${config.review.escalateCriticality}`);
 	if (!within(config.lint.duplicateSimilarity, 0, 1)) invalid.push(`lint.duplicateSimilarity=${config.lint.duplicateSimilarity}`);
 	if (config.routing.shardSize < 10 || config.routing.shardSize > 255) invalid.push(`routing.shardSize=${config.routing.shardSize} (must be 10..255)`);
-	if (!["index", "bm25", "qmd"].includes(config.search.engine)) invalid.push(`search.engine=${config.search.engine}`);
+	if (!["auto", "index", "bm25", "vector", "hybrid", "qmd"].includes(config.search.engine)) invalid.push(`search.engine=${config.search.engine}`);
+	if (!MODEL_PRESETS[config.search.vector.model]) invalid.push(`search.vector.model=${config.search.vector.model} (presets: ${Object.keys(MODEL_PRESETS).join(", ")})`);
+	if (config.search.vector.db !== "embedded") invalid.push(`search.vector.db=${config.search.vector.db} (only "embedded" is supported in P1)`);
+	if (config.search.vector.dimensions != null) {
+		const dimensions = config.search.vector.dimensions;
+		const max = MODEL_PRESETS[config.search.vector.model]?.dimensions ?? 0;
+		if (!Number.isInteger(dimensions) || dimensions < 1 || dimensions > max) invalid.push(`search.vector.dimensions=${dimensions} (1..${max})`);
+	}
 	checks.push(
 		invalid.length === 0
 			? check("config values", "ok", `provider ${config.provider}, writer ${config.writer.mode}, shard ${config.routing.shardSize}`)
@@ -82,6 +91,17 @@ export async function runDoctor(loaded: LoadedConfig): Promise<DoctorReport> {
 			? check("env file", "ok", loaded.envFilePath)
 			: check("env file", "warn", `not found: ${loaded.envFilePath}`),
 	);
+	if (config.search.vector.enabled) {
+		try {
+			const registry = await readRegistry(loaded.agentDir);
+			const enabled = registry.wikis.filter((entry) => entry.enabled).length;
+			checks.push(check("vector registry", "ok", `${registry.wikis.length} registered, ${enabled} enabled; run wiki_index status for index counts`));
+		} catch (error) {
+			checks.push(check("vector registry", "warn", `unreadable: ${(error as Error).message}`));
+		}
+	} else {
+		checks.push(check("vector registry", "ok", "semantic search disabled"));
+	}
 	if (config.globalWikiRoot) {
 		const vaultRoot = isAbsolute(config.globalWikiRoot) ? config.globalWikiRoot : join(loaded.agentDir, config.globalWikiRoot);
 		const vault = resolveLayout(vaultRoot, ".", config.stateRoot);

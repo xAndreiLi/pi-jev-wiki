@@ -154,6 +154,9 @@ docs/wiki/
 
 ## Maintenance
 
+- Semantic search: `wiki_ask` with `scope: "all"` searches every registered wiki (vector +
+  BM25 fused by rank via RRF); `wiki_index` reports and rebuilds the index. The index is a derived
+  cache — never a source of truth, and safe to rebuild after a `search.vector.model` change.
 - Code or history changed since the last sync → `wiki_sync`; it queues affected file-linked claims
   for `wiki_review`. Resolve items with accept/reject/supersede/defer. The agent owns routine
   upkeep; only critical items reach the user.
