@@ -231,9 +231,12 @@ under `docs/` and `research/` stays in the repository.
 
 ## Status
 
-**Published:** [`pi-jev-wiki@0.6.0`](https://www.npmjs.com/package/pi-jev-wiki) — CI-published with
+**Published:** [`pi-jev-wiki@0.7.0`](https://www.npmjs.com/package/pi-jev-wiki) — CI-published with
 SLSA provenance (`0.2.0`, the first release, was an interactive publish and has no attestation).
 Listed on the [pi package gallery](https://pi.dev/packages/pi-jev-wiki).
+
+0.7.0 adds a configurable capture cadence (`capture.cadence` = `manual` | `task` | `commit`), so a
+wiki updates per task, only when you commit, or only on demand.
 
 0.6.0 adds the cross-wiki catalog (`wiki_toc scope=all`) with per-wiki TOC manifests and staleness
 flags, Jev retrieval judgments (batched rerank + evidence sufficiency, ledger-recorded), wiki-tagged
