@@ -1,3 +1,4 @@
 {
-	"capture": { "onSettle": true }
+	"wikiRoot": "docs/wiki",
+	"capture": { "cadence": "task" }
 }
