@@ -70,7 +70,7 @@ runNpm(["run", "test:all"]);
 runNpm(["version", next, "--no-git-tag-version", "--allow-same-version"]);
 run("git", ["add", "package.json", "package-lock.json"]);
 run("git", ["commit", "-m", `chore(release): ${next}`]);
-run("git", ["tag", `v${next}`]);
+run("git", ["tag", "-a", `v${next}`, "-m", `pi-jev-wiki ${next}`]);
 
 console.log(
 	[

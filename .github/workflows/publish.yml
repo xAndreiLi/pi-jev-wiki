@@ -44,6 +44,7 @@ jobs:
         if: steps.published.outputs.exists != 'true'
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NPM_CONFIG_IGNORE_SCRIPTS: "true"
         run: |
           set +e
           npm publish --provenance --access public > publish.log 2>&1
