@@ -371,3 +371,18 @@
 ## [2026-09-26] finalize | Release-session auto-capture worked: merged the "a fix is not live until the session reloads" consequence into extension-loads-at-session-start; the embedding-progress claim and shard-pruning invariant were already filed (duplicate review item rejected). Declined three File recommendations as docs duplication: the release procedure and 0.2.0-provenance note already live in docs/RELEASING.md, which stays the single source; progress-sink and non-UI details are derivable code behavior already in the gotcha body; the gh-PATH observation is environment-specific and not grounded here.
 - Updated: invariants/extension-loads-at-session-start.md
 
+## [2026-09-26] capture | 8 insights (settled)
+- Raw: raw/sessions/2026-09-26-session-2026-09-26-0008.md
+- Filed 3 · reinforced 0 · review 1 · rejected 4
+
+## [2026-09-26] capture | 1 insights (tool)
+- Raw: raw/sessions/2026-09-26-session-2026-09-26-0010.md
+- Filed 0 · reinforced 0 · review 0 · rejected 1
+
+## [2026-09-26] capture | 1 insights (tool)
+- Raw: raw/sessions/2026-09-26-session-2026-09-26-0010.md
+- Filed 0 · reinforced 0 · review 1 · rejected 0
+
+## [2026-09-26] finalize | File the capture-files-proposals gotcha: task-cadence extraction can label an assistant recommendation as user: evidence and Jev scores it user_stated, so a pending proposal can be filed as if the user stated it. The capture's other three accepted claims were declined: the maxPerSession display-cap fact is about to be superseded by the 0.8.0 fix, the 10.1 routing design is awaiting Andrei's decision, and the SKILL.md schema-contract rule is already documented on gotcha-skill-schema-drift.
+- Updated: architecture/gotcha-capture-proposals.md
+
