@@ -3,49 +3,82 @@
 [![npm version](https://img.shields.io/npm/v/pi-jev-wiki.svg)](https://www.npmjs.com/package/pi-jev-wiki)
 [![license](https://img.shields.io/npm/l/pi-jev-wiki.svg)](LICENSE)
 
-A pi package that gives coding agents a maintained **mental model of a project**: module
-responsibilities, boundaries, data flow, invariants, decisions, and change impact — stored as a
-markdown wiki and maintained with **Jev** (TypeSafe's calibrated decision model).
+**Give your agents a long-term memory they can actually trust.** `pi-jev-wiki` builds a living,
+interconnected wiki — a knowledge graph in plain markdown — from your documents, sessions, and
+agent insights. Every claim is vetted by **Jev** (TypeSafe's calibrated decision model) for what is
+factual, grounded, and worth keeping, so the wiki stays concise instead of becoming another dumping
+ground. Agents search it on demand across every registered wiki, and you can read, edit, and
+version it like any other Markdown.
 
-The npm package is **`pi-jev-wiki`** (matching the repository); the extension, tools, and config
-files keep the `jev-wiki` name.
+Works for any domain: a project's mental model (module boundaries, invariants, decisions, change
+impact), personal and life knowledge, research notes — anything an agent should remember between
+sessions.
 
-Jev is the arbiter and reminder on what is grounded, derivable, durable, and where it belongs;
-the agent decides and writes, with the final say. Code owns every threshold.
+> **Naming:** the package and repository are **`pi-jev-wiki`**. The extension, its tools, and its
+> config and state files keep the shorter `jev-wiki` name — `.pi/jev-wiki.json`,
+> `~/.pi/agent/jev-wiki.json`, `docs/wiki/.jev-wiki/`.
 
-- Read [`PLAN.md`](docs/plans/PLAN.md) for the design and phases.
-- Read [`CRITIQUE.md`](docs/CRITIQUE.md) for the risk analysis and efficiency evaluation.
-- Research sources live in [`research/`](research/README.md).
+## Why agents keep consulting it
+
+- **Never injected.** Nothing is pushed into the context window; the table of contents is exposed
+  like a skill and the agent reads what it needs, when it needs it.
+- **Vetted, not dumped.** Jev gates what enters: grounded in evidence, durable, non-duplicative,
+  and free of secrets. The wiki is not a second copy of your repository.
+- **Searchable.** Lexical (index/BM25), semantic (local embeddings, no API calls), or hybrid
+  retrieval — across **all registered wikis** from any session.
+- **Auditable.** Every claim carries evidence and a lifecycle status; every decision lands in a
+  ledger. Contradictions become visible disputes, never silent edits.
+- **Portable.** Plain Markdown in your project (Obsidian-compatible, git-friendly); the semantic
+  index is a derived cache you can rebuild or delete at any time.
+
+## How knowledge is vetted
+
+Jev acts as an arbiter and reminder on what is grounded, derivable, durable, and where it belongs;
+the agent decides and writes, with the final say, and code owns every threshold.
+
+1. **Extraction** — a source is staged immutably in `raw/` and split into atomic claims with
+   verbatim quotes.
+2. **Judgment** — Jev scores each claim for groundedness, derivability, durability, importance,
+   duplication, sensitivity, and placement, then code maps those scores to a decision.
+3. **Filing** — accepted claims are written into topic pages with `status`, `support`, and
+   `evidence`; duplicates reinforce existing claims instead of creating noise.
+4. **Review** — below-threshold and disputed claims go to the agent-owned review queue; only
+   critical items escalate to the user. Overrides are allowed and recorded in the ledger.
+5. **Upkeep** — file-linked claims are re-verified against commits (`wiki_sync`), lint catches
+   stale, orphaned, or unbacked claims, and superseded knowledge is linked, never deleted.
 
 ## What it does
 
 | Tool | Purpose |
 |---|---|
 | `wiki_toc` | the wiki table of contents (compact above 60 pages, per-topic tables) |
-| `wiki_ask` | find pages and excerpts (auto / index / BM25 / vector / hybrid / qmd) |
-| `wiki_index` | manage the cross-wiki semantic index (status, discover, rebuild, add/remove, enable/disable) |
+| `wiki_ask` | search pages and excerpts (auto / index / BM25 / vector / hybrid / qmd), with `scope: all` across registered wikis |
+| `wiki_index` | manage the semantic index: `status`, `model`, `discover`, `rebuild`, `add`/`remove`, `enable`/`disable` |
 | `wiki_ingest` | ingest a document: raw source → claims → Jev verdicts → placement brief |
 | `wiki_insights` | capture agent insights, Jev-filtered and placed |
-| `wiki_finalize` | update TOC/log after writing pages, check links |
+| `wiki_finalize` | update TOC/log after writing pages, check links, record overrides, refresh the index |
 | `wiki_sync` | re-verify file-linked claims against commits since the last sync |
-| `wiki_review` | list or resolve review items; critical items escalate to the user |
+| `wiki_review` | list or resolve review items (bulk resolve supported); critical items escalate to the user |
 | `wiki_lint` | health checks: TOC, links, orphans, unbacked claims, contradictions, duplicates |
 | `wiki_remove` | delete obsolete pages and their TOC entries |
 | `wiki_structure` | deterministic module/dependency map and architecture coverage |
+| `wiki_triage` | explain rejected claims: scores, whether the problem is evidence or policy, and the fix |
 | `wiki_doctor` | config, key, lock, ledger, queue, git/sync, search health |
 | `wiki_setup` | inspect or configure the Jev API key (TypeSafe or OpenRouter) |
 | `wiki_status` | pages, raw sources, ledger, consultations, Jev usage |
 | `/wiki:ingest`, `/wiki:capture`, `/wiki:sync`, `/wiki:review`, `/wiki:lint`, `/wiki:status` | user-facing commands |
 
-The wiki is **never injected** into sessions. The table of contents is available like a skill
-(`wiki_toc` + the `llm-wiki` skill); the agent consults it on demand.
+**Semantic search is local-first.** Embeddings run on your machine (`@huggingface/transformers`)
+and vectors live in an embedded Postgres with pgvector (`@electric-sql/pglite`). No API keys, no
+Docker, no Python, and nothing leaves the machine. If the optional dependencies or the index are
+missing, everything degrades gracefully to keyword search.
 
 ## Install
 
 ```bash
-pi install /path/to/jev-wiki        # local folder
-pi install npm:pi-jev-wiki             # once published
-pi install git:github.com/xAndreiLi/pi-jev-wiki@v0.2.0
+pi install npm:pi-jev-wiki                        # published release
+pi install /path/to/pi-jev-wiki                   # local folder
+pi install git:github.com/xAndreiLi/pi-jev-wiki@v0.4.0
 ```
 
 For development, load it directly:
@@ -84,6 +117,33 @@ When a key is missing, ask the agent to run `wiki_setup`:
 - `action=write-env provider=... apiKey=...` — writes to `.env` after checking gitignore
 - `action=test` — one tiny live call to verify connectivity and auth
 
+## Search in practice
+
+`wiki_ask` picks a retrieval mode automatically (`search.engine: "auto"` → hybrid when an index
+exists, keyword otherwise) and can search every registered wiki:
+
+| Mode | What it does |
+|---|---|
+| `keyword` | TOC/index or BM25 over page text; zero dependencies |
+| `semantic` | cosine KNN over claim- and section-level embeddings |
+| `hybrid` | **RRF fusion** of BM25 and vector ranks — the default once indexed |
+| `scope: "all"` | searches every registered wiki (life wiki, project wikis, WSL projects), tagging results `[wiki-name]` with page, claim id, kind, and status |
+
+Choosing the embedding model happens once, before the first build; the agent asks and persists the
+answer with `wiki_index action=model`:
+
+| Preset | Model | Download | Dims | Best for |
+|---|---|---|---|---|
+| `performance` | EmbeddingGemma-300M (q8) | ~309 MB | 768 | everyday use, multilingual, fastest |
+| `quality` | Qwen3-Embedding-0.6B (q8) | ~614 MB | 1024 | maximum retrieval quality |
+
+First run: `wiki_index action=rebuild` downloads the model once into `<agent dir>/jev-wiki/models`
+and builds the index; afterwards `wiki_finalize` keeps touched pages in sync automatically. Queries
+never trigger a download — a cold index silently falls back to keyword search. Existing wikis are
+found with `wiki_index action=discover` (scans the home directory and WSL distros), adopted with
+`register=true`, and indexed with `rebuild all=true`. Switching presets re-embeds everything and
+purges the previous model's vectors per wiki.
+
 ## Configuration
 
 Optional overrides in `~/.pi/agent/jev-wiki.json` or project `.pi/jev-wiki.json`
@@ -92,43 +152,17 @@ Optional overrides in `~/.pi/agent/jev-wiki.json` or project `.pi/jev-wiki.json`
 ```json
 {
   "provider": "typesafe",
-  "model": "jev-latest",
   "wikiRoot": "docs/wiki",
   "globalWikiRoot": null,
   "writer": { "mode": "guided" },
   "review": { "autoAcceptUserStated": true },
   "thresholds": { "autoAccept": 0.8, "minDerivable": 0.5 },
-  "search": { "engine": "auto", "vector": { "enabled": true, "model": "performance" } }
+  "search": {
+    "engine": "auto",
+    "vector": { "enabled": true, "model": "performance", "scan": { "wsl": true } }
+  }
 }
 ```
-
-Semantic search is optional and local: with `@electric-sql/pglite` + `@electric-sql/pglite-pgvector`
-and `@huggingface/transformers` installed (optional dependencies), `wiki_ask` fuses BM25 and vector
-results and can search **all registered wikis** (`scope: all`). `search.vector.model` selects the
-preset — `performance` (EmbeddingGemma-300M, ~309 MB download, 768d) or `quality`
-(Qwen3-Embedding-0.6B, ~614 MB, 1024d). The index is a derived cache at `<agent dir>/jev-wiki/`;
-manage it with `wiki_index` (`status`, `rebuild`, `add`, `remove`, `enable`, `disable`).
-
-First run: `wiki_index action=rebuild` downloads the preset model once into
-`<agent dir>/jev-wiki/models` and builds the index; afterwards `wiki_finalize` keeps touched pages
-in sync automatically. Queries never trigger a download — if the index is cold, `wiki_ask` falls
-back to keyword search. Check state any time with `wiki_index action=status` or `wiki_doctor`.
-
-Existing wikis are found with `wiki_index action=discover` (scans the home directory plus WSL
-distros), adopted with `register=true`, and indexed with `rebuild all=true`.
-
-**Choosing the embedding model.** `wiki_index action=model` reports the effective preset and where it
-came from; before the first build of an index the agent asks which one to use:
-
-| Preset | Model | Download | Dims |
-|---|---|---|---|
-| `performance` | EmbeddingGemma-300M (q8) | ~309 MB | 768 |
-| `quality` | Qwen3-Embedding-0.6B (q8) | ~614 MB | 1024 |
-
-`wiki_index action=model model=quality` persists the choice to `~/.pi/agent/jev-wiki.json` for every
-project; a project `.pi/jev-wiki.json` can override it. Switching presets requires
-`wiki_index action=rebuild all=true` — the previous model's vectors are purged per wiki, and queries
-fall back to keyword search until the rebuild finishes.
 
 The optional `globalWikiRoot` adds a read-only cross-project vault: `wiki_ask` also searches that
 wiki and tags its results `[global vault]`. It resolves against the pi agent dir when relative.
@@ -148,29 +182,30 @@ docs/wiki/
     └── <topic>/                     # gotcha-*, glossary-*, concept-*, summary-*
 ```
 
-Runtime state lives in `docs/wiki/.jev-wiki/` (gitignored): the decision ledger
-(`decisions.jsonl`), raw-source hash index, and session log.
+`raw/` and `wiki/` are the source of truth. Runtime state lives in `docs/wiki/.jev-wiki/`
+(gitignored): the decision ledger (`decisions.jsonl`), the raw-source hash index, and the session
+log. The semantic index lives at `<agent dir>/jev-wiki/` and is always disposable.
 
 ## Development
 
 ```bash
 npm install
-npx tsc --noEmit      # typecheck
+npm run test:all      # typecheck + unit + scale + vector tests (offline)
 npm run smoke         # deterministic checks + live Jev round-trips
 ```
 
 ## Repository layout
 
 ```text
-src/          pi extension, Jev client, pipelines, wiki primitives
+src/          pi extension, Jev client, pipelines, wiki primitives, vector search
 skills/       llm-wiki skill + page templates (the schema layer)
-scripts/      unit, smoke, paging, and scale tests
+scripts/      unit, smoke, paging, scale, and vector tests
 docs/
+  notes/      design notes (e.g. semantic-search.md)
   plans/      PLAN.md (master plan) + plans index
   DESIGN.md   detailed technical design
   CRITIQUE.md pre-implementation critique and efficiency evaluation
   HARDENING.md hardening roadmap with statuses
-  notes/      source notes used for dogfooding
   wiki/       this project's own knowledge wiki (dogfood)
   RELEASING.md release runbook
 research/     source material gathered during design
@@ -182,15 +217,24 @@ under `docs/` and `research/` stays in the repository.
 ## Status
 
 **Published:** [`pi-jev-wiki@0.4.0`](https://www.npmjs.com/package/pi-jev-wiki) — published by CI
-with SLSA provenance. The 0.2.0 first release was an interactive publish and has no attestation.
+with SLSA provenance (the 0.2.0 first release was an interactive publish and has no attestation).
 Listed on the [pi package gallery](https://pi.dev/packages/pi-jev-wiki).
+
+**Unreleased on `main`** (not yet on npm):
+
+- Jev verdicts are advisory; the agent has the final say and records overrides in the ledger.
+- Bulk review resolution and user-stated auto-accept keep upkeep agent-owned.
+- Cross-wiki semantic search: PGlite + pgvector index, `performance`/`quality` model presets with a
+  first-build choice, RRF hybrid retrieval, wiki discovery/adoption, and `wiki_index` management.
+- Word-boundary slug handling, a `globalWikiRoot` doctor check, and frictionless first-run behavior
+  (no surprise downloads, clean headless shutdown).
 
 Implemented through P3: both intake channels (research ingest + agent insights), architecture-first
 pages, TOC/log, decision ledger, change-driven invalidation (`wiki_sync`), agent-managed review,
-draft/auto writers with adaptive risk, pluggable search (index/BM25/qmd), hierarchical TOC,
-lint/consolidation checks, redaction, cross-process locking, `wiki_doctor`/`wiki_setup`, and
-offline unit + scale tests.
+draft/auto writers with adaptive risk, pluggable search (index/BM25/qmd plus the vector engine),
+lint/consolidation checks, redaction, cross-process locking, and offline unit + scale + vector tests.
 
-Not yet done: trusted publishing (OIDC) migration, the decision-quality evaluation harness, and the
+Not yet done: the decision-quality evaluation harness (recall@5/MRR benchmarks to tune the default
+retrieval mode), OIDC trusted publishing, server-Postgres and cloud embedding providers, and the
 remaining hardening items tracked in [`docs/HARDENING.md`](docs/HARDENING.md). See
 [`docs/RELEASING.md`](docs/RELEASING.md) for the release process.
