@@ -24,6 +24,8 @@ claims:
 files: [src/extension.ts, src/pipeline/capture.ts]
 ---
 
+
+
 # Capture evidence resolves from the session cwd
 
 **Symptom.** A task-cadence capture from a session run outside the project (for example from `~`)

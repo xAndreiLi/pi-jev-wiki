@@ -11,7 +11,8 @@ claims:
     text: "The agent-facing table of contents is hierarchical: index.md stays the complete machine catalog while toc.md holds the compact view with per-topic tables, keeping the agent-facing TOC about a kilobyte at a thousand pages."
     status: verified
     support: 0.92
-    evidence: ["raw/sessions/2026-09-19-session-2026-09-19-1921.md"]
+    evidence: [raw/sessions/2026-09-19-session-2026-09-19-1921.md]
+    last_checked: 2026-09-26
   - id: c2
     text: "Per-wiki index.md and toc/<topic>.md form the human TOC; .jev-wiki/toc.json (manifest) is the derived machine view (page/topic counts, entries hash, newest page mtime)."
     status: verified
@@ -48,7 +49,7 @@ claims:
     reviewed: 2026-09-26
     last_checked: 2026-09-26
   - id: c7
-    text: "The registry at ~/.pi/agent/jev-wiki/wikis.json is the source of wiki membership; discovery (wiki_index action=discover) finds wikis on disk (home + WSL) and can adopt them."
+    text: The registry at ~/.pi/agent/jev-wiki/wikis.json is the source of wiki membership; discovery (wiki_index action=discover) finds wikis on disk (home + WSL) and can adopt them.
     status: verified
     support: 0.98
     evidence: [raw/knowledge-pipeline-current/2026-09-26-knowledge-pipeline-current-state.md]
@@ -63,6 +64,8 @@ claims:
     last_checked: 2026-09-26
 files: [src/wiki/toc.ts, src/wiki/manifest.ts, src/vector/catalog.ts, src/vector/registry.ts]
 ---
+
+
 
 # Table of contents hierarchy
 

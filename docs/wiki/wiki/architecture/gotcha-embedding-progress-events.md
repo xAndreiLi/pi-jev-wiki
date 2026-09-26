@@ -17,6 +17,7 @@ claims:
 files: [src/vector/embed.ts, src/vector/index.ts, src/extension.ts]
 ---
 
+
 # Embedding model emits progress for cached loads
 
 **Symptom.** `wiki_finalize` (or `wiki_index rebuild`) prints a wall of lines like:

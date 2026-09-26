@@ -403,3 +403,32 @@
 
 ## [2026-09-26] finalize | Dispositioned the 0.8.0 wrap-up capture: the sole File recommendation restated decisions/out-of-scope-disposition.md#c1 (no page change), the two review items restated the cross-wiki decisions already filed, and the five rejected items were derivable code detail or transient session state. Nothing new to write.
 
+## [2026-09-26] capture | 1 insights (tool)
+- Raw: raw/sessions/2026-09-26-session-2026-09-26-0034.md
+- Filed 0 · reinforced 1 · review 0 · rejected 0
+
+## [2026-09-26] finalize | Add the token-economy policy (c4) to the adjudication-policy page: Jev tokens are cheap relative to model tokens, so agents prefer an extra Jev call over a guess; code still owns thresholds.
+- Updated: architecture/adjudication-policy.md
+
+## [2026-09-26] sync | 40 claim(s) checked
+- Baseline: 0484128 → 7165a91
+- Changed files: 120
+- Applied: architecture/flow-capture.md#c2 → needs_recheck
+- Applied: architecture/flow-retrieval.md#c14 → needs_recheck
+- Applied: architecture/gotcha-capture-evidence-resolution.md#c2 → needs_recheck
+- Applied: architecture/gotcha-capture-proposals.md#c1 → needs_recheck
+- Applied: architecture/gotcha-skill-schema-drift.md#c1 → supersede
+- Applied: architecture/table-of-contents.md#c8 → needs_recheck
+- Applied: decisions/cross-wiki-writes.md#c1 → needs_recheck
+- Applied: decisions/cross-wiki-writes.md#c2 → needs_recheck
+
+## [2026-09-26] finalize | Sync/review maintenance: accepted six re-verified claims, superseded the schema-drift and proposals-gotcha claims, rejected the stale wiki_ask status claim, and added the capture.route pointer to the capture flow. Also filed the use-Jev-liberally policy on the adjudication-policy page.
+- Updated: architecture/adjudication-policy.md
+- Updated: architecture/flow-capture.md
+- Updated: architecture/gotcha-capture-proposals.md
+- Updated: architecture/gotcha-skill-schema-drift.md
+- Updated: architecture/gotcha-capture-evidence-resolution.md
+- Updated: architecture/flow-retrieval.md
+- Updated: architecture/table-of-contents.md
+- Updated: decisions/cross-wiki-writes.md
+

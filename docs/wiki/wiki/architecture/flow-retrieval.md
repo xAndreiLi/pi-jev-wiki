@@ -29,7 +29,7 @@ claims:
     reviewed: 2026-09-26
     last_checked: 2026-09-26
   - id: c4
-    text: "Embedding presets include MRL truncation and per-model prompt templates."
+    text: Embedding presets include MRL truncation and per-model prompt templates.
     status: verified
     support: 0.81
     evidence: [raw/knowledge-pipeline-current/2026-09-26-knowledge-pipeline-current-state.md]
@@ -43,7 +43,7 @@ claims:
     reviewed: 2026-09-26
     last_checked: 2026-09-26
   - id: c6
-    text: "The vector index uses PGlite + pgvector with one user-level database covering every registered wiki at ~/.pi/agent/jev-wiki/vector."
+    text: The vector index uses PGlite + pgvector with one user-level database covering every registered wiki at ~/.pi/agent/jev-wiki/vector.
     status: verified
     support: 0.98
     evidence: [raw/knowledge-pipeline-current/2026-09-26-knowledge-pipeline-current-state.md]
@@ -57,7 +57,7 @@ claims:
     reviewed: 2026-09-26
     last_checked: 2026-09-26
   - id: c8
-    text: "Queries never download a model; a cold or mismatched index falls back to keyword search."
+    text: Queries never download a model; a cold or mismatched index falls back to keyword search.
     status: verified
     support: 0.98
     evidence: [raw/knowledge-pipeline-current/2026-09-26-knowledge-pipeline-current-state.md]
@@ -71,7 +71,7 @@ claims:
     reviewed: 2026-09-26
     last_checked: 2026-09-26
   - id: c10
-    text: "Hybrid search fuses BM25 and vector ranks with reciprocal rank fusion."
+    text: Hybrid search fuses BM25 and vector ranks with reciprocal rank fusion.
     status: verified
     support: 0.99
     evidence: [raw/knowledge-pipeline-current/2026-09-26-knowledge-pipeline-current-state.md]
@@ -106,7 +106,7 @@ claims:
     reviewed: 2026-09-26
     last_checked: 2026-09-26
   - id: c15
-    text: "Rerank verdicts are logged as ask.judge."
+    text: Rerank verdicts are logged as ask.judge.
     status: verified
     support: 0.77
     evidence: [raw/knowledge-pipeline-current/2026-09-26-knowledge-pipeline-current-state.md]
@@ -114,6 +114,8 @@ claims:
     last_checked: 2026-09-26
 files: [src/vector/chunks.ts, src/vector/embed.ts, src/vector/db.ts, src/wiki/search.ts, src/vector/judgments.ts]
 ---
+
+
 
 # Retrieval pipeline
 

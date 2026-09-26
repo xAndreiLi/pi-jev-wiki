@@ -12,6 +12,7 @@ claims:
     status: verified
     support: 0.98
     evidence: [raw/jev-wiki-architecture-notes/2026-09-19-jev-wiki-architecture-notes.md]
+    last_checked: 2026-09-26
   - id: c2
     text: "capture.cadence has three modes: manual (default, only /wiki:capture or explicit wiki_insights), task (after each settled task, a Jev pre-screen decides whether the session is worth extracting; accepted insights are queued for the agent to write with a 10-minute debounce), and commit (only after a new git commit is detected, regardless of how it was made, with no time debounce)."
     status: verified
@@ -35,6 +36,8 @@ claims:
     last_checked: 2026-09-26
 files: [src/pipeline/capture.ts, src/config.ts]
 ---
+
+
 
 # Capture flow
 
@@ -60,7 +63,9 @@ files: [src/pipeline/capture.ts, src/config.ts]
 - `task` — after each settled task a Jev pre-screen decides whether the session is worth extracting; accepted insights are queued for the agent to write with a 10-minute debounce.
 - `commit` — only after a new git commit is detected, regardless of how it was made, with no time debounce ("update the wiki when I'm ready to commit").
 
-`capture.onCompact: true` remains an independent trigger (capture before context compaction), and the legacy `capture.onSettle: true` still enables task capture.
+`capture.onCompact: true` remains an independent trigger (capture before context compaction), and the legacy `capture.onSettle: true` still enables task capture. `capture.route`
+decides *where* the capture is filed — subject routing by default, session-directory routing when
+set to `session`; see [Capture routing and gating](../invariants/capture-routing-and-gating.md).
 
 ## Invariants
 

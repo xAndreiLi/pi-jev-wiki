@@ -1,21 +1,25 @@
 ---
-title: Capture can file the agent's proposals as the user's words
+title: "Capture can file the agent's proposals as the user's words"
 type: gotcha
 topic: architecture
-summary: "Session extraction can label an assistant recommendation as `user:` evidence with no code check that the words came from a user turn; Jev then scores trustTier user_stated, so a proposal awaiting the user's decision can be filed as if the user had stated it."
+summary: "Historical: session extraction could label an assistant recommendation as `user:` evidence with no code check that the words came from a user turn, and Jev then scored trustTier user_stated; 0.8.0 closes the pathway by validating user evidence against actual user turns."
 tags: [capture, adjudication, trust-tier, proposals, gotcha]
 updated: 2026-09-26
 sources: [raw/sessions/2026-09-26-session-2026-09-26-0010.md, raw/sessions/2026-09-26-session-2026-09-26-0008.md]
 claims:
   - id: c1
     text: "Session capture can extract the agent's own unapproved proposals as user-attributed evidence and recommend filing them: the 2026-09-26 planning capture records an assistant routing recommendation as `user: Assistant recommendation awaiting Andrei's call` with a file verdict at grounded 0.87, and the same claim scored trustTier user_stated 0.96 — so a recommendation awaiting the user's approval can reach the wiki as if the user had stated it."
-    status: verified
+    status: superseded
     support: 0.79
-    evidence: [raw/sessions/2026-09-26-session-2026-09-26-0010.md, raw/sessions/2026-09-26-session-2026-09-26-0008.md, .jev-wiki/decisions.jsonl, "c5e5f62"]
+    evidence: [raw/sessions/2026-09-26-session-2026-09-26-0010.md, raw/sessions/2026-09-26-session-2026-09-26-0008.md, .jev-wiki/decisions.jsonl, c5e5f62]
     reviewed: 2026-09-26
     last_checked: 2026-09-26
+    superseded_by: "0.8.0 validates user-kind evidence against actual user turns and renders unsupported items as agent-stated (unverified), closing the user_stated pathway (see Mitigation below)."
+    superseded_at: 2026-09-26
 files: [src/pipeline/capture.ts, src/extension.ts]
 ---
+
+
 
 # Capture can file the agent's proposals as the user's words
 
