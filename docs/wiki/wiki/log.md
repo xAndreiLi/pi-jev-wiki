@@ -438,3 +438,10 @@
 - Orphans: 0 · raw backlog: 0
 - Contradiction checks: 8 · duplicate candidates: 2
 
+## [2026-09-26] capture | 1 insights (tool)
+- Raw: raw/sessions/2026-09-26-session-2026-09-26-0041.md
+- Filed 1 · reinforced 0 · review 0 · rejected 0
+
+## [2026-09-26] finalize | File the npm minor-version pin gotcha: an @latest extension update can report success while the store stays on the old minor; explicit-version updates rewrite the spec. 0.8.0 published with provenance and the installed copy updated to 0.8.0.
+- Updated: pi/npm-minor-version-pin.md
+

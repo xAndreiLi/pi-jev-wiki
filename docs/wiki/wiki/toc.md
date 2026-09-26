@@ -1,13 +1,13 @@
 # Wiki TOC
 
-> 34 pages across 4 topics. Per-topic tables: `toc/<topic>.md`. Full machine index: `index.md`.
+> 35 pages across 4 topics. Per-topic tables: `toc/<topic>.md`. Full machine index: `index.md`.
 
 | Topic | Pages | Table |
 |-------|-------|-------|
 | architecture | 10 | [toc/architecture.md](toc/architecture.md) |
 | decisions | 11 | [toc/decisions.md](toc/decisions.md) |
 | invariants | 11 | [toc/invariants.md](toc/invariants.md) |
-| pi | 2 | [toc/pi.md](toc/pi.md) |
+| pi | 3 | [toc/pi.md](toc/pi.md) |
 
 ## Recently updated
 - [Adjudication policy computed in code](architecture/adjudication-policy.md) — Thresholds and composite scores are computed in code, making Jev verdicts advisory and policy changes model-free. (2026-09-26)

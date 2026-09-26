@@ -2,8 +2,14 @@
 
 ## Current state (2026-09-26)
 
-- **Published:** `pi-jev-wiki@0.7.1` by CI with **SLSA provenance** (2026-09-26). `0.2.0` was the
-  manual first release and has no attestation; `0.3.0`–`0.7.0` were CI-published.
+- **Published:** `pi-jev-wiki@0.8.0` by CI with **SLSA provenance** (2026-09-26). `0.2.0` was the
+  manual first release and has no attestation; `0.3.0`–`0.7.1` were CI-published.
+- **Installed copies do not cross minor versions by themselves.** pi's npm store pins a `^<minor>`
+  range, and for 0.x releases that excludes the next minor (`^0.7.1` does not match `0.8.0`), so
+  `pi update --extension npm:pi-jev-wiki@latest` can report success while staying on the old
+  version. Update with the explicit version (`pi update --extension npm:pi-jev-wiki@0.8.0`) and
+  confirm `node_modules/pi-jev-wiki/package.json` in the pi npm store afterwards. The spec is
+  rewritten to `^0.8.0` when the explicit version is installed, so future patch updates work.
 - **Release flow:** `npm run release -- <version|major|minor|patch>` verifies a clean tree, the
   changelog section, and the tag; runs the full suite; bumps, commits, and creates an **annotated**
   tag. Then `git push origin main --follow-tags` — CI runs `npm run test:all` and publishes on the

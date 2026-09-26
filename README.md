@@ -83,13 +83,18 @@ missing, everything degrades gracefully to keyword search.
 ```bash
 pi install npm:pi-jev-wiki                        # published release
 pi install /path/to/pi-jev-wiki                   # local folder
-pi install git:github.com/xAndreiLi/pi-jev-wiki@v0.7.0
+pi install git:github.com/xAndreiLi/pi-jev-wiki@v0.8.0
 ```
 
 Install **one source at a time**. Registering two copies of the extension (for example the npm
 package *and* a local folder) makes pi refuse to load it with `Tool "wiki_*" conflicts with …`,
 because every tool name is registered twice. Check with `pi list`; drop the duplicate with
 `pi remove <source>`.
+
+To update an npm install to a new minor version, pass the version explicitly: pi's npm store pins
+a `^<minor>` range, which for 0.x releases excludes the next minor (`^0.7.1` does not match
+`0.8.0`). Use `pi update --extension npm:pi-jev-wiki@0.8.0`, then confirm the store copy's
+`package.json` version.
 
 For development, load the working copy directly instead of installing a second copy:
 
@@ -254,9 +259,14 @@ under `docs/` and `research/` stays in the repository.
 
 ## Status
 
-**Published:** [`pi-jev-wiki@0.7.1`](https://www.npmjs.com/package/pi-jev-wiki) — CI-published with
+**Published:** [`pi-jev-wiki@0.8.0`](https://www.npmjs.com/package/pi-jev-wiki) — CI-published with
 SLSA provenance (`0.2.0`, the first release, was an interactive publish and has no attestation).
 Listed on the [pi package gallery](https://pi.dev/packages/pi-jev-wiki).
+
+0.8.0 adds cross-wiki writes: every write tool takes `wiki: "<registered name>"`, auto-capture
+routes to the subject wiki by default (warning instead of guessing on ambiguity), and ingest/review
+hardening lands alongside (`out_of_scope`, review paging, rejection diagnostics, CRLF-safe hashing,
+append-only raw sources, doctor integrity checks).
 
 0.7.1 fixes two rough edges: removing the last page of a topic no longer leaves a stale
 `toc/<topic>.md` shard, and embedding-model load progress is a single footer status line instead of
