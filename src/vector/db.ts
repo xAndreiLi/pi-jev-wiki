@@ -282,3 +282,10 @@ export function vectorDbFor(dataDir: string): PGliteVectorDb {
 	}
 	return db;
 }
+
+/** Release every cached PGlite handle (session shutdown; keeps headless runs exiting cleanly). */
+export async function closeVectorDbs(): Promise<void> {
+	const open = [...instances.values()];
+	instances.clear();
+	await Promise.allSettled(open.map((db) => db.close()));
+}

@@ -13,7 +13,8 @@ import { git, headCommit, isGitRepo } from "./git.ts";
 import { readLedger } from "./ledger.ts";
 import { readReviews } from "./review.ts";
 import { readSyncState } from "./sync.ts";
-import { MODEL_PRESETS } from "./vector/embed.ts";
+import { MODEL_PRESETS, modelsDir } from "./vector/embed.ts";
+import { modelsCacheBytes } from "./vector/index.ts";
 import { readRegistry } from "./vector/registry.ts";
 import { listMarkdownFiles, resolveLayout, type WikiLayout } from "./wiki/layout.ts";
 import { isLocked } from "./wiki/lock.ts";
@@ -95,7 +96,14 @@ export async function runDoctor(loaded: LoadedConfig): Promise<DoctorReport> {
 		try {
 			const registry = await readRegistry(loaded.agentDir);
 			const enabled = registry.wikis.filter((entry) => entry.enabled).length;
-			checks.push(check("vector registry", "ok", `${registry.wikis.length} registered, ${enabled} enabled; run wiki_index status for index counts`));
+			const cachedBytes = await modelsCacheBytes(modelsDir(loaded.agentDir));
+			checks.push(
+				check(
+					"vector registry",
+					"ok",
+					`${registry.wikis.length} registered, ${enabled} enabled; model cache ${cachedBytes > 0 ? `~${Math.round(cachedBytes / 1_000_000)} MB` : "empty"}; run wiki_index status for index counts`,
+				),
+			);
 		} catch (error) {
 			checks.push(check("vector registry", "warn", `unreadable: ${(error as Error).message}`));
 		}

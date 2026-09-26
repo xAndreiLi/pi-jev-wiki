@@ -117,6 +117,10 @@ await check("registers, dedupes, renames collisions, toggles, and removes", asyn
 	assert.deepEqual(enabledWikiNames(registry), ["life-2"]);
 	await unregisterWiki(agentDir, "life-2");
 	assert.equal((await readRegistry(agentDir)).wikis.length, 1);
+	const genericRoot = join(agentDir, "docs", "wiki");
+	await mkdir(genericRoot, { recursive: true });
+	const generic = await registerWiki(agentDir, genericRoot);
+	assert.ok(!["wiki", "docs"].includes(generic.registration.name), `generic segments should be skipped, got ${generic.registration.name}`);
 	await rm(agentDir, { recursive: true, force: true });
 });
 

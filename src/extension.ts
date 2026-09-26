@@ -55,9 +55,11 @@ import {
 import { extractMarkdownLinks } from "./wiki/links.ts";
 import { appendLog, entryFromPage, isWikiMetaFile, parseIndex, readIndex, readRecentLog, renderCompactToc, renderIndex, topicSlug, updateIndex, upsertEntries, writeIndex, type TocEntry } from "./wiki/toc.ts";
 import { createSearchEngine, VectorSearchEngine, type SearchResult } from "./wiki/search.ts";
-import { forgetWikiIndex, indexWiki, vectorStatus } from "./vector/index.ts";
+import { forgetWikiIndex, hasWarmIndex, indexWiki, vectorStatus } from "./vector/index.ts";
+import { resolvePreset } from "./vector/embed.ts";
 import { vectorEnabled, vectorSearch } from "./vector/query.ts";
-import { enabledWikiNames, readRegistry, registerWiki, setWikiEnabled, unregisterWiki } from "./vector/registry.ts";
+import { closeVectorDbs } from "./vector/db.ts";
+import { enabledWikiNames, readRegistry, registerWiki, resolveWikiRoot, setWikiEnabled, setWikiRoot, unregisterWiki } from "./vector/registry.ts";
 
 interface Runtime {
 	loaded: LoadedConfig;
@@ -1182,15 +1184,20 @@ export default function (pi: ExtensionAPI) {
 			if (vector.enabled && vector.sync.onFinalize && updates.length > 0) {
 				try {
 					const { registration } = await registerWiki(loaded.agentDir, layout.root);
-					const report = await indexWiki({
-						agentDir: loaded.agentDir,
-						wiki: registration.name,
-						root: layout.root,
-						model: vector.model,
-						...(vector.dimensions ? { dimensions: vector.dimensions } : {}),
-						paths: updates.map((entry) => entry.path),
-					});
-					reindexNote = `Reindexed ${report.embedded} chunk(s), ${report.skipped} unchanged (${report.total} total).`;
+					if (await hasWarmIndex(loaded.agentDir, registration.name, vector.model)) {
+						const report = await indexWiki({
+							agentDir: loaded.agentDir,
+							wiki: registration.name,
+							root: layout.root,
+							model: vector.model,
+							...(vector.dimensions ? { dimensions: vector.dimensions } : {}),
+							paths: updates.map((entry) => entry.path),
+						});
+						reindexNote = `Reindexed ${report.embedded} chunk(s), ${report.skipped} unchanged (${report.total} total).`;
+					} else {
+						const downloadMb = Math.round(resolvePreset(vector.model).expectedBytes / 1_000_000);
+						reindexNote = `Semantic index for \`${registration.name}\` is not built yet — run wiki_index action=rebuild (one-time ~${downloadMb} MB model download).`;
+					}
 				} catch (error) {
 					reindexNote = `Semantic reindex skipped: ${(error as Error).message}`;
 				}
@@ -1491,9 +1498,17 @@ export default function (pi: ExtensionAPI) {
 			const vector = loaded.config.search.vector;
 			if (params.action === "status") {
 				const status = await vectorStatus(loaded.agentDir, vector.model, vector.dimensions ?? undefined);
+				const downloadMb = Math.round(status.downloadBytes / 1_000_000);
+				const cachedMb = Math.round(status.modelsBytes / 1_000_000);
+				const cacheLabel =
+					status.modelsBytes === 0
+						? `not downloaded yet (first rebuild downloads ~${downloadMb} MB)`
+						: status.modelsBytes >= status.downloadBytes * 0.5
+							? `cached (~${cachedMb} MB)`
+							: `partial (~${cachedMb} MB of ~${downloadMb} MB)`;
 				const lines = [
 					"# Semantic index",
-					`- preset: ${vector.model} (${status.repo}), ${status.dimensions}d, ~${Math.round(status.downloadBytes / 1_000_000)} MB download`,
+					`- preset: ${vector.model} (${status.repo}), ${status.dimensions}d — ${cacheLabel}`,
 					`- models dir: ${status.modelsDir}`,
 					`- database: ${status.dbAvailable ? "ok" : `unavailable — ${status.error}`}`,
 					"",
@@ -1508,10 +1523,12 @@ export default function (pi: ExtensionAPI) {
 			}
 			if (params.action === "rebuild") {
 				const target = await resolveTargetWiki(loaded.agentDir, layout.root, params.wiki);
+				const root = await resolveWikiRoot(target.root).catch(() => target.root);
+				if (root !== target.root) await setWikiRoot(loaded.agentDir, target.name, root);
 				const report = await indexWiki({
 					agentDir: loaded.agentDir,
 					wiki: target.name,
-					root: target.root,
+					root,
 					model: vector.model,
 					...(vector.dimensions ? { dimensions: vector.dimensions } : {}),
 				});
@@ -1521,7 +1538,7 @@ export default function (pi: ExtensionAPI) {
 				};
 			}
 			if (params.action === "add") {
-				const root = params.path ? resolve(ctx.cwd, params.path) : layout.root;
+				const root = params.path ? await resolveWikiRoot(resolve(ctx.cwd, params.path)) : layout.root;
 				const { registration, created } = await registerWiki(loaded.agentDir, root, { name: params.wiki });
 				return {
 					content: [{ type: "text", text: `${created ? "Registered" : "Already registered"} wiki \`${registration.name}\` → ${registration.root}` }],
@@ -1761,6 +1778,10 @@ export default function (pi: ExtensionAPI) {
 				"Lint the project wiki: call wiki_lint, report the findings, then work any queued judgment items with wiki_review (read the referenced pages first).",
 			);
 		},
+	});
+
+	pi.on("session_shutdown", async () => {
+		await closeVectorDbs().catch(() => undefined);
 	});
 
 	pi.on("session_start", async (_event, ctx) => {

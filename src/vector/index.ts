@@ -3,6 +3,7 @@
  * content hash; a model change purges the previous model's rows for that wiki.
  */
 import { existsSync } from "node:fs";
+import { readdir, stat } from "node:fs/promises";
 import { join, relative } from "node:path";
 import { listMarkdownFiles, readPage, resolveLayout } from "../wiki/layout.ts";
 import { chunkPage, type WikiPageInput } from "./chunks.ts";
@@ -78,6 +79,7 @@ export async function indexWiki(options: IndexOptions): Promise<IndexReport> {
 			preset,
 			...(options.dimensions !== undefined ? { dimensions: options.dimensions } : {}),
 			cacheDir: modelsDir(options.agentDir),
+			onProgress: (message) => console.log(`[jev-wiki] embedding model: ${message}`),
 		}));
 		const vectors = await provider.embed(
 			pending.map((entry) => ({ title: entry.chunk.title, text: entry.chunk.text })),
@@ -129,6 +131,7 @@ export interface VectorStatus {
 	dimensions: number;
 	downloadBytes: number;
 	modelsDir: string;
+	modelsBytes: number;
 	registry: Awaited<ReturnType<typeof readRegistry>>;
 	states: Array<IndexState & { name: string; root: string; enabled: boolean }>;
 	dbAvailable: boolean;
@@ -158,11 +161,33 @@ export async function vectorStatus(agentDir: string, model: string, dimensions?:
 		dimensions: dimensions ?? preset.dimensions,
 		downloadBytes: preset.expectedBytes,
 		modelsDir: modelsDir(agentDir),
+		modelsBytes: await modelsCacheBytes(modelsDir(agentDir)),
 		registry,
 		states,
 		dbAvailable,
 		...(error ? { error } : {}),
 	};
+}
+
+/** True when the wiki already has chunks for this model (i.e. the index is warm). */
+export async function hasWarmIndex(agentDir: string, wiki: string, model: string): Promise<boolean> {
+	const db = vectorDbFor(vectorDataDir(agentDir));
+	await db.init();
+	const counts = await db.counts();
+	return counts.some((entry) => entry.wiki === wiki && entry.model === model && entry.chunks > 0);
+}
+
+/** Total bytes of the local model cache (used for first-run status messages). */
+export async function modelsCacheBytes(dir: string): Promise<number> {
+	if (!existsSync(dir)) return 0;
+	let total = 0;
+	const entries = await readdir(dir, { withFileTypes: true }).catch(() => []);
+	for (const entry of entries) {
+		const path = join(dir, entry.name);
+		if (entry.isDirectory()) total += await modelsCacheBytes(path);
+		else if (entry.isFile()) total += (await stat(path).catch(() => undefined))?.size ?? 0;
+	}
+	return total;
 }
 
 export async function forgetWikiIndex(agentDir: string, wiki: string): Promise<void> {

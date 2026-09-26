@@ -84,10 +84,26 @@ interface ModelLike {
 
 interface TransformersModule {
 	env: { cacheDir?: string };
-	AutoTokenizer: { from_pretrained(repo: string): Promise<TokenizerLike> };
-	AutoModel: { from_pretrained(repo: string, options: { dtype: string }): Promise<ModelLike> };
-	pipeline(task: string, repo: string, options: { dtype: string }): Promise<unknown>;
+	AutoTokenizer: {
+		from_pretrained(repo: string, options?: { progress_callback?: ProgressCallback }): Promise<TokenizerLike>;
+	};
+	AutoModel: {
+		from_pretrained(repo: string, options?: { dtype?: string; progress_callback?: ProgressCallback }): Promise<ModelLike>;
+	};
+	pipeline(
+		task: string,
+		repo: string,
+		options?: { dtype?: string; progress_callback?: ProgressCallback },
+	): Promise<unknown>;
 }
+
+interface ProgressInfo {
+	status?: string;
+	file?: string;
+	progress?: number;
+}
+
+type ProgressCallback = (info: ProgressInfo) => void;
 
 async function loadTransformers(): Promise<TransformersModule> {
 	const specifier = "@huggingface/transformers";
@@ -109,6 +125,8 @@ export interface LocalProviderOptions {
 	dtype?: string;
 	cacheDir?: string;
 	batchSize?: number;
+	/** Optional progress sink for the first-run model download. */
+	onProgress?: (message: string) => void;
 }
 
 interface Extractor {
@@ -127,7 +145,17 @@ export async function createLocalProvider(options: LocalProviderOptions): Promis
 	const transformers = await loadTransformers();
 	if (options.cacheDir) transformers.env.cacheDir = options.cacheDir;
 
-	const encode = await createEncoder(transformers, preset, dtype);
+	const progress_callback: ProgressCallback | undefined = options.onProgress
+		? (info) => {
+				if (info?.status === "progress" && typeof info.progress === "number") {
+					options.onProgress?.(`${info.file ?? "model"} ${Math.round(info.progress)}%`);
+				} else if (info?.status === "done" && info.file) {
+					options.onProgress?.(`${info.file} ready`);
+				}
+			}
+		: undefined;
+
+	const encode = await createEncoder(transformers, preset, dtype, progress_callback);
 
 	return {
 		id: `${preset.id}:${dtype}`,
@@ -149,10 +177,11 @@ async function createEncoder(
 	transformers: TransformersModule,
 	preset: ModelPreset,
 	dtype: string,
+	progress_callback?: ProgressCallback,
 ): Promise<(texts: string[]) => Promise<number[][]>> {
 	if (preset.pooling === "sentence_embedding") {
-		const tokenizer = await transformers.AutoTokenizer.from_pretrained(preset.repo);
-		const model = await transformers.AutoModel.from_pretrained(preset.repo, { dtype });
+		const tokenizer = await transformers.AutoTokenizer.from_pretrained(preset.repo, { progress_callback });
+		const model = await transformers.AutoModel.from_pretrained(preset.repo, { dtype, progress_callback });
 		return async (texts) => {
 			const inputs = await tokenizer(texts, { padding: true, truncation: true });
 			const output = await model(inputs);
@@ -160,7 +189,7 @@ async function createEncoder(
 			return output.sentence_embedding.tolist();
 		};
 	}
-	const extractor = (await transformers.pipeline("feature-extraction", preset.repo, { dtype })) as unknown as Extractor;
+	const extractor = (await transformers.pipeline("feature-extraction", preset.repo, { dtype, progress_callback })) as unknown as Extractor;
 	return async (texts) => {
 		const output = await extractor(texts, { pooling: preset.pooling, normalize: false });
 		return output.tolist();

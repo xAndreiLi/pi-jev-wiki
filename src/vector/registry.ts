@@ -4,7 +4,8 @@
  */
 import { existsSync } from "node:fs";
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
-import { basename, join } from "node:path";
+import { basename, join, resolve } from "node:path";
+import { homedir } from "node:os";
 
 export interface WikiRegistration {
 	name: string;
@@ -48,13 +49,23 @@ export function normalizeRoot(root: string): string {
 	return root.replace(/\\/g, "/").replace(/\/+$/, "");
 }
 
+const GENERIC_SEGMENTS = new Set(["wiki", "docs", "documentation", "notes"]);
+
+/** Derive a stable, human-friendly wiki name from its root path. */
 export function wikiNameFor(root: string): string {
-	const base = basename(normalizeRoot(root)) || "wiki";
-	const slug = base
-		.toLowerCase()
-		.replace(/[^a-z0-9]+/g, "-")
-		.replace(/^-+|-+$/g, "");
-	return slug || "wiki";
+	const normalized = normalizeRoot(root);
+	const segments = normalized.split("/").filter(Boolean);
+	for (let index = segments.length - 1; index >= 0; index--) {
+		const segment = segments[index];
+		if (GENERIC_SEGMENTS.has(segment.toLowerCase())) continue;
+		if (segment.toLowerCase() === basename(homedir()).toLowerCase()) return "home";
+		const slug = segment
+			.toLowerCase()
+			.replace(/[^a-z0-9]+/g, "-")
+			.replace(/^-+|-+$/g, "");
+		if (slug) return slug;
+	}
+	return "home";
 }
 
 export async function registerWiki(
@@ -83,6 +94,41 @@ export async function registerWiki(
 	registry.wikis.push(registration);
 	await writeRegistry(agentDir, registry);
 	return { registration, created: true };
+}
+
+/**
+ * Resolve a path the user named (project root or wiki root) to the wiki root —
+ * the directory that contains the `wiki/` pages. Checks the project's
+ * `.pi/jev-wiki.json` wikiRoot, then the spec's default `docs/wiki`.
+ */
+export async function resolveWikiRoot(path: string): Promise<string> {
+	const normalized = normalizeRoot(path);
+	const candidates: string[] = [normalized];
+	const configPath = join(normalized, ".pi", "jev-wiki.json");
+	if (existsSync(configPath)) {
+		try {
+			const config = JSON.parse(await readFile(configPath, "utf8")) as { wikiRoot?: string };
+			if (typeof config.wikiRoot === "string" && config.wikiRoot.trim()) candidates.push(resolve(normalized, config.wikiRoot));
+		} catch {
+			// Fall through to the default candidates.
+		}
+	}
+	for (const candidate of [join(normalized, "docs", "wiki"), join(normalized, "wiki"), normalized]) {
+		if (!candidates.includes(candidate)) candidates.push(candidate);
+	}
+	for (const candidate of candidates) {
+		if (existsSync(join(candidate, "wiki"))) return normalizeRoot(candidate);
+	}
+	throw new Error(`No wiki found at ${normalized} (looked for a wiki/ directory, docs/wiki, and the project .pi/jev-wiki.json wikiRoot).`);
+}
+
+export async function setWikiRoot(agentDir: string, name: string, root: string): Promise<WikiRegistration | undefined> {
+	const registry = await readRegistry(agentDir);
+	const registration = registry.wikis.find((entry) => entry.name === name);
+	if (!registration) return undefined;
+	registration.root = normalizeRoot(root);
+	await writeRegistry(agentDir, registry);
+	return registration;
 }
 
 export async function setWikiEnabled(agentDir: string, name: string, enabled: boolean): Promise<WikiRegistration | undefined> {

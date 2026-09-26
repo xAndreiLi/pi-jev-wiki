@@ -39,12 +39,22 @@ export async function vectorSearch(
 	query: string,
 	options: VectorQueryOptions,
 ): Promise<SearchResult[]> {
-	const provider = await providerFor(agentDir, config);
-	const [embedding] = await provider.embed([{ text: query }], "query");
 	const db = vectorDbFor(vectorDataDir(agentDir));
 	await db.init();
+	// Queries never download a model: a cold or mismatched index degrades to keyword search.
+	const model = config.search.vector.model;
+	const counts = await db.counts();
+	const warm = counts.some(
+		(entry) =>
+			entry.model === model &&
+			entry.chunks > 0 &&
+			(!options.wikis || options.wikis.length === 0 || options.wikis.includes(entry.wiki)),
+	);
+	if (!warm) return [];
+	const provider = await providerFor(agentDir, config);
+	const [embedding] = await provider.embed([{ text: query }], "query");
 	const hits = await db.knn(embedding, {
-		model: config.search.vector.model,
+		model,
 		dim: provider.dimensions,
 		limit: options.limit,
 		...(options.wikis && options.wikis.length > 0 ? { wikis: options.wikis } : {}),
@@ -56,7 +66,7 @@ export async function vectorSearch(
 		score: hit.score,
 		excerpt: hit.text.length > 600 ? `${hit.text.slice(0, 600)}…` : hit.text,
 		wiki: hit.wiki,
-		anchor: hit.claimId ?? hit.key,
+		anchor: hit.claimId ?? (hit.kind === "page-section" ? hit.key.replace(/^section:/, "") : hit.key),
 		kind: hit.kind,
 		...(hit.status ? { status: hit.status } : {}),
 	}));

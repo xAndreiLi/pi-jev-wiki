@@ -109,6 +109,11 @@ preset — `performance` (EmbeddingGemma-300M, ~309 MB download, 768d) or `quali
 (Qwen3-Embedding-0.6B, ~614 MB, 1024d). The index is a derived cache at `<agent dir>/jev-wiki/`;
 manage it with `wiki_index` (`status`, `rebuild`, `add`, `remove`, `enable`, `disable`).
 
+First run: `wiki_index action=rebuild` downloads the preset model once into
+`<agent dir>/jev-wiki/models` and builds the index; afterwards `wiki_finalize` keeps touched pages
+in sync automatically. Queries never trigger a download — if the index is cold, `wiki_ask` falls
+back to keyword search. Check state any time with `wiki_index action=status` or `wiki_doctor`.
+
 The optional `globalWikiRoot` adds a read-only cross-project vault: `wiki_ask` also searches that
 wiki and tags its results `[global vault]`. It resolves against the pi agent dir when relative.
 
