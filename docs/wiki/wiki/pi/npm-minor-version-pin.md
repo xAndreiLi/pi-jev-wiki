@@ -14,8 +14,11 @@ claims:
     evidence: [raw/sessions/2026-09-26-session-2026-09-26-0041.md, docs/RELEASING.md, "Observed 2026-09-26: @latest reported success while the store copy stayed 0.7.1; @0.8.0 installed 0.8.0 and rewrote the spec."]
     reviewed: 2026-09-26
     last_checked: 2026-09-26
+    corroborations: 2
+    last_confirmed: 2026-09-26
 files: [docs/RELEASING.md]
 ---
+
 
 # npm-installed extensions do not cross minor versions on update
 

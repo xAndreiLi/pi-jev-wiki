@@ -449,3 +449,9 @@
 - Updated: invariants/capture-routing-and-gating.md
 - Updated: pi/one-install-source.md
 
+## [2026-09-26] capture | 8 insights (settled)
+- Raw: raw/sessions/2026-09-26-session-2026-09-26-0043.md
+- Filed 3 · reinforced 1 · review 1 · rejected 3
+
+## [2026-09-26] finalize | Dispositioned the post-publish capture: all File recommendations restated already-filed pi/ claims (and reinforced them mechanically), the Jev-liberal restatement maps to adjudication-policy c4, and the review item restated cross-wiki-writes c1 (confirmed). Two release-runbook gaps it surfaced were added to docs/RELEASING.md instead.
+

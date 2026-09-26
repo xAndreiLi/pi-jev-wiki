@@ -16,6 +16,12 @@
   tag. Lightweight tags are not pushed by `--follow-tags`, so always use annotated tags. Verify the
   run with `gh run list --workflow publish.yml --limit 10 --json status,conclusion,headBranch`
   (filter on the tag — the newest entry by creation time may be an older release).
+- **After the CI run:** create the GitHub release manually — the publish workflow publishes to npm
+  and does not create a release. Reuse the changelog section as the notes:
+  `gh release create v<version> --title "v<version>" --notes-file <changelog-section>`.
+- **Registry propagation:** a freshly published version can take a minute or two before
+  `npm view` sees it; poll `npm view pi-jev-wiki version --prefer-online` before verifying an
+  artifact or updating installed copies.
 - **CI auth:** verified end-to-end. `.github/workflows/publish.yml` authenticates with the
   `NPM_TOKEN` secret (a granular access token with **Bypass two-factor authentication** checked),
   publishes with provenance, and skips versions that are already on the registry.

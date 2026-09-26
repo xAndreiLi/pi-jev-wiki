@@ -14,17 +14,21 @@ claims:
     evidence: [raw/sessions/2026-09-26-session-2026-09-26-2307.md, README.md, docs/wiki/wiki/pi/one-install-source.md]
     reviewed: 2026-09-26
     last_checked: 2026-09-26
-    corroborations: 2
+    corroborations: 3
     last_confirmed: 2026-09-26
   - id: c2
     text: "A packed-artifact smoke test must run with extension discovery disabled (`pi -ne -e <packed>/src/extension.ts`) because a registered npm install would otherwise register a second copy and hit the same tool-conflict failure."
     status: verified
-    support: 0.88
-    evidence: [raw/sessions/2026-09-26-session-2026-09-26-2307.md, "pi -ne -e …"]
+    support: 0.89
+    evidence: [raw/sessions/2026-09-26-session-2026-09-26-2307.md, pi -ne -e …, docs/wiki/wiki/pi/one-install-source.md]
     reviewed: 2026-09-26
     last_checked: 2026-09-26
+    corroborations: 2
+    last_confirmed: 2026-09-26
 files: [README.md]
 ---
+
+
 
 
 # One install source only
