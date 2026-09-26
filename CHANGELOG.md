@@ -2,6 +2,20 @@
 
 ## Unreleased
 
+### Added
+
+- Cross-wiki catalog: `wiki_toc scope=all` lists every registered wiki with page/topic counts, chunk
+  counts, index model, last-indexed time, and staleness flags (`toc-stale`, `index-stale`,
+  `root-missing`, `never-indexed`, `model-mismatch`, `disabled`); `wiki_toc wiki=<name>` reads one
+  wiki's entries. Paged (`limit`/`offset`) and failure-isolated (concurrency 4, 750 ms per wiki).
+- Per-wiki TOC manifests (`.jev-wiki/toc.json`), written by the same single writer as `index.md`,
+  carrying page/topic counts and an entries hash so drift is detectable; staleness is computed from
+  the current newest page mtime, never guessed.
+- Jev retrieval judgments in `wiki_ask`: one batched call returns a relevance score per candidate
+  (rerank) plus an evidence-sufficiency verdict. `search.jev.rerank` = `auto` (hybrid only) |
+  `always` | `never`; `search.jev.sufficiency` adds a calibrated "may not cover this yet" note below
+  `minSufficiency`. Verdicts land in the ledger (`ask.judge`) for the retrieval benchmark.
+
 ### Fixed
 
 - Lexical (index/BM25) results now carry their wiki name, so hybrid answers always show provenance

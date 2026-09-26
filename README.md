@@ -51,7 +51,7 @@ the agent decides and writes, with the final say, and code owns every threshold.
 
 | Tool | Purpose |
 |---|---|
-| `wiki_toc` | the wiki table of contents (compact above 60 pages, per-topic tables) |
+| `wiki_toc` | the local wiki's contents (topic/tag/query filters), another registered wiki by name, or the cross-wiki catalog with index health (`scope: all`) |
 | `wiki_ask` | search pages and excerpts (auto / index / BM25 / vector / hybrid / qmd), with `scope: all` across registered wikis |
 | `wiki_index` | manage the semantic index: `status`, `model`, `discover`, `rebuild`, `add`/`remove`, `enable`/`disable` |
 | `wiki_ingest` | ingest a document: raw source → claims → Jev verdicts → placement brief |
@@ -131,7 +131,6 @@ exists, keyword otherwise) and can search every registered wiki:
 
 Choosing the embedding model happens once, before the first build; the agent asks and persists the
 answer with `wiki_index action=model`:
-
 | Preset | Model | Download | Dims | Best for |
 |---|---|---|---|---|
 | `performance` | EmbeddingGemma-300M (q8) | ~309 MB | 768 | everyday use, multilingual, fastest |
@@ -159,7 +158,8 @@ Optional overrides in `~/.pi/agent/jev-wiki.json` or project `.pi/jev-wiki.json`
   "thresholds": { "autoAccept": 0.8, "minDerivable": 0.5 },
   "search": {
     "engine": "auto",
-    "vector": { "enabled": true, "model": "performance", "scan": { "wsl": true } }
+    "vector": { "enabled": true, "model": "performance", "scan": { "wsl": true } },
+    "jev": { "rerank": "auto", "sufficiency": true }
   }
 }
 ```
@@ -223,6 +223,10 @@ Listed on the [pi package gallery](https://pi.dev/packages/pi-jev-wiki).
 0.5.0 adds cross-wiki semantic search (PGlite + pgvector, `performance`/`quality` model presets,
 RRF hybrid retrieval), wiki discovery and adoption, the embedding-model choice flow, advisory Jev
 verdicts with a recorded override ledger, bulk review resolution, and the first-run/shutdown fixes.
+
+**Unreleased on `main`:** the cross-wiki catalog (`wiki_toc scope=all`) with per-wiki TOC
+manifests and staleness flags, Jev retrieval judgments (batched rerank + evidence sufficiency),
+wiki-tagged lexical results, granularity-aware fusion, and generated-file exclusion from the index.
 
 Implemented through P3: both intake channels (research ingest + agent insights), architecture-first
 pages, TOC/log, decision ledger, change-driven invalidation (`wiki_sync`), agent-managed review,

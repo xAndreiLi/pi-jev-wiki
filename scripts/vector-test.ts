@@ -4,7 +4,7 @@
  * Run: npm run test:vector
  */
 import assert from "node:assert/strict";
-import { mkdtemp, readFile, rm, writeFile, mkdir } from "node:fs/promises";
+import { mkdtemp, readFile, rm, utimes, writeFile, mkdir } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { chunkPage, hashChunk, splitSections } from "../src/vector/chunks.ts";
@@ -14,6 +14,12 @@ import { enabledWikiNames, readRegistry, registerWiki, setWikiEnabled, unregiste
 import { vectorDbFor } from "../src/vector/db.ts";
 import { vectorDataDir } from "../src/vector/registry.ts";
 import { discoverWikis } from "../src/vector/discover.ts";
+import { buildCatalog } from "../src/vector/catalog.ts";
+import { judgeRetrieval } from "../src/vector/judgments.ts";
+import { countPages, readManifest } from "../src/wiki/manifest.ts";
+import { entryFromPage, updateIndex, upsertEntries } from "../src/wiki/toc.ts";
+import { resolveLayout } from "../src/wiki/layout.ts";
+import type { JevClient } from "../src/jev.ts";
 import { configuredModel, modelChoiceSource, writeModelSetting } from "../src/vector/settings.ts";
 import type { LoadedConfig } from "../src/config.ts";
 import { NamedSearchEngine, rrfFuse, type SearchResult } from "../src/wiki/search.ts";
@@ -308,6 +314,118 @@ await check("model choice source prefers project over user over default", async 
 	assert.deepEqual(await modelChoiceSource(loaded), { model: "quality", source: "user" });
 	await writeModelSetting(projectConfig, "performance");
 	assert.deepEqual(await modelChoiceSource(loaded), { model: "performance", source: "project" });
+	await rm(dir, { recursive: true, force: true });
+});
+
+console.log("catalog and manifest");
+await check("manifest tracks page counts, topics, and staleness", async () => {
+	const dir = await mkdtemp(join(tmpdir(), "jev-catalog-"));
+	const root = join(dir, "alpha", "docs", "wiki");
+	await mkdir(join(root, "wiki", "topic"), { recursive: true });
+	await writeFile(join(root, "wiki", "topic", "a.md"), "# A\n");
+	await writeFile(join(root, "wiki", "topic", "b.md"), "# B\n");
+	const layout = resolveLayout(root, ".", ".jev-wiki");
+	const entries = [
+		entryFromPage("topic/a.md", { title: "A", type: "concept", summary: "first", tags: [], updated: "2026-01-01" }),
+		entryFromPage("topic/b.md", { title: "B", type: "concept", summary: "second", tags: [], updated: "2026-01-01" }),
+	];
+	await updateIndex(layout, (current) => upsertEntries(current, entries));
+	const manifest = await readManifest(layout);
+	assert.equal(manifest?.pages, 2);
+	assert.deepEqual(manifest?.topics, [{ slug: "topic", count: 2 }]);
+	assert.equal(await countPages(layout), 2, "generated index/toc files are excluded");
+	assert.ok(manifest?.entriesHash);
+
+	// A page touched after the manifest was written makes the TOC stale.
+	const future = new Date(Date.now() + 60_000);
+	await utimes(join(root, "wiki", "topic", "a.md"), future, future);
+	const catalog = await buildCatalog({
+		registry: [{ name: "alpha", root: root.replace(/\\/g, "/"), enabled: true, added: "2026-01-01T00:00:00.000Z" }],
+		states: new Map([["alpha", { chunks: 3, model: "performance", updatedAt: new Date().toISOString() }]]),
+		stateRoot: ".jev-wiki",
+		model: "performance",
+	});
+	const alpha = catalog.entries[0];
+	assert.ok(alpha.flags.includes("toc-stale"), `expected toc-stale, got ${alpha.flags.join(",")}`);
+	assert.equal(alpha.pages, 2);
+	assert.equal(alpha.chunks, 3);
+	await rm(dir, { recursive: true, force: true });
+});
+await check("catalog isolates missing roots and flags model mismatches", async () => {
+	const dir = await mkdtemp(join(tmpdir(), "jev-catalog2-"));
+	const root = join(dir, "beta");
+	await mkdir(join(root, "wiki"), { recursive: true });
+	await writeFile(join(root, "wiki", "p.md"), "# P\n");
+	const layout = resolveLayout(root, ".", ".jev-wiki");
+	await updateIndex(layout, (current) =>
+		upsertEntries(current, [entryFromPage("p.md", { title: "P", type: "concept", summary: "s", tags: [], updated: "2026-01-01" })]),
+	);
+	const catalog = await buildCatalog({
+		registry: [
+			{ name: "beta", root: root.replace(/\\/g, "/"), enabled: true, added: "2026-01-01T00:00:00.000Z" },
+			{ name: "gone", root: join(dir, "gone").replace(/\\/g, "/"), enabled: true, added: "2026-01-01T00:00:00.000Z" },
+		],
+		states: new Map([["beta", { chunks: 9, model: "quality", updatedAt: "2026-01-02T00:00:00.000Z" }]]),
+		stateRoot: ".jev-wiki",
+		model: "performance",
+	});
+	assert.equal(catalog.total, 2);
+	assert.deepEqual(catalog.entries.find((entry) => entry.name === "gone")?.flags, ["root-missing"]);
+	const beta = catalog.entries.find((entry) => entry.name === "beta");
+	assert.ok(beta?.flags.includes("model-mismatch"));
+	assert.ok(!beta?.flags.includes("never-indexed"));
+	await rm(dir, { recursive: true, force: true });
+});
+
+console.log("Jev retrieval judgments");
+await check("reranks by judged relevance and flags insufficient evidence", async () => {
+	const results: SearchResult[] = [
+		{ path: "a.md", title: "A", score: 0.03, excerpt: "first", wiki: "home" },
+		{ path: "b.md", title: "B", score: 0.02, excerpt: "second", wiki: "home" },
+	];
+	const client = {
+		async systemOne() {
+			return {
+				model: "fake",
+				answers: { c1: { type: "noul", noul: 0.1 }, c2: { type: "noul", noul: 0.9 }, sufficient: { type: "noul", noul: 0.3 } },
+				usage: { input_tokens: 1, output_tokens: 1 },
+			};
+		},
+	} as unknown as JevClient;
+	const judgment = await judgeRetrieval({ client, query: "q", results, minSufficiency: 0.5 });
+	assert.equal(judgment.results[0].path, "b.md");
+	assert.equal(judgment.sufficiency, 0.3);
+	assert.ok(judgment.notes.some((note) => note.includes("insufficient")));
+	assert.equal(judgment.candidateScores.length, 2);
+});
+await check("propagates Jev failures so callers can fall back", async () => {
+	const client = { async systemOne() { throw new Error("no key"); } } as unknown as JevClient;
+	await assert.rejects(
+		() => judgeRetrieval({ client, query: "q", results: [{ path: "a.md", title: "A", score: 1, excerpt: "x" }] }),
+		/no key/,
+	);
+});
+
+await check("catalog scales across many wikis", async () => {
+	const dir = await mkdtemp(join(tmpdir(), "jev-catalog-scale-"));
+	const registry: Array<{ name: string; root: string; enabled: boolean; added: string }> = [];
+	for (let index = 0; index < 100; index++) {
+		const root = join(dir, `wiki-${index}`);
+		await mkdir(join(root, "wiki"), { recursive: true });
+		await writeFile(join(root, "wiki", "p.md"), "# P\n");
+		const layout = resolveLayout(root, ".", ".jev-wiki");
+		await updateIndex(layout, (current) =>
+			upsertEntries(current, [entryFromPage("p.md", { title: `P${index}`, type: "concept", summary: "s", tags: [], updated: "2026-01-01" })]),
+		);
+		registry.push({ name: `wiki-${index}`, root: root.replace(/\\/g, "/"), enabled: true, added: "2026-01-01T00:00:00.000Z" });
+	}
+	const started = Date.now();
+	const catalog = await buildCatalog({ registry, states: new Map(), stateRoot: ".jev-wiki", model: "performance", limit: 100 });
+	const elapsed = Date.now() - started;
+	assert.equal(catalog.total, 100);
+	assert.equal(catalog.entries.length, 100);
+	console.log(`      (100 wikis catalogued in ${elapsed}ms)`);
+	assert.ok(elapsed < 10_000, `catalog took ${elapsed}ms`);
 	await rm(dir, { recursive: true, force: true });
 });
 

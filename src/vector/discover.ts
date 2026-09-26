@@ -6,9 +6,10 @@ import { execFile } from "node:child_process";
 import { existsSync } from "node:fs";
 import { readdir, readFile } from "node:fs/promises";
 import { homedir } from "node:os";
-import { basename, join, resolve } from "node:path";
+import { join, resolve } from "node:path";
 import { promisify } from "node:util";
-import { listMarkdownFiles } from "../wiki/layout.ts";
+import { listMarkdownFiles, resolveLayout } from "../wiki/layout.ts";
+import { countPages } from "../wiki/manifest.ts";
 import { normalizeRoot, wikiNameFor, type WikiRegistration } from "./registry.ts";
 
 const run = promisify(execFile);
@@ -189,7 +190,7 @@ async function projectConfigRoot(dir: string): Promise<string | undefined> {
 }
 
 async function describeRoot(root: string, marker: WikiMarker, source: DiscoveredWiki["source"]): Promise<DiscoveredWiki> {
-	const pages = existsSync(join(root, "wiki")) ? (await listMarkdownFiles(join(root, "wiki"))).filter((file) => !/^(index|log)\.md$/.test(basename(file))).length : 0;
+	const pages = await countPages(resolveLayout(root, ".", ".jev-wiki")).catch(() => 0);
 	const rawSources = existsSync(join(root, "raw")) ? (await listMarkdownFiles(join(root, "raw"))).length : 0;
 	return {
 		root,

@@ -6,7 +6,7 @@ import type { WikiLayout } from "./wiki/layout.ts";
 
 export interface MetricEntry {
 	ts: string;
-	op: "toc" | "ask" | "sync" | "review" | "lint";
+	op: "toc" | "catalog" | "ask" | "sync" | "review" | "lint";
 	query?: string;
 	pages?: string[];
 	detail?: unknown;

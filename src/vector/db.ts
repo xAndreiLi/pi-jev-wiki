@@ -239,12 +239,21 @@ export class PGliteVectorDb implements VectorDb {
 
 	async state(wiki: string): Promise<IndexState | undefined> {
 		const db = await this.handle();
-		const result = await db.query<{ wiki: string; model: string; dim: number; chunks: number; updated_at: string }>(
+		const result = await db.query<{ wiki: string; model: string; dim: number; chunks: number; updated_at: string | Date }>(
 			"SELECT wiki, model, dim, chunks, updated_at FROM wiki_index_state WHERE wiki = $1",
 			[wiki],
 		);
 		const row = result.rows[0];
-		return row ? { wiki: row.wiki, model: row.model, dim: row.dim, chunks: row.chunks, updatedAt: String(row.updated_at) } : undefined;
+		if (!row) return undefined;
+		// Normalize driver timestamps to ISO so string comparisons (staleness) and display are stable.
+		const updated = row.updated_at instanceof Date ? row.updated_at : new Date(String(row.updated_at));
+		return {
+			wiki: row.wiki,
+			model: row.model,
+			dim: row.dim,
+			chunks: row.chunks,
+			updatedAt: Number.isNaN(updated.getTime()) ? String(row.updated_at) : updated.toISOString(),
+		};
 	}
 
 	async setState(state: IndexState): Promise<void> {

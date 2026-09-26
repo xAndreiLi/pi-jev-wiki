@@ -60,6 +60,8 @@ import { MODEL_PRESETS, resolvePreset } from "./vector/embed.ts";
 import { modelChoiceSource, writeModelSetting } from "./vector/settings.ts";
 import { vectorEnabled, vectorSearch } from "./vector/query.ts";
 import { closeVectorDbs, vectorDbFor } from "./vector/db.ts";
+import { buildCatalog, renderCatalog } from "./vector/catalog.ts";
+import { judgeRetrieval } from "./vector/judgments.ts";
 import { discoverWikis, maxScanDepth, scanRoots } from "./vector/discover.ts";
 import { vectorDataDir } from "./vector/registry.ts";
 import { enabledWikiNames, normalizeRoot, readRegistry, registerWiki, resolveWikiRoot, setWikiEnabled, setWikiRoot, unregisterWiki } from "./vector/registry.ts";
@@ -263,6 +265,22 @@ function bestCandidateClaim(text: string, candidates: CandidateClaim[]): Candida
 		if (!best || score > best.score) best = { candidate, score };
 	}
 	return best && best.score >= 0.3 ? best.candidate : undefined;
+}
+
+/** Render TOC entries as compact, budget-capped lines. */
+function renderTocLines(entries: TocEntry[], maxChars: number): string {
+	const lines: string[] = [];
+	let used = 0;
+	for (const entry of entries) {
+		const line = `- ${entry.type} · **${entry.title}** — ${entry.summary} \`${entry.path}\` (updated ${entry.updated})`;
+		if (used + line.length > maxChars) {
+			lines.push(`… ${entries.length - lines.length} more entries (narrow with topic/tag/query).`);
+			break;
+		}
+		lines.push(line);
+		used += line.length + 1;
+	}
+	return lines.join("\n");
 }
 
 /** Resolve a wiki by registered name, or auto-register the current wiki root. */
@@ -851,19 +869,75 @@ export default function (pi: ExtensionAPI) {
 	pi.registerTool({
 		name: "wiki_toc",
 		label: "Wiki Table of Contents",
-		description: "Read the project wiki table of contents (optionally filtered by topic, tag, or query).",
-		promptSnippet: "Read the wiki table of contents",
+		description:
+			"Read a wiki table of contents: the local wiki (filterable by topic/tag/query), another registered wiki by name, or the cross-wiki catalog with index health (scope=all).",
+		promptSnippet: "Read the wiki table of contents or the cross-wiki catalog",
 		promptGuidelines: [
 			"Use wiki_toc before architectural or unfamiliar changes, when planning work, or when a project term is unclear.",
-			"Consult the wiki proactively: it holds the project's structure, invariants, decisions, and gotchas.",
+			"Use wiki_toc scope=all to list every registered wiki with page counts, topics, and index health; use wiki: <name> to read another wiki's entries.",
 		],
 		parameters: Type.Object({
 			topic: Type.Optional(Type.String({ description: "Filter to one topic directory" })),
 			tag: Type.Optional(Type.String({ description: "Filter to entries carrying this tag" })),
 			query: Type.Optional(Type.String({ description: "Substring match on title or summary" })),
+			wiki: Type.Optional(Type.String({ description: "Read another registered wiki's TOC by name" })),
+			scope: Type.Optional(StringEnum(["local", "all"] as const, { description: "local (default) or all: the cross-wiki catalog" })),
+			limit: Type.Optional(Type.Number({ description: "scope=all: max wikis to list (default 25)" })),
+			offset: Type.Optional(Type.Number({ description: "scope=all: skip this many wikis (paging)" })),
 		}),
 		async execute(_id, params, _signal, _onUpdate, ctx) {
 			const { loaded, layout } = runtimeFor(ctx);
+			if (params.scope === "all") {
+				const registry = await readRegistry(loaded.agentDir);
+				const states = new Map<string, { chunks: number; model: string; updatedAt: string }>();
+				try {
+					const db = vectorDbFor(vectorDataDir(loaded.agentDir));
+					await db.init();
+					for (const entry of registry.wikis) {
+						const state = await db.state(entry.name);
+						if (state) states.set(entry.name, { chunks: state.chunks, model: state.model, updatedAt: state.updatedAt });
+					}
+				} catch {
+					// The catalog still reports TOC metadata when the index is unavailable.
+				}
+				const result = await buildCatalog({
+					registry: registry.wikis,
+					states,
+					stateRoot: loaded.config.stateRoot,
+					model: loaded.config.search.vector.model,
+					...(params.limit !== undefined ? { limit: params.limit } : {}),
+					...(params.offset !== undefined ? { offset: params.offset } : {}),
+				});
+				await recordMetric(layout, { op: "catalog", detail: { total: result.total, limit: result.limit, offset: result.offset } });
+				return { content: [{ type: "text", text: renderCatalog(result, loaded.config.search.vector.model) }], details: result };
+			}
+			if (params.wiki) {
+				const registry = await readRegistry(loaded.agentDir);
+				const entry = registry.wikis.find((item) => item.name === params.wiki);
+				if (!entry) throw new Error(`Wiki "${params.wiki}" is not registered — run wiki_toc scope=all to list wikis.`);
+				const target = resolveLayout(entry.root, ".", loaded.config.stateRoot);
+				const targetEntries = await readIndex(target);
+				let filteredTarget = targetEntries;
+				if (params.topic) filteredTarget = filteredTarget.filter((item) => item.path.startsWith(`${params.topic}/`));
+				if (params.tag) filteredTarget = filteredTarget.filter((item) => item.tags.includes(params.tag!));
+				if (params.query) {
+					const needle = params.query.toLowerCase();
+					filteredTarget = filteredTarget.filter(
+						(item) => item.title.toLowerCase().includes(needle) || item.summary.toLowerCase().includes(needle),
+					);
+				}
+				if (filteredTarget.length === 0) {
+					return {
+						content: [{ type: "text", text: `Wiki \`${entry.name}\` has no matching TOC entries (${targetEntries.length} total).` }],
+						details: { wiki: entry.name, entries: targetEntries.length, filtered: 0 },
+					};
+				}
+				const body = renderTocLines(filteredTarget, loaded.config.toc.maxTokens * 4);
+				return {
+					content: [{ type: "text", text: [`# ${entry.name} — ${entry.root}`, "", body].join("\n") }],
+					details: { wiki: entry.name, root: entry.root, entries: targetEntries.length, filtered: filteredTarget.length },
+				};
+			}
 			const entries = await readIndex(layout);
 			let filtered = entries;
 			if (params.topic) filtered = filtered.filter((entry) => entry.path.startsWith(`${params.topic}/`));
@@ -994,6 +1068,33 @@ export default function (pi: ExtensionAPI) {
 					content: [{ type: "text", text: [`No wiki pages match (engine: ${engine.name}). The wiki may not cover this yet.`, ...hints].join("\n") }],
 					details: { matches: 0, engine: engine.name, ...(scopeWikis ? { wikis: scopeWikis } : {}) },
 				};
+			}
+			const jevConfig = loaded.config.search.jev;
+			const wantsRerank = jevConfig.rerank === "always" || (jevConfig.rerank === "auto" && engine.name.includes("vector"));
+			if (jevConfig.sufficiency || wantsRerank) {
+				try {
+					const client = await requireClient(loaded, ctx);
+					const judgment = await judgeRetrieval({
+						client,
+						query: params.query,
+						results,
+						maxCandidates: jevConfig.maxCandidates,
+						minSufficiency: jevConfig.minSufficiency,
+						signal: ctx.signal,
+					});
+					if (wantsRerank) results = judgment.results;
+					notes.push(...judgment.notes);
+					await appendLedger(layout, {
+						actor: "jev",
+						op: "ask.judge",
+						subject: params.query.slice(0, 120),
+						action: wantsRerank ? "reranked" : "scored",
+						verdict: { sufficiency: judgment.sufficiency ?? null, candidates: judgment.candidateScores },
+						usage: judgment.usage,
+					});
+				} catch (error) {
+					notes.push(`Jev retrieval judgment skipped: ${(error as Error).message}`);
+				}
 			}
 			const text = results
 				.map((result) => {

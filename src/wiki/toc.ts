@@ -14,6 +14,7 @@ import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { todayISO, writeTextAtomic, type WikiLayout } from "./layout.ts";
 import { withWikiLock } from "./lock.ts";
+import { writeManifest } from "./manifest.ts";
 
 export interface TocEntry {
 	path: string;
@@ -158,6 +159,9 @@ export async function updateIndex(
 		const entries = await readIndex(layout);
 		const next = await mutator(entries);
 		await writeIndex(layout, next);
+		// The manifest is derived state written by the same single writer, so the
+		// overview never has to parse pages and can never drift silently.
+		await writeManifest(layout, next);
 		return next;
 	});
 }

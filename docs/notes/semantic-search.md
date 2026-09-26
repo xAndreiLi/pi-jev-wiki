@@ -57,6 +57,10 @@ wiki_ask(query, scope) ──▶ embed ──▶ cosine KNN ─┐              
   granularity-aware — a page-level lexical hit merges into a claim-level vector hit for the same
   page, while distinct claims stay separate. Empty results name scoped wikis with no indexed content
   yet instead of a generic "no match".
+- **Catalog**: `wiki_toc scope=all` reads per-wiki TOC manifests plus index state and reports pages,
+  topics, chunks, model, and staleness flags without parsing pages in bulk; see
+  [`overview-and-toc.md`](overview-and-toc.md). Jev adds batched rerank and an evidence-sufficiency
+  verdict to `wiki_ask` (`search.jev`), with every verdict recorded in the ledger.
 
 ## Model selection
 
@@ -96,6 +100,6 @@ counts, marker type, and index status. `register=true` adopts everything unregis
   tests with a fake embedder.
 - **P2** — cross-wiki links/`parent` integration, index-aware TOC, per-wiki opt-out surfaced in
   `wiki_status`.
-- **P3** — golden-query benchmark (recall@5 / MRR: BM25 vs vector vs hybrid) and default
-  `wiki_ask` engine selection.
+- **P3** — golden-query benchmark (recall@5 / MRR: BM25 vs vector vs hybrid vs Jev-reranked) and
+  default `wiki_ask` engine selection.
 - **P4** — server Postgres, OpenAI/Ollama providers, HNSW, optional reranker.

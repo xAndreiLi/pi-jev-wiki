@@ -64,6 +64,7 @@ export interface JevWikiConfig {
 			fusion: { rrfK: number; candidateMultiplier: number };
 			scan: { roots?: string[]; maxDepth: number; wsl: boolean };
 		};
+		jev: { rerank: "auto" | "always" | "never"; sufficiency: boolean; minSufficiency: number; maxCandidates: number };
 	};
 }
 
@@ -98,6 +99,7 @@ export const DEFAULT_CONFIG: JevWikiConfig = {
 			fusion: { rrfK: 60, candidateMultiplier: 3 },
 			scan: { maxDepth: 6, wsl: true },
 		},
+		jev: { rerank: "auto", sufficiency: true, minSufficiency: 0.5, maxCandidates: 8 },
 	},
 };
 
