@@ -1,5 +1,26 @@
 # Changelog
 
+## 0.8.1 — 2026-09-26
+
+### Fixed
+
+- Auto-capture no longer starts a model turn of its own. The settle hook writes the brief and
+  `pending-capture.md` and delivers the brief when the next turn begins, instead of forcing a
+  follow-up turn that repeated wiki maintenance and a second answer after every finished response.
+  `capture.triggerTurn: true` restores the forced-turn behaviour. The compact-capture path already
+  delivered this way.
+- `wiki_review` resolutions verify the page after the serializer round-trip: the affected claim's
+  status is re-read and a warning is returned when it did not survive (`accept`, `reject`,
+  `supersede`). Frontmatter is re-serialized on every write, so drift is now detected instead of
+  assumed away.
+
+### Docs
+
+- `skills/llm-wiki/SKILL.md`: **Finalize before the final response** — complete every wiki write and
+  `wiki_finalize` before the task-ending response, keep the decisions section last, and dispose of
+  any pending capture at the start of a turn; notes the advisory capture delivery.
+- `README.md`: capture delivery is advisory by default; `capture.triggerTurn` documented.
+
 ## 0.8.0 — 2026-09-26
 
 ### Added

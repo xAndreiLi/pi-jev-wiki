@@ -13,7 +13,7 @@ import { resolveWriterMode } from "../src/pipeline/write.ts";
 import { checkLiterals, closestPassage } from "../src/grounding.ts";
 import { nearIdenticalClaims } from "../src/lint.ts";
 import { redact } from "../src/redact.ts";
-import { applyReviewResolution, enqueueReview, listOpenReviews, resolveReview } from "../src/review.ts";
+import { applyReviewResolution, enqueueReview, expectedClaimStatus, listOpenReviews, resolveReview } from "../src/review.ts";
 import { fileMatches } from "../src/git.ts";
 import type { LedgerEntry } from "../src/ledger.ts";
 import { buildTriageReport, remedyFor } from "../src/triage.ts";
@@ -260,6 +260,7 @@ try {
 		assert.equal(open.length, 1);
 		const applied = await applyReviewResolution(layout, open[0], "accept");
 		assert.match(applied, /accept applied/);
+		assert.doesNotMatch(applied, /round-trip/, "a clean accept must not report drift");
 		await resolveReview(layout, open[0].id, "accept", "test");
 		assert.equal((await listOpenReviews(layout)).length, 0);
 		const page = parseFrontmatter(await readFile(pagePath, "utf8"));
@@ -279,6 +280,33 @@ try {
 		assert.match(applied, /out of scope/);
 		assert.equal(await readFile(pagePath, "utf8"), before);
 		await resolveReview(layout, item.id, "out_of_scope", "belongs to home");
+	});
+	await check("accept keeps a user-stated claim and reports no drift", async () => {
+		const pagePath2 = join(layout.wikiDir, "decisions", "user-stated-page.md");
+		await writePage(
+			pagePath2,
+			{
+				title: "User stated",
+				type: "decision",
+				topic: "decisions",
+				summary: "s",
+				updated: "2026-01-01",
+				claims: [{ id: "u1", text: "Andrei said so explicitly.", status: "user-stated", evidence: [] }],
+			},
+			"# User stated",
+		);
+		const item2 = await enqueueReview(layout, {
+			kind: "claim_review",
+			claimText: "Andrei said so explicitly.",
+			page: "decisions/user-stated-page.md",
+			claimId: "u1",
+			criticality: 0.3,
+		});
+		const applied2 = await applyReviewResolution(layout, { ...item2!, page: "decisions/user-stated-page.md" }, "accept");
+		assert.match(applied2, /accept applied/);
+		assert.doesNotMatch(applied2, /round-trip/);
+		const parsed = parseFrontmatter(await readFile(pagePath2, "utf8"));
+		assert.equal((parsed.data.claims as Array<Record<string, unknown>>)[0].status, "user-stated");
 	});
 } finally {
 	await rm(root, { recursive: true, force: true });
@@ -484,6 +512,20 @@ await check("near-identical claims are not contradiction candidates", () => {
 		await rm(rawRoot, { recursive: true, force: true });
 	}
 }
+
+console.log("\nreview round-trip verification");
+await check("maps the expected claim status per resolution", () => {
+	assert.equal(expectedClaimStatus(undefined, "accept"), "verified");
+	assert.equal(expectedClaimStatus("user-stated", "accept"), "user-stated");
+	assert.equal(expectedClaimStatus("verified", "reject"), "rejected");
+	assert.equal(expectedClaimStatus("verified", "supersede"), "superseded");
+	assert.equal(expectedClaimStatus("needs_recheck", "defer"), "needs_recheck");
+	assert.equal(expectedClaimStatus("verified", "out_of_scope"), undefined);
+});
+await check("capture delivery is advisory by default", () => {
+	assert.equal(DEFAULT_CONFIG.capture.triggerTurn, false);
+	assert.equal(DEFAULT_CONFIG.capture.route, "subject");
+});
 
 if (failures > 0) {
 	console.error(`\n${failures} check(s) failed`);

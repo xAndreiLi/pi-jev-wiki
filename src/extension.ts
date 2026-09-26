@@ -2350,14 +2350,18 @@ export default function (pi: ExtensionAPI) {
 			if (!result || result.accepted === 0) return;
 			await writeTextAtomic(join(result.layout.stateDir, "pending-capture.md"), `# Pending capture\n\n${result.brief}\n\nWrite or merge the accepted pages following the llm-wiki skill, then call wiki_finalize.\n`);
 			if (ctx.hasUI) {
-				pi.sendMessage(
-					{
-						customType: "jev-wiki",
-						content: `${result.brief}\n\nWrite or merge the accepted pages following the llm-wiki skill, then call wiki_finalize.`,
-						display: true,
-					},
-					{ deliverAs: "followUp", triggerTurn: true },
-				);
+				// Advisory by default: the brief waits for the next natural turn instead of
+				// starting one (capture.triggerTurn: true restores the forced turn).
+				const message = {
+					customType: "jev-wiki",
+					content: `${result.brief}\n\nWrite or merge the accepted pages following the llm-wiki skill, then call wiki_finalize.`,
+					display: true,
+				};
+				if (loaded.config.capture.triggerTurn) {
+					pi.sendMessage(message, { deliverAs: "followUp", triggerTurn: true });
+				} else {
+					pi.sendMessage(message, { deliverAs: "nextTurn" });
+				}
 			}
 		} catch {
 			/* auto-capture is best-effort and must never break the session */

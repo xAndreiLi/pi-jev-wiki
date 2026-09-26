@@ -109,8 +109,29 @@ export async function resolveReview(
 }
 
 /**
+ * The claim status a resolution should leave behind, derived from the status the
+ * claim had before the write. Used to verify the page after the serializer round-trip.
+ */
+export function expectedClaimStatus(previousStatus: string | undefined, resolution: ReviewResolution): string | undefined {
+	switch (resolution) {
+		case "accept":
+			return previousStatus === "user-stated" ? "user-stated" : "verified";
+		case "reject":
+			return "rejected";
+		case "supersede":
+			return "superseded";
+		case "defer":
+			return previousStatus;
+		default:
+			return undefined;
+	}
+}
+
+/**
  * Apply a resolution to the claim in its page frontmatter.
  * Returns a status message; a missing page/claim is not fatal (the agent may handle it).
+ * The page is re-read after the write and a warning is returned if the claim state did
+ * not survive the serializer round-trip — frontmatter is re-serialized, not preserved.
  */
 export async function applyReviewResolution(
 	layout: WikiLayout,
@@ -121,6 +142,7 @@ export async function applyReviewResolution(
 	if (!item.page) return "no page attached; resolution recorded only";
 	const pagePath = join(layout.wikiDir, item.page);
 	if (!existsSync(pagePath)) return `page not found: ${item.page}`;
+	const label = `${item.page}${item.claimId ? `#${item.claimId}` : ""}`;
 	const page = await readPage(pagePath);
 	const claims = Array.isArray(page.data.claims) ? (page.data.claims as Record<string, unknown>[]) : [];
 	const index = claims.findIndex(
@@ -128,6 +150,7 @@ export async function applyReviewResolution(
 	);
 	if (index === -1) return `claim not found on ${item.page}`;
 	const claim = claims[index];
+	const previousStatus = typeof claim.status === "string" ? claim.status : undefined;
 	if (resolution === "accept") {
 		if (claim.status !== "user-stated") {
 			claim.status = "verified";
@@ -143,5 +166,20 @@ export async function applyReviewResolution(
 	page.data.claims = claims;
 	page.data.updated = todayISO();
 	await writePage(pagePath, page.data, page.body);
-	return `${resolution} applied to ${item.page}${item.claimId ? `#${item.claimId}` : ""}`;
+
+	const expected = expectedClaimStatus(previousStatus, resolution);
+	if (expected !== undefined) {
+		const roundTrip = await readPage(pagePath);
+		const after = (Array.isArray(roundTrip.data.claims) ? (roundTrip.data.claims as Record<string, unknown>[]) : []).find(
+			(candidate) => (item.claimId && candidate.id === item.claimId) || candidate.text === item.claimText,
+		);
+		const actual = after && typeof after.status === "string" ? after.status : undefined;
+		if (actual === undefined) {
+			return `${resolution} applied to ${label}, but the claim is missing after the page round-trip — re-read the page.`;
+		}
+		if (actual !== expected) {
+			return `${resolution} applied to ${label}, but the round-trip left status "${actual}" (expected "${expected}") — re-read the page.`;
+		}
+	}
+	return `${resolution} applied to ${label}`;
 }

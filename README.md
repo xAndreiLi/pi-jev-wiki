@@ -207,8 +207,10 @@ evidence points at. `capture.route: "session"` restores working-directory routin
 | `commit` | only after a **new git commit** is detected, however it was made — "update the wiki when I'm ready to commit" (no time debounce) |
 
 `capture.onCompact: true` remains an independent trigger (capture before context compaction), and
-the legacy `capture.onSettle: true` still enables task capture. Whatever the cadence, accepted
-insights are only *proposed*: the agent writes or merges the pages and calls `wiki_finalize`.
+the legacy `capture.onSettle: true` still enables task capture. Captures are advisory by default:
+the settle hook records the brief for the next turn instead of starting one (`capture.triggerTurn:
+true` restores the old forced turn). Whatever the cadence, accepted insights are only *proposed*:
+the agent writes or merges the pages and calls `wiki_finalize`.
 
 ## Wiki layout
 

@@ -1,4 +1,4 @@
 {
 	"wikiRoot": "docs/wiki",
-	"capture": { "cadence": "task" }
+	"capture": { "cadence": "manual" }
 }

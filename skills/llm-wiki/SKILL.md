@@ -146,6 +146,11 @@ no wiki-maintenance narration behind it.
 reindex; capture hooks may also fire when the turn settles. When any of that runs after the
 decisions, the user's terminal floods with maintenance chatter after the question they are being
 asked. Settle the wiki first; ask last.
+
+**Advisory delivery.** Auto-capture does not start a turn of its own: the settle hook writes the
+brief to `pending-capture.md` and delivers it when the next turn begins (`capture.triggerTurn: true`
+restores the old forced turn). If a pending capture exists at the start of a turn, dispose of it
+before the response, per the rule above.
 - **Rejections are reminders.** When you agree, the remedy is evidence, not prose — derivable →
   add what code cannot show (commit, quote, rationale); unsupported → attach evidence that states
   the claim; duplicate → reinforce the existing page. When you disagree, override it deliberately

@@ -50,7 +50,7 @@ export interface JevWikiConfig {
 	toc: { maxTokens: number };
 	lint: { orphanMinAgeDays: number; duplicateSimilarity: number };
 	gitCommit: boolean;
-	capture: { cadence: CaptureCadence; onCompact: boolean; onSettle?: boolean; route?: CaptureRoute };
+	capture: { cadence: CaptureCadence; onCompact: boolean; onSettle?: boolean; route?: CaptureRoute; triggerTurn?: boolean };
 	search: {
 		engine: "auto" | "index" | "bm25" | "vector" | "hybrid" | "qmd";
 		qmdCollection?: string;
@@ -89,7 +89,7 @@ export const DEFAULT_CONFIG: JevWikiConfig = {
 	toc: { maxTokens: 3000 },
 	lint: { orphanMinAgeDays: 7, duplicateSimilarity: 0.72 },
 	gitCommit: false,
-	capture: { cadence: "manual", onCompact: false, route: "subject" },
+	capture: { cadence: "manual", onCompact: false, route: "subject", triggerTurn: false },
 	search: {
 		engine: "auto",
 		vector: {
