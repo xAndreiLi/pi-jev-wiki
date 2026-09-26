@@ -104,6 +104,37 @@ function truncate(text: string, maxChars: number): string {
 	return `${text.slice(0, maxChars)}\n\n[... truncated ...]`;
 }
 
+/**
+ * One-line progress for embedding-model loads, which emit many progress events even
+ * when the model is cached. With a UI the latest message replaces the footer status
+ * entry (throttled); without one, at most a single line is printed.
+ */
+function modelProgressSink(ctx: ExtensionContext): { onProgress: (message: string) => void; done: () => void } {
+	const key = "jev-wiki";
+	let lastText = "";
+	let lastAt = 0;
+	let announced = false;
+	return {
+		onProgress(message: string) {
+			const text = `embedding model: ${message}`;
+			if (ctx.hasUI) {
+				const now = Date.now();
+				if (text === lastText || now - lastAt < 250) return;
+				lastAt = now;
+				lastText = text;
+				ctx.ui.setStatus(key, text);
+				return;
+			}
+			if (announced) return;
+			announced = true;
+			console.error("[jev-wiki] embedding model: loading...");
+		},
+		done() {
+			if (ctx.hasUI) ctx.ui.setStatus(key, undefined);
+		},
+	};
+}
+
 /** Build Jev-readable evidence for an insight: file excerpts, commit messages, quotes. */
 async function buildInsightEvidence(
 	insight: { text: string; evidence?: Array<{ kind: string; ref: string; quote?: string }> },
@@ -1315,15 +1346,21 @@ export default function (pi: ExtensionAPI) {
 				try {
 					const { registration } = await registerWiki(loaded.agentDir, layout.root);
 					if (await hasWarmIndex(loaded.agentDir, registration.name, vector.model)) {
-						const report = await indexWiki({
-							agentDir: loaded.agentDir,
-							wiki: registration.name,
-							root: layout.root,
-							model: vector.model,
-							...(vector.dimensions ? { dimensions: vector.dimensions } : {}),
-							paths: updates.map((entry) => entry.path),
-						});
-						reindexNote = `Reindexed ${report.embedded} chunk(s), ${report.skipped} unchanged (${report.total} total).`;
+						const progress = modelProgressSink(ctx);
+						try {
+							const report = await indexWiki({
+								agentDir: loaded.agentDir,
+								wiki: registration.name,
+								root: layout.root,
+								model: vector.model,
+								...(vector.dimensions ? { dimensions: vector.dimensions } : {}),
+								paths: updates.map((entry) => entry.path),
+								onProgress: progress.onProgress,
+							});
+							reindexNote = `Reindexed ${report.embedded} chunk(s), ${report.skipped} unchanged (${report.total} total).`;
+						} finally {
+							progress.done();
+						}
 					} else {
 						const downloadMb = Math.round(resolvePreset(vector.model).expectedBytes / 1_000_000);
 						reindexNote = `Semantic index for \`${registration.name}\` is not built yet — run wiki_index action=rebuild (one-time ~${downloadMb} MB model download).`;
@@ -1769,38 +1806,50 @@ export default function (pi: ExtensionAPI) {
 				if (params.all) {
 					const registry = await readRegistry(loaded.agentDir);
 					const reports: string[] = [];
-					for (const entry of registry.wikis.filter((item) => item.enabled)) {
-						try {
-							const root = await resolveWikiRoot(entry.root).catch(() => entry.root);
-							if (root !== entry.root) await setWikiRoot(loaded.agentDir, entry.name, root);
-							const report = await indexWiki({
-								agentDir: loaded.agentDir,
-								wiki: entry.name,
-								root,
-								model: vector.model,
-								...(vector.dimensions ? { dimensions: vector.dimensions } : {}),
-							});
-							reports.push(`- ${entry.name}: ${report.embedded} embedded, ${report.skipped} unchanged, ${report.removed} removed, ${report.total} chunks (${report.milliseconds}ms)`);
-						} catch (error) {
-							reports.push(`- ${entry.name}: failed — ${(error as Error).message}`);
+					const progress = modelProgressSink(ctx);
+					try {
+						for (const entry of registry.wikis.filter((item) => item.enabled)) {
+							try {
+								const root = await resolveWikiRoot(entry.root).catch(() => entry.root);
+								if (root !== entry.root) await setWikiRoot(loaded.agentDir, entry.name, root);
+								const report = await indexWiki({
+									agentDir: loaded.agentDir,
+									wiki: entry.name,
+									root,
+									model: vector.model,
+									...(vector.dimensions ? { dimensions: vector.dimensions } : {}),
+									onProgress: progress.onProgress,
+								});
+								reports.push(`- ${entry.name}: ${report.embedded} embedded, ${report.skipped} unchanged, ${report.removed} removed, ${report.total} chunks (${report.milliseconds}ms)`);
+							} catch (error) {
+								reports.push(`- ${entry.name}: failed — ${(error as Error).message}`);
+							}
 						}
+					} finally {
+						progress.done();
 					}
 					return { content: [{ type: "text", text: [`# Indexed ${reports.length} wiki(s)`, ...reports].join("\n") }], details: { reports } };
 				}
 				const target = await resolveTargetWiki(loaded.agentDir, layout.root, params.wiki);
 				const root = await resolveWikiRoot(target.root).catch(() => target.root);
 				if (root !== target.root) await setWikiRoot(loaded.agentDir, target.name, root);
-				const report = await indexWiki({
-					agentDir: loaded.agentDir,
-					wiki: target.name,
-					root,
-					model: vector.model,
-					...(vector.dimensions ? { dimensions: vector.dimensions } : {}),
-				});
-				return {
-					content: [{ type: "text", text: `Indexed \`${target.name}\`: ${report.embedded} embedded, ${report.skipped} unchanged, ${report.removed} removed, ${report.total} chunks in ${report.milliseconds}ms.` }],
-					details: report,
-				};
+				const progress = modelProgressSink(ctx);
+				try {
+					const report = await indexWiki({
+						agentDir: loaded.agentDir,
+						wiki: target.name,
+						root,
+						model: vector.model,
+						...(vector.dimensions ? { dimensions: vector.dimensions } : {}),
+						onProgress: progress.onProgress,
+					});
+					return {
+						content: [{ type: "text", text: `Indexed \`${target.name}\`: ${report.embedded} embedded, ${report.skipped} unchanged, ${report.removed} removed, ${report.total} chunks in ${report.milliseconds}ms.` }],
+						details: report,
+					};
+				} finally {
+					progress.done();
+				}
 			}
 			if (params.action === "add") {
 				const root = params.path ? await resolveWikiRoot(resolve(ctx.cwd, params.path)) : layout.root;

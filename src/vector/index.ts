@@ -21,6 +21,8 @@ export interface IndexOptions {
 	paths?: string[];
 	/** Use this provider instead of loading a local model (tests, future backends). */
 	provider?: EmbeddingProvider;
+	/** Progress sink for embedding-model loads; the local model emits many progress events even when cached. */
+	onProgress?: (message: string) => void;
 }
 
 export interface IndexReport {
@@ -75,12 +77,14 @@ export async function indexWiki(options: IndexOptions): Promise<IndexReport> {
 
 	let embedded = 0;
 	if (pending.length > 0) {
-		const provider = options.provider ?? (await createLocalProvider({
-			preset,
-			...(options.dimensions !== undefined ? { dimensions: options.dimensions } : {}),
-			cacheDir: modelsDir(options.agentDir),
-			onProgress: (message) => console.log(`[jev-wiki] embedding model: ${message}`),
-		}));
+		const provider =
+			options.provider ??
+			(await createLocalProvider({
+				preset,
+				...(options.dimensions !== undefined ? { dimensions: options.dimensions } : {}),
+				cacheDir: modelsDir(options.agentDir),
+				...(options.onProgress ? { onProgress: options.onProgress } : {}),
+			}));
 		const vectors = await provider.embed(
 			pending.map((entry) => ({ title: entry.chunk.title, text: entry.chunk.text })),
 			"document",
