@@ -16,6 +16,13 @@ claims:
     last_checked: 2026-09-26
     corroborations: 2
     last_confirmed: 2026-09-26
+  - id: c2
+    text: "A packed-artifact smoke test must run with extension discovery disabled (`pi -ne -e <packed>/src/extension.ts`) because a registered npm install would otherwise register a second copy and hit the same tool-conflict failure."
+    status: verified
+    support: 0.88
+    evidence: [raw/sessions/2026-09-26-session-2026-09-26-2307.md, "pi -ne -e …"]
+    reviewed: 2026-09-26
+    last_checked: 2026-09-26
 files: [README.md]
 ---
 
@@ -35,7 +42,15 @@ the duplicate. The supported sources are exactly one of:
 ```bash
 pi install npm:pi-jev-wiki                        # published release
 pi install /path/to/pi-jev-wiki                   # local folder
-pi install git:github.com/xAndreiLi/pi-jev-wiki@v0.7.0
+pi install git:github.com/xAndreiLi/pi-jev-wiki@v0.8.0
+```
+
+**Packed-artifact smoke tests.** Verifying a packed release while the npm install is registered
+would register two copies and hit the same conflict. Run it with discovery disabled and the packed
+extension loaded explicitly:
+
+```bash
+pi -ne -e /tmp/pi-jev-wiki/package/src/extension.ts --skill /tmp/pi-jev-wiki/package/skills/llm-wiki
 ```
 
 **Development instead of a second install.** Load the working copy with the documented dev command

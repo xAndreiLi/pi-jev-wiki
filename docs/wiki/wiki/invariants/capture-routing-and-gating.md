@@ -24,7 +24,7 @@ claims:
     reviewed: 2026-09-26
     last_checked: 2026-09-26
   - id: c3
-    text: "Auto-capture routing defaults to the subject wiki: with capture.route: subject, the capture is filed into the registered wiki that owns the files the session edited when exactly one does; otherwise it stays on the session wiki with a visible warning. The working-directory rule applies when capture.route: session."
+    text: "Capture routing is deterministic and auditable: the target is either the subject wiki chosen from edit evidence or the session's working-directory wiki, every decision is recorded in the ledger as capture.route, and an ambiguous match produces a warning in the brief rather than a silent guess."
     status: verified
     support: 0.83
     evidence: [raw/sessions/2026-09-26-session-2026-09-26-0025.md, "c5e5f62"]

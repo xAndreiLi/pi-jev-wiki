@@ -445,3 +445,7 @@
 ## [2026-09-26] finalize | File the npm minor-version pin gotcha: an @latest extension update can report success while the store stays on the old minor; explicit-version updates rewrite the spec. 0.8.0 published with provenance and the installed copy updated to 0.8.0.
 - Updated: pi/npm-minor-version-pin.md
 
+## [2026-09-26] finalize | Post-release review cleanup: de-duplicated the routing policy vs invariant claims, added the packed-artifact isolation procedure to the one-install-source gotcha, and dispositioned the remaining capture/review items (one serializer item deliberately left open).
+- Updated: invariants/capture-routing-and-gating.md
+- Updated: pi/one-install-source.md
+
