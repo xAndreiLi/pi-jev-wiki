@@ -397,3 +397,9 @@
 - Updated: invariants/capture-routing-and-gating.md
 - Updated: architecture/gotcha-capture-proposals.md
 
+## [2026-09-26] capture | 8 insights (settled)
+- Raw: raw/sessions/2026-09-26-session-2026-09-26-0029.md
+- Filed 1 · reinforced 0 · review 2 · rejected 5
+
+## [2026-09-26] finalize | Dispositioned the 0.8.0 wrap-up capture: the sole File recommendation restated decisions/out-of-scope-disposition.md#c1 (no page change), the two review items restated the cross-wiki decisions already filed, and the five rejected items were derivable code detail or transient session state. Nothing new to write.
+
