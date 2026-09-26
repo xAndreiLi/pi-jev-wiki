@@ -459,3 +459,9 @@
 - Baseline: 7165a91 → afbcc1a
 - Changed files: 25
 
+## [2026-09-26] capture | 8 insights (settled)
+- Raw: raw/sessions/2026-09-26-session-2026-09-26-004856.md
+- Filed 4 · reinforced 0 · review 1 · rejected 3
+
+## [2026-09-26] finalize | Dispositioned the fourth post-release capture: all four File recommendations restated already-filed pi/ claims (mechanically reinforced to 3–4×) or duplicated docs/RELEASING.md, which stays the release single source; the review item restated the out-of-scope disposition decision (confirmed). No pages changed.
+
