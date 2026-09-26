@@ -54,6 +54,16 @@ wiki_ask(query, scope) ──▶ embed ──▶ cosine KNN ─┐              
   20k+ chunks. Results carry `wiki`, `path`, `claim_id`, `status`, so `wiki_ask` can cite
   `[life] personal/summary-andrei-li.md#c3` and exclude superseded claims by default.
 
+## Discovery and adoption
+
+`wiki_index action=discover` walks the configured scan roots (default: the home directory;
+`search.vector.scan.roots`, `maxDepth`, `wsl`) and queries each WSL distro with `find`, mapping
+results to `\\wsl.localhost` paths. A directory is a wiki root when it contains `.jev-wiki/`, or
+`wiki/` plus `raw/` or `wiki/index.md`; project `.pi/jev-wiki.json` files resolve their `wikiRoot`
+too. The report groups wikis into unregistered / registered-but-missing / registered, with page
+counts, marker type, and index status. `register=true` adopts everything unregistered;
+`rebuild all=true` indexes every enabled wiki.
+
 ## Known limitations (P1)
 
 - PGlite is a single-process database: concurrent pi sessions writing the index at the same

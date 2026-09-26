@@ -9,10 +9,11 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { chunkPage, hashChunk, splitSections } from "../src/vector/chunks.ts";
 import { MODEL_PRESETS, previewEmbedText, truncateAndNormalize, type EmbedInput, type EmbeddingProvider } from "../src/vector/embed.ts";
-import { forgetWikiIndex, indexWiki } from "../src/vector/index.ts";
+import { forgetWikiIndex, hasWarmIndex, indexWiki } from "../src/vector/index.ts";
 import { enabledWikiNames, readRegistry, registerWiki, setWikiEnabled, unregisterWiki } from "../src/vector/registry.ts";
 import { vectorDbFor } from "../src/vector/db.ts";
 import { vectorDataDir } from "../src/vector/registry.ts";
+import { discoverWikis } from "../src/vector/discover.ts";
 import { rrfFuse, type SearchResult } from "../src/wiki/search.ts";
 
 let failures = 0;
@@ -159,6 +160,12 @@ await check("indexes, skips unchanged chunks, and re-embeds edits", async () => 
 
 	await forgetWikiIndex(agentDir, "testwiki");
 	assert.equal((await db.counts()).length, 0);
+
+	const emptyRoot = join(agentDir, "empty");
+	await mkdir(join(emptyRoot, "wiki"), { recursive: true });
+	const empty = await indexWiki({ agentDir, wiki: "emptywiki", root: emptyRoot, model: "performance", dimensions: 4, provider });
+	assert.equal(empty.total, 0);
+	assert.equal(await hasWarmIndex(agentDir, "emptywiki", "performance"), true);
 	await db.close();
 	await rm(agentDir, { recursive: true, force: true });
 });
@@ -183,6 +190,64 @@ function fakeProvider(): EmbeddingProvider {
 		},
 	};
 }
+
+console.log("wiki discovery");
+await check("finds wiki roots, respects skip rules and project configs", async () => {
+	const dir = await mkdtemp(join(tmpdir(), "jev-discover-"));
+	const alphaRoot = join(dir, "projects", "alpha", "docs", "wiki");
+	await mkdir(join(alphaRoot, "wiki"), { recursive: true });
+	await mkdir(join(alphaRoot, "raw", "notes"), { recursive: true });
+	await mkdir(join(alphaRoot, ".jev-wiki"), { recursive: true });
+	await writeFile(join(alphaRoot, ".jev-wiki", "decisions.jsonl"), "");
+	await writeFile(join(alphaRoot, "wiki", "index.md"), "# Index\n");
+	await writeFile(join(alphaRoot, "wiki", "page.md"), page("Alpha", "c1", "Alpha claim.", "body text ".repeat(20)));
+	await writeFile(join(alphaRoot, "raw", "notes", "src.md"), "source");
+
+	const betaRoot = join(dir, "projects", "beta", "knowledge");
+	await mkdir(join(dir, "projects", "beta", ".pi"), { recursive: true });
+	await writeFile(join(dir, "projects", "beta", ".pi", "jev-wiki.json"), JSON.stringify({ wikiRoot: "knowledge" }));
+	await mkdir(join(betaRoot, "wiki"), { recursive: true });
+	await writeFile(join(betaRoot, "wiki", "index.md"), "# Beta\n");
+
+	await mkdir(join(dir, "projects", "decoy", "wiki"), { recursive: true });
+	await writeFile(join(dir, "projects", "decoy", "wiki", "notes.md"), "# notes\n");
+	await mkdir(join(dir, "projects", "gamma", "node_modules", "pkg", "docs", "wiki", "wiki"), { recursive: true });
+	await writeFile(join(dir, "projects", "gamma", "node_modules", "pkg", "docs", "wiki", "wiki", "index.md"), "# hidden\n");
+
+	const found = await discoverWikis({ roots: [dir], maxDepth: 8, wsl: false });
+	const roots = found.map((entry) => entry.root);
+	assert.ok(roots.some((root) => root.endsWith("alpha/docs/wiki")), `alpha missing: ${roots.join(", ")}`);
+	assert.ok(roots.some((root) => root.endsWith("beta/knowledge")), `beta missing: ${roots.join(", ")}`);
+	assert.ok(!roots.some((root) => root.includes("decoy")), "decoy should not be detected");
+	assert.ok(!roots.some((root) => root.includes("node_modules")), "skipped dirs should not be scanned");
+	const alpha = found.find((entry) => entry.root.endsWith("alpha/docs/wiki"));
+	assert.equal(alpha?.pages, 1);
+	assert.equal(alpha?.rawSources, 1);
+	assert.equal(alpha?.marker, "state-dir");
+	await rm(dir, { recursive: true, force: true });
+});
+await check("reconciles registered wikis and flags missing roots", async () => {
+	const dir = await mkdtemp(join(tmpdir(), "jev-discover-reg-"));
+	const real = join(dir, "real", "docs", "wiki");
+	await mkdir(join(real, "wiki"), { recursive: true });
+	await writeFile(join(real, "wiki", "index.md"), "# R\n");
+	const gone = join(dir, "gone", "docs", "wiki");
+	const found = await discoverWikis({
+		roots: [dir],
+		maxDepth: 6,
+		wsl: false,
+		registry: [
+			{ name: "real", root: real, enabled: true, added: "2026-01-01T00:00:00.000Z" },
+			{ name: "gone", root: gone, enabled: true, added: "2026-01-01T00:00:00.000Z" },
+		],
+		states: new Map([["real", { chunks: 7, model: "performance", updatedAt: "2026-01-02T00:00:00.000Z" }]]),
+	});
+	const realEntry = found.find((entry) => entry.name === "real");
+	assert.equal(realEntry?.registered, true);
+	assert.equal(realEntry?.chunks, 7);
+	assert.equal(found.find((entry) => entry.name === "gone")?.missing, true);
+	await rm(dir, { recursive: true, force: true });
+});
 
 if (failures > 0) {
 	console.error(`\n${failures} vector test(s) failed.`);

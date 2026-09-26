@@ -23,7 +23,7 @@ the agent decides and writes, with the final say. Code owns every threshold.
 |---|---|
 | `wiki_toc` | the wiki table of contents (compact above 60 pages, per-topic tables) |
 | `wiki_ask` | find pages and excerpts (auto / index / BM25 / vector / hybrid / qmd) |
-| `wiki_index` | manage the cross-wiki semantic index (PGlite + pgvector) |
+| `wiki_index` | manage the cross-wiki semantic index (status, discover, rebuild, add/remove, enable/disable) |
 | `wiki_ingest` | ingest a document: raw source → claims → Jev verdicts → placement brief |
 | `wiki_insights` | capture agent insights, Jev-filtered and placed |
 | `wiki_finalize` | update TOC/log after writing pages, check links |
@@ -113,6 +113,9 @@ First run: `wiki_index action=rebuild` downloads the preset model once into
 `<agent dir>/jev-wiki/models` and builds the index; afterwards `wiki_finalize` keeps touched pages
 in sync automatically. Queries never trigger a download — if the index is cold, `wiki_ask` falls
 back to keyword search. Check state any time with `wiki_index action=status` or `wiki_doctor`.
+
+Existing wikis are found with `wiki_index action=discover` (scans the home directory plus WSL
+distros), adopted with `register=true`, and indexed with `rebuild all=true`.
 
 The optional `globalWikiRoot` adds a read-only cross-project vault: `wiki_ask` also searches that
 wiki and tags its results `[global vault]`. It resolves against the pi agent dir when relative.

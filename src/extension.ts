@@ -58,7 +58,9 @@ import { createSearchEngine, VectorSearchEngine, type SearchResult } from "./wik
 import { forgetWikiIndex, hasWarmIndex, indexWiki, vectorStatus } from "./vector/index.ts";
 import { resolvePreset } from "./vector/embed.ts";
 import { vectorEnabled, vectorSearch } from "./vector/query.ts";
-import { closeVectorDbs } from "./vector/db.ts";
+import { closeVectorDbs, vectorDbFor } from "./vector/db.ts";
+import { discoverWikis, maxScanDepth, scanRoots } from "./vector/discover.ts";
+import { vectorDataDir } from "./vector/registry.ts";
 import { enabledWikiNames, readRegistry, registerWiki, resolveWikiRoot, setWikiEnabled, setWikiRoot, unregisterWiki } from "./vector/registry.ts";
 
 interface Runtime {
@@ -1486,12 +1488,16 @@ export default function (pi: ExtensionAPI) {
 		promptSnippet: "Manage the cross-wiki semantic index",
 		promptGuidelines: [
 			"Use wiki_index status to check index health; rebuild after changing search.vector.model or when doctor reports a stale index.",
+			"Use wiki_index discover to find existing wikis on the machine, then register=true and rebuild all=true to adopt and index them.",
 			"The semantic index is a derived cache — a model change re-embeds the whole wiki.",
 		],
 		parameters: Type.Object({
-			action: StringEnum(["status", "rebuild", "add", "remove", "enable", "disable"] as const),
+			action: StringEnum(["status", "discover", "rebuild", "add", "remove", "enable", "disable"] as const),
 			wiki: Type.Optional(Type.String({ description: "Registered wiki name (defaults to the current wiki)" })),
 			path: Type.Optional(Type.String({ description: "Wiki root path for action=add (defaults to the current wiki root)" })),
+			paths: Type.Optional(Type.Array(Type.String({ description: "Scan root paths for action=discover (defaults to configured roots, then home)" }))),
+			register: Type.Optional(Type.Boolean({ description: "action=discover: register every unregistered wiki found" })),
+			all: Type.Optional(Type.Boolean({ description: "action=rebuild: reindex every enabled registered wiki" })),
 		}),
 		async execute(_id, params, _signal, _onUpdate, ctx) {
 			const { loaded, layout } = runtimeFor(ctx);
@@ -1521,7 +1527,85 @@ export default function (pi: ExtensionAPI) {
 				];
 				return { content: [{ type: "text", text: lines.join("\n") }], details: status };
 			}
+			if (params.action === "discover") {
+				const registry = await readRegistry(loaded.agentDir);
+				const scan = vector.scan ?? { maxDepth: 6, wsl: true };
+				const roots = scanRoots(params.paths && params.paths.length > 0 ? params.paths.map((entry) => resolve(ctx.cwd, entry)) : scan.roots);
+				const states = new Map<string, { chunks: number; model: string; updatedAt: string }>();
+				try {
+					const db = vectorDbFor(vectorDataDir(loaded.agentDir));
+					await db.init();
+					for (const entry of registry.wikis) {
+						const state = await db.state(entry.name);
+						if (state) states.set(entry.name, { chunks: state.chunks, model: state.model, updatedAt: state.updatedAt });
+					}
+				} catch {
+					// Discovery still works when the index database is unavailable.
+				}
+				const discovered = await discoverWikis({
+					roots,
+					maxDepth: maxScanDepth(scan.maxDepth),
+					wsl: scan.wsl,
+					registry: registry.wikis,
+					states,
+				});
+				const adopted: Array<{ name: string; root: string }> = [];
+				if (params.register) {
+					for (const entry of discovered.filter((item) => !item.registered && !item.missing)) {
+						const { registration, created } = await registerWiki(loaded.agentDir, entry.root, { name: entry.name });
+						if (created) adopted.push({ name: registration.name, root: registration.root });
+					}
+				}
+				const lines = [
+					"# Wiki discovery",
+					`Scanned ${roots.length} root(s): ${roots.join(", ")}${scan.wsl ? " (plus WSL distros)" : ""}`,
+					`Found ${discovered.length} wiki(s).`,
+					"",
+				];
+				const groups: Array<[string, typeof discovered]> = [
+					["Unregistered", discovered.filter((entry) => !entry.registered && !entry.missing)],
+					["Registered but missing on disk", discovered.filter((entry) => entry.registered && entry.missing)],
+					["Registered", discovered.filter((entry) => entry.registered && !entry.missing)],
+				];
+				for (const [title, group] of groups) {
+					if (group.length === 0) continue;
+					lines.push(`## ${title} (${group.length})`);
+					for (const entry of group) {
+						const index = entry.chunks !== undefined ? `${entry.chunks} chunks, ${entry.model}` : "not indexed";
+						const flags = [entry.marker, entry.enabled === false ? "disabled" : undefined].filter(Boolean).join(", ");
+						lines.push(`- **${entry.name}** — ${entry.root} — ${entry.pages} pages, ${entry.rawSources} raw — index: ${index} — ${flags}`);
+					}
+					lines.push("");
+				}
+				if (adopted.length > 0) {
+					lines.push(`Adopted ${adopted.length} wiki(s): ${adopted.map((entry) => `\`${entry.name}\``).join(", ")}. Rebuild with all=true to index them.`);
+				} else if (!params.register && discovered.some((entry) => !entry.registered && !entry.missing)) {
+					lines.push("Re-run with register=true to adopt the unregistered wikis, then rebuild with all=true to index them.");
+				}
+				return { content: [{ type: "text", text: lines.join("\n") }], details: { roots, discovered, adopted } };
+			}
 			if (params.action === "rebuild") {
+				if (params.all) {
+					const registry = await readRegistry(loaded.agentDir);
+					const reports: string[] = [];
+					for (const entry of registry.wikis.filter((item) => item.enabled)) {
+						try {
+							const root = await resolveWikiRoot(entry.root).catch(() => entry.root);
+							if (root !== entry.root) await setWikiRoot(loaded.agentDir, entry.name, root);
+							const report = await indexWiki({
+								agentDir: loaded.agentDir,
+								wiki: entry.name,
+								root,
+								model: vector.model,
+								...(vector.dimensions ? { dimensions: vector.dimensions } : {}),
+							});
+							reports.push(`- ${entry.name}: ${report.embedded} embedded, ${report.skipped} unchanged, ${report.removed} removed, ${report.total} chunks (${report.milliseconds}ms)`);
+						} catch (error) {
+							reports.push(`- ${entry.name}: failed — ${(error as Error).message}`);
+						}
+					}
+					return { content: [{ type: "text", text: [`# Indexed ${reports.length} wiki(s)`, ...reports].join("\n") }], details: { reports } };
+				}
 				const target = await resolveTargetWiki(loaded.agentDir, layout.root, params.wiki);
 				const root = await resolveWikiRoot(target.root).catch(() => target.root);
 				if (root !== target.root) await setWikiRoot(loaded.agentDir, target.name, root);

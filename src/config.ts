@@ -62,6 +62,7 @@ export interface JevWikiConfig {
 			chunk: { pageSections: boolean; maxTokens: number; overlap: number };
 			sync: { onFinalize: boolean };
 			fusion: { rrfK: number; candidateMultiplier: number };
+			scan: { roots?: string[]; maxDepth: number; wsl: boolean };
 		};
 	};
 }
@@ -95,6 +96,7 @@ export const DEFAULT_CONFIG: JevWikiConfig = {
 			chunk: { pageSections: true, maxTokens: 1200, overlap: 160 },
 			sync: { onFinalize: true },
 			fusion: { rrfK: 60, candidateMultiplier: 3 },
+			scan: { maxDepth: 6, wsl: true },
 		},
 	},
 };

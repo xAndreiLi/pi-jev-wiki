@@ -169,10 +169,12 @@ export async function vectorStatus(agentDir: string, model: string, dimensions?:
 	};
 }
 
-/** True when the wiki already has chunks for this model (i.e. the index is warm). */
+/** True when the wiki has been indexed for this model (an empty index still counts). */
 export async function hasWarmIndex(agentDir: string, wiki: string, model: string): Promise<boolean> {
 	const db = vectorDbFor(vectorDataDir(agentDir));
 	await db.init();
+	const state = await db.state(wiki);
+	if (state && state.model === model) return true;
 	const counts = await db.counts();
 	return counts.some((entry) => entry.wiki === wiki && entry.model === model && entry.chunks > 0);
 }
