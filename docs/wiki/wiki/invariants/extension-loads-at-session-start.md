@@ -40,7 +40,8 @@ on the next settled task — no reload needed. Only plugin *code* requires a rel
 **Practical consequences.**
 
 - After `pi install` of a new version, start a new session (or `/reload`) before relying on its
-  features; a running session keeps the old behaviour.
+  features — a released fix stays invisible in the running session, which keeps executing the
+  previously loaded version.
 - After editing `.pi/jev-wiki.json` or the user config, the next event already sees the new values.
 - For development, load the working copy with `pi -e ./src/extension.ts --skill ./skills/llm-wiki`
   rather than installing a second copy — see [One install source only](../pi/one-install-source.md).
