@@ -294,3 +294,7 @@
 - Orphans: 0 · raw backlog: 0
 - Contradiction checks: 0 · duplicate candidates: 0
 
+## [2026-09-20] capture | 8 insights (settled)
+- Raw: raw/sessions/2026-09-20-session-2026-09-20-2127.md
+- Filed 0 · reinforced 0 · review 2 · rejected 6
+
