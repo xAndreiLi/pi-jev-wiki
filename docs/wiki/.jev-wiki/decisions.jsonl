@@ -732,3 +732,4 @@
 {"ts":"2026-09-26T03:18:00.301Z","actor":"jev","op":"lint.contradiction","subject":"architecture/flow-capture.md vs architecture/gotcha-capture-evidence-resolution.md","verdict":{"relation":"consistent","confidence":0.86},"action":"report","usage":{"input_tokens":552,"output_tokens":62}}
 {"ts":"2026-09-26T03:18:00.463Z","actor":"jev","op":"lint.duplicate","subject":"architecture/flow-retrieval.md vs invariants/generated-files.md","verdict":{"similarity":0.8,"same":0.12},"action":"keep","usage":{"input_tokens":403,"output_tokens":20}}
 {"ts":"2026-09-26T03:18:00.466Z","actor":"code","op":"wiki.lint","action":"report","verdict":{"tocAdded":0,"brokenLinks":0,"orphans":0,"rawBacklog":0,"unbackedClaims":0,"contradictions":0,"duplicates":0}}
+{"ts":"2026-09-26T03:22:15.126Z","actor":"jev","op":"capture.screen","subject":"settled","verdict":{"worth_capturing":0.18},"action":"skip","usage":{"input_tokens":462,"output_tokens":23}}

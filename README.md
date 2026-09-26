@@ -238,9 +238,13 @@ under `docs/` and `research/` stays in the repository.
 
 ## Status
 
-**Published:** [`pi-jev-wiki@0.7.0`](https://www.npmjs.com/package/pi-jev-wiki) — CI-published with
+**Published:** [`pi-jev-wiki@0.7.1`](https://www.npmjs.com/package/pi-jev-wiki) — CI-published with
 SLSA provenance (`0.2.0`, the first release, was an interactive publish and has no attestation).
 Listed on the [pi package gallery](https://pi.dev/packages/pi-jev-wiki).
+
+0.7.1 fixes two rough edges: removing the last page of a topic no longer leaves a stale
+`toc/<topic>.md` shard, and embedding-model load progress is a single footer status line instead of
+a wall of console lines.
 
 0.7.0 adds a configurable capture cadence (`capture.cadence` = `manual` | `task` | `commit`), so a
 wiki updates per task, only when you commit, or only on demand.

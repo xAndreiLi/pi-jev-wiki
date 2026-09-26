@@ -2,8 +2,8 @@
 
 ## Current state (2026-09-26)
 
-- **Published:** `pi-jev-wiki@0.7.0` by CI with **SLSA provenance** (2026-09-26). `0.2.0` was the
-  manual first release and has no attestation; `0.3.0`–`0.6.0` were CI-published.
+- **Published:** `pi-jev-wiki@0.7.1` by CI with **SLSA provenance** (2026-09-26). `0.2.0` was the
+  manual first release and has no attestation; `0.3.0`–`0.7.0` were CI-published.
 - **Release flow:** `npm run release -- <version|major|minor|patch>` verifies a clean tree, the
   changelog section, and the tag; runs the full suite; bumps, commits, and creates an **annotated**
   tag. Then `git push origin main --follow-tags` — CI runs `npm run test:all` and publishes on the
