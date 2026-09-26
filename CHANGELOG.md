@@ -1,5 +1,57 @@
 # Changelog
 
+## 0.5.0 — 2026-09-26
+
+### Added
+
+- Cross-wiki semantic search: a local PGlite + pgvector index over claim- and section-level chunks,
+  with `performance` (EmbeddingGemma-300M, 768d) and `quality` (Qwen3-Embedding-0.6B, 1024d)
+  presets, MRL truncation, and per-model prompt templates.
+- `wiki_index` tool: `status`, `model`, `discover`, `rebuild` (single wiki or `all`), `add`,
+  `remove`, `enable`, `disable`; `wiki_finalize` refreshes touched pages incrementally by content
+  hash.
+- Wiki discovery: scans the home directory and WSL distros, reconciles the user-level registry
+  (including registered-but-missing roots), and adopts found wikis with `register=true`.
+- Embedding-model selection: `wiki_index action=model` reports the effective preset and its source
+  and persists the choice to the user-level config; the first rebuild without a recorded choice
+  stops and asks instead of downloading silently.
+- Hybrid retrieval: reciprocal rank fusion of BM25 and vector ranks behind `wiki_ask`
+  (`auto` / `keyword` / `semantic` / `hybrid`, `scope: local|all`, explicit wiki lists), tagging
+  results with wiki name, claim id, kind, and status.
+- Bulk review resolution (`wiki_review ids=[...]`) and user-stated auto-accept
+  (`review.autoAcceptUserStated`), keeping wiki upkeep agent-owned.
+- Agent overrides recorded in the decision ledger via `wiki_finalize`'s `overrides` parameter; lint
+  treats recorded overrides as accepted backing.
+- `npm run release -- <version|major|minor|patch>`: verifies a clean tree, runs the full suite,
+  bumps, commits, and tags.
+
+### Changed
+
+- Jev verdicts are advisory: the brief presents "Suggested not to add" reminders, the agent has the
+  final say, and overrides are allowed with a recorded reason. Sensitive/injection content and silent
+  contradiction resolution remain hard boundaries.
+- `search.engine` defaults to `auto`: hybrid when an index exists, keyword fallback otherwise.
+- Page-section anchors render as heading slugs; raw filenames and page slugs truncate at word
+  boundaries; auto-registered wiki names skip generic path segments.
+- The publish workflow runs the full suite (`npm run test:all`, now including the vector tests) in a
+  single step, and `prepublishOnly` matches it.
+
+### Fixed
+
+- Headless/print sessions no longer hang after completing: cached PGlite handles close on session
+  shutdown.
+- `wiki_index add`/`rebuild` resolve project roots to the real wiki root and self-heal stale
+  registry roots.
+- Queries never trigger a model download; a cold or mismatched index falls back to keyword search.
+- A built-but-empty wiki counts as warm, so `wiki_finalize` stops reprinting build guidance.
+- `wiki_doctor` validates the vector configuration and registry and reports model-cache size.
+
+### Docs
+
+- README repositioned around the package purpose — a vetted, searchable knowledge graph for agents
+  — with clarified naming, corrected install commands, and an explicit unreleased-status list.
+- `docs/notes/semantic-search.md` records the design, decisions, phases, and known limitations.
+
 ## 0.4.0 — 2026-09-20
 
 ### Added

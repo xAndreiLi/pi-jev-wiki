@@ -29,9 +29,7 @@ jobs:
             exit 1
           fi
           npm whoami
-      - run: npm run typecheck
-      - run: npm run test:unit
-      - run: npm run test:scale
+      - run: npm run test:all
       - name: Check published version
         id: published
         env:

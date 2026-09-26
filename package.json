@@ -46,7 +46,8 @@
     "test:unit": "jiti scripts/unit-test.ts",
     "test:vector": "jiti scripts/vector-test.ts",
     "test:all": "tsc --noEmit && jiti scripts/unit-test.ts && jiti scripts/scale-test.ts && jiti scripts/vector-test.ts",
-    "prepublishOnly": "npm run typecheck && npm run test:unit"
+    "release": "jiti scripts/release.ts",
+    "prepublishOnly": "npm run test:all"
   },
   "peerDependencies": {
     "@earendil-works/pi-ai": "*",
