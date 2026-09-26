@@ -458,6 +458,34 @@ project files; `.env` is gitignored.
 
 ---
 
+## 8.1 Capture cadence
+
+`capture.cadence` (`manual` | `task` | `commit`) selects the automatic capture trigger; code
+resolves the effective triggers in `resolveCaptureTriggers` (`src/config.ts`).
+
+- `task` — `agent_settled` runs the Jev pre-screen and extraction, debounced (10 minutes, and never
+  twice for the same transcript). Accepted insights are written to `.jev-wiki/pending-capture.md`
+  and handed to the agent as a follow-up turn that writes/merges pages and calls `wiki_finalize`.
+- `commit` — `agent_settled` compares the current git HEAD with the value recorded at session start
+  (or the last capture); a new commit triggers capture with no time debounce. Commits made outside
+  the agent are picked up on the next settle, so "update when I'm ready to commit" works regardless
+  of how the commit happened.
+- `manual` — no automatic capture; `/wiki:capture` and `wiki_insights` remain available. The legacy
+  `capture.onSettle: true` still enables task capture, and `capture.onCompact: true` stays an
+  independent pre-compaction trigger.
+
+Capture is always advisory: Jev pre-screens and filters, the agent writes, and nothing is filed
+without the agent following the llm-wiki skill.
+
+## 8.2 Retrieval judgments (Jev)
+
+`wiki_ask` may call Jev once per query, batched: a relevance `noul` per candidate (up to
+`search.jev.maxCandidates`, default 8) and one evidence-sufficiency `noul`. `search.jev.rerank` is
+`auto` (hybrid only — the case where fused order is least trustworthy) | `always` | `never`; a
+sufficiency verdict below `minSufficiency` adds a calibrated "may not cover this yet" note. Every
+verdict lands in the ledger as an `ask.judge` entry with per-candidate scores and token usage, which
+is the training data for the retrieval benchmark. Failures degrade to the unjudged order.
+
 ## 9. Failure modes and mitigations
 
 | Risk | Mitigation |

@@ -15,7 +15,7 @@ import { applyReviewResolution, enqueueReview, listOpenReviews, resolveReview } 
 import { fileMatches } from "../src/git.ts";
 import type { LedgerEntry } from "../src/ledger.ts";
 import { buildTriageReport, remedyFor } from "../src/triage.ts";
-import { DEFAULT_CONFIG, type ResolvedConfig } from "../src/config.ts";
+import { DEFAULT_CONFIG, resolveCaptureTriggers, type ResolvedConfig } from "../src/config.ts";
 import { ensureLayout, resolveLayout, slugify, writePage } from "../src/wiki/layout.ts";
 import { parseFrontmatter, serializeFrontmatter } from "../src/wiki/frontmatter.ts";
 import { isLocked, withWikiLock } from "../src/wiki/lock.ts";
@@ -305,6 +305,15 @@ await check("frontmatter round-trips nested claim lists", () => {
 	const data = { title: "T", claims: [{ id: "c1", text: "x", status: "verified", evidence: ["a", "b"] }] };
 	const parsed = parseFrontmatter(serializeFrontmatter(data, "body"));
 	assert.deepEqual(parsed.data, data);
+});
+
+console.log("capture cadence");
+await check("cadence resolves task, commit, and manual triggers", () => {
+	const base = { ...DEFAULT_CONFIG } as ResolvedConfig;
+	assert.deepEqual(resolveCaptureTriggers({ ...base, capture: { cadence: "task", onCompact: false } }), { task: true, commit: false, compact: false });
+	assert.deepEqual(resolveCaptureTriggers({ ...base, capture: { cadence: "commit", onCompact: true } }), { task: false, commit: true, compact: true });
+	assert.deepEqual(resolveCaptureTriggers({ ...base, capture: { cadence: "manual", onCompact: false } }), { task: false, commit: false, compact: false });
+	assert.deepEqual(resolveCaptureTriggers({ ...base, capture: { cadence: "manual", onCompact: false, onSettle: true } }), { task: true, commit: false, compact: false });
 });
 
 if (failures > 0) {

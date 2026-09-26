@@ -467,13 +467,39 @@ This is the calibration and audit substrate: per-wiki precision of auto-accepts,
   Jev's `criticality`/`risk` as evaluated by the agent.
 - Automated insight capture: `session_before_compact` hook, optional `agent_settled` debounce,
   nested-LLM extraction fallback; recurrence promotion from `session-log.jsonl`.
+- **Capture cadence — delivered:** `capture.cadence` = `manual` | `task` | `commit`; commit cadence
+  compares git HEAD across settles, so commits made outside the agent still trigger capture.
 - Corroboration ledger and date-based supersession; optional git commit per ingest.
 - Structure scan (`wiki_structure`) seeds/refreshes module and impact pages from the repo.
 
 ### P3 — Scale and reach
-- qmd/hybrid search behind `search.ts`; hierarchical TOC.
+- qmd/hybrid search behind `search.ts`; hierarchical TOC — **delivered** as hybrid RRF plus the
+  compact per-topic TOC.
 - Consolidation/forgetting passes; entity graph from frontmatter.
-- Global (cross-project) vault with `global_vs_project` routing.
+- Global cross-project vault — **superseded** by the user-level registry, the cross-wiki catalog,
+  and retrieval judgments (see the roadmap below and `docs/notes/overview-and-toc.md`).
+
+### Delivered since this plan was written (2026-09-26)
+
+- **Retrieval judgments:** batched Jev rerank plus evidence sufficiency behind `search.jev`,
+  recorded as `ask.judge` (`src/vector/judgments.ts`).
+- **Cross-wiki catalog:** `wiki_toc scope=all` reads per-wiki TOC manifests (`.jev-wiki/toc.json`,
+  single-writer, hash-checked) plus index state and reports pages, topics, chunks, model, and
+  staleness flags — paged, failure-isolated, 100 wikis in ~28 ms.
+- **Semantic search:** PGlite + pgvector, `performance`/`quality` presets, registry,
+  discovery/adoption, granularity-aware RRF with wiki-tagged results, generated-file exclusion, and
+  `npm run toc:refresh` for pre-manifest wikis.
+- **Capture cadence:** `capture.cadence` = `manual` | `task` | `commit`.
+
+### Remaining roadmap
+
+- **Routing (P-B):** Jev chooses wikis / catalog-vs-search once the registry passes ~20 wikis.
+- **Cross-wiki contradiction scan** and **summary-fidelity lint** (queue summaries Jev rates stale),
+  plus cross-wiki See-also suggestions (`link_relevance`).
+- **Catalog cache:** in-process root+mtime fingerprint cache to avoid repeat walks.
+- **Retrieval benchmark:** golden-query recall@5 / MRR for BM25 vs vector vs hybrid vs Jev-reranked,
+  setting the default engine and rerank thresholds from measured data.
+- Then P4: server Postgres, cloud embedding providers, HNSW at 20k+ chunks, optional reranker.
 
 ---
 

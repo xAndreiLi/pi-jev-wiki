@@ -160,12 +160,27 @@ Optional overrides in `~/.pi/agent/jev-wiki.json` or project `.pi/jev-wiki.json`
     "engine": "auto",
     "vector": { "enabled": true, "model": "performance", "scan": { "wsl": true } },
     "jev": { "rerank": "auto", "sufficiency": true }
-  }
+  },
+  "capture": { "cadence": "task" }
 }
 ```
 
 The optional `globalWikiRoot` adds a read-only cross-project vault: `wiki_ask` also searches that
 wiki and tags its results `[global vault]`. It resolves against the pi agent dir when relative.
+
+## Keeping the wiki updated
+
+`capture.cadence` controls how often the agent writes knowledge back during normal work:
+
+| Cadence | Behaviour |
+|---|---|
+| `manual` (default) | only `/wiki:capture` or an explicit `wiki_insights` call |
+| `task` | after each settled task, a Jev pre-screen decides whether the session is worth extracting; accepted insights are queued for the agent to write (10-minute debounce) |
+| `commit` | only after a **new git commit** is detected, however it was made — "update the wiki when I'm ready to commit" (no time debounce) |
+
+`capture.onCompact: true` remains an independent trigger (capture before context compaction), and
+the legacy `capture.onSettle: true` still enables task capture. Whatever the cadence, accepted
+insights are only *proposed*: the agent writes or merges the pages and calls `wiki_finalize`.
 
 ## Wiki layout
 

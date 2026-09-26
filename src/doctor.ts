@@ -56,6 +56,7 @@ export async function runDoctor(loaded: LoadedConfig): Promise<DoctorReport> {
 	if (!within(config.review.escalateCriticality, 0, 1)) invalid.push(`review.escalateCriticality=${config.review.escalateCriticality}`);
 	if (!within(config.lint.duplicateSimilarity, 0, 1)) invalid.push(`lint.duplicateSimilarity=${config.lint.duplicateSimilarity}`);
 	if (config.routing.shardSize < 10 || config.routing.shardSize > 255) invalid.push(`routing.shardSize=${config.routing.shardSize} (must be 10..255)`);
+	if (!["manual", "task", "commit"].includes(config.capture.cadence ?? "manual")) invalid.push(`capture.cadence=${config.capture.cadence}`);
 	if (!["auto", "always", "never"].includes(config.search.jev.rerank)) invalid.push(`search.jev.rerank=${config.search.jev.rerank}`);
 	if (!within(config.search.jev.minSufficiency, 0, 1)) invalid.push(`search.jev.minSufficiency=${config.search.jev.minSufficiency}`);
 	if (config.search.jev.maxCandidates < 1 || config.search.jev.maxCandidates > 50) invalid.push(`search.jev.maxCandidates=${config.search.jev.maxCandidates} (1..50)`);

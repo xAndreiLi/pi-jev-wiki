@@ -11,7 +11,7 @@ export interface SessionLogEntry {
 	ts: string;
 	text: string;
 	kind?: string;
-	source: "tool" | "compact" | "settled";
+	source: "tool" | "compact" | "settled" | "commit";
 	action: string;
 	reason?: string;
 	grounded?: number;

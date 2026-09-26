@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- Configurable capture cadence: `capture.cadence` = `manual` (default; explicit capture only) |
+  `task` (after each settled task, debounced) | `commit` (after a new git commit is observed,
+  however it was made). `capture.onCompact` stays an independent trigger and the legacy
+  `capture.onSettle: true` still enables task capture.
+
 ## 0.6.0 — 2026-09-26
 
 ### Added

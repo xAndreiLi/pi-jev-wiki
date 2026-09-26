@@ -12,7 +12,7 @@ import { basename, dirname, isAbsolute, join, relative, resolve } from "node:pat
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { StringEnum } from "@earendil-works/pi-ai";
 import { Type } from "typebox";
-import { loadConfig, type LoadedConfig, type JevWikiConfig, type WriterMode } from "./config.ts";
+import { loadConfig, resolveCaptureTriggers, type LoadedConfig, type JevWikiConfig, type WriterMode } from "./config.ts";
 import { git, headCommit, isGitRepo } from "./git.ts";
 import { appendLedger, readLedger, summarizeLedger } from "./ledger.ts";
 import { lintWiki } from "./lint.ts";
@@ -549,7 +549,7 @@ async function mapLimitLocal<T, R>(items: T[], limit: number, fn: (item: T) => P
 // ---------------------------------------------------------------------------
 
 interface ProcessInsightsOptions {
-	source: "tool" | "compact" | "settled";
+	source: "tool" | "compact" | "settled" | "commit";
 	mode?: WriterMode;
 }
 
@@ -2054,6 +2054,7 @@ export default function (pi: ExtensionAPI) {
 		if (!loaded.apiKey) {
 			ctx.ui.notify(`jev-wiki: no Jev token found (expected JEV_TOKEN in ${loaded.envFilePath})`, "warning");
 		}
+		lastCommitSeen = await headCommit(ctx.cwd).catch(() => undefined);
 		try {
 			if (loaded.config.sync.onSessionStart !== "check") return;
 			const layout = resolveLayout(ctx.cwd, loaded.config.wikiRoot, loaded.config.stateRoot);
@@ -2076,11 +2077,13 @@ export default function (pi: ExtensionAPI) {
 	let autoCaptureInFlight = false;
 	let lastAutoCaptureAt = 0;
 	let lastAutoCaptureMessageCount = 0;
+	let lastCommitSeen: string | undefined;
 
 	async function autoCapture(
 		ctx: ExtensionContext,
-		source: "compact" | "settled",
+		source: "compact" | "settled" | "commit",
 		entries?: unknown[],
+		options?: { minIntervalMs?: number },
 	): Promise<{ accepted: number; brief: string } | undefined> {
 		const loaded = loadConfig(ctx.cwd);
 		if (!loaded.apiKey) return undefined;
@@ -2090,7 +2093,8 @@ export default function (pi: ExtensionAPI) {
 			return candidate?.type === "message" && (candidate.message?.role === "user" || candidate.message?.role === "assistant");
 		}).length;
 		if (messageCount < 3 || messageCount === lastAutoCaptureMessageCount) return undefined;
-		if (Date.now() - lastAutoCaptureAt < 10 * 60_000) return undefined;
+		const minIntervalMs = options?.minIntervalMs ?? 10 * 60_000;
+		if (Date.now() - lastAutoCaptureAt < minIntervalMs) return undefined;
 		if (autoCaptureInFlight) return undefined;
 		autoCaptureInFlight = true;
 		try {
@@ -2148,8 +2152,18 @@ export default function (pi: ExtensionAPI) {
 	pi.on("agent_settled", async (_event, ctx) => {
 		try {
 			const loaded = loadConfig(ctx.cwd);
-			if (!loaded.config.capture.onSettle) return;
-			const result = await autoCapture(ctx, "settled");
+			const triggers = resolveCaptureTriggers(loaded.config);
+			if (!triggers.task && !triggers.commit) return;
+			let source: "settled" | "commit" = "settled";
+			if (triggers.commit) {
+				// Commit cadence: capture once per new commit (a deliberate checkpoint),
+				// regardless of how the commit was made.
+				const head = await headCommit(ctx.cwd).catch(() => undefined);
+				if (!head || head === lastCommitSeen) return;
+				lastCommitSeen = head;
+				source = "commit";
+			}
+			const result = await autoCapture(ctx, source, undefined, { minIntervalMs: source === "commit" ? 0 : undefined });
 			if (!result || result.accepted === 0) return;
 			const layout = resolveLayout(ctx.cwd, loaded.config.wikiRoot, loaded.config.stateRoot);
 			await writeTextAtomic(join(layout.stateDir, "pending-capture.md"), `# Pending capture\n\n${result.brief}\n\nWrite or merge the accepted pages following the llm-wiki skill, then call wiki_finalize.\n`);

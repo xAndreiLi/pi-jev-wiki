@@ -11,6 +11,7 @@ import { CONFIG_DIR_NAME, getAgentDir } from "@earendil-works/pi-coding-agent";
 
 export type WriterMode = "guided" | "draft" | "auto";
 export type ReviewMode = "agent" | "human";
+export type CaptureCadence = "manual" | "task" | "commit";
 
 export interface ProviderPreset {
 	baseUrl: string;
@@ -48,7 +49,7 @@ export interface JevWikiConfig {
 	toc: { maxTokens: number };
 	lint: { orphanMinAgeDays: number; duplicateSimilarity: number };
 	gitCommit: boolean;
-	capture: { onCompact: boolean; onSettle: boolean };
+	capture: { cadence: CaptureCadence; onCompact: boolean; onSettle?: boolean };
 	search: {
 		engine: "auto" | "index" | "bm25" | "vector" | "hybrid" | "qmd";
 		qmdCollection?: string;
@@ -87,7 +88,7 @@ export const DEFAULT_CONFIG: JevWikiConfig = {
 	toc: { maxTokens: 3000 },
 	lint: { orphanMinAgeDays: 7, duplicateSimilarity: 0.72 },
 	gitCommit: false,
-	capture: { onCompact: false, onSettle: false },
+	capture: { cadence: "manual", onCompact: false },
 	search: {
 		engine: "auto",
 		vector: {
@@ -102,6 +103,22 @@ export const DEFAULT_CONFIG: JevWikiConfig = {
 		jev: { rerank: "auto", sufficiency: true, minSufficiency: 0.5, maxCandidates: 8 },
 	},
 };
+
+/**
+ * Resolve the capture triggers. `capture.cadence` is the primary knob:
+ * - `task`   — capture after each settled task (debounced)
+ * - `commit` — capture after a new git commit is observed
+ * - `manual` — only explicit /wiki:capture or wiki_insights (legacy `onSettle: true` still enables task capture)
+ * `capture.onCompact` remains an independent extra trigger.
+ */
+export function resolveCaptureTriggers(config: ResolvedConfig): { task: boolean; commit: boolean; compact: boolean } {
+	const cadence = config.capture.cadence ?? "manual";
+	return {
+		task: cadence === "task" || (cadence === "manual" && config.capture.onSettle === true),
+		commit: cadence === "commit",
+		compact: config.capture.onCompact === true,
+	};
+}
 
 export interface LoadedConfig {
 	cwd: string;
