@@ -71,7 +71,9 @@ export interface ClaimVerdicts {
 	topicConfidence?: number;
 	target?: string;
 	targetConfidence?: number;
+	mergeInto?: string;
 	anyFit?: number;
+	topicIsNew?: boolean;
 	newPage: boolean;
 }
 
@@ -313,6 +315,7 @@ export async function adjudicateClaim(
 	const importance = scoreValue(response, "importance");
 	const criticality = scoreValue(response, "criticality");
 	const relation = choiceValue(response, "relation");
+	const topicChoice = choiceValue(response, "topic");
 
 	const verdicts: ClaimVerdicts = {
 		grounded: noulValue(response, "grounded"),
@@ -334,8 +337,9 @@ export async function adjudicateClaim(
 		relationConfidence: relation?.confidence,
 		pageType: choiceValue(response, "page_type")?.value,
 		pageTypeConfidence: choiceValue(response, "page_type")?.confidence,
-		topic: choiceValue(response, "topic")?.value,
-		topicConfidence: choiceValue(response, "topic")?.confidence,
+		topic: topicChoice?.value === "new_topic" ? suggestTopic(kind?.value ?? claim.kind) : topicChoice?.value,
+		topicConfidence: topicChoice?.confidence,
+		topicIsNew: topicChoice?.value === "new_topic",
 		newPage: true,
 	};
 
@@ -418,6 +422,14 @@ export function decideClaim(verdicts: ClaimVerdicts, config: ResolvedConfig): Cl
 		return { action: "file", score, reasons };
 	}
 	if (verdicts.grounded >= thresholds.minSupport) {
+		if (
+			config.review.autoAcceptUserStated &&
+			verdicts.trustTier === "user_stated" &&
+			verdicts.durable >= 0.5 &&
+			verdicts.importance >= thresholds.minImportance
+		) {
+			return { action: "file_user_stated", score, reasons: [...reasons, "user-stated trust tier (auto-accepted)"] };
+		}
 		return { action: "review", score, reasons: [...reasons, "below auto-accept threshold"] };
 	}
 	if (verdicts.trustTier === "user_stated" && verdicts.durable >= 0.5 && verdicts.importance >= thresholds.minImportance) {
@@ -427,4 +439,21 @@ export function decideClaim(verdicts: ClaimVerdicts, config: ResolvedConfig): Cl
 		return { action: "file", score, reasons: [...reasons, "repo-verified evidence"] };
 	}
 	return { action: "reject_unsupported", score, reasons: [...reasons, "not grounded in evidence"] };
+}
+
+/** Concrete topic suggestion for a claim kind when Jev finds no existing topic fits. */
+const TOPIC_BY_KIND: Record<string, string> = {
+	architecture: "architecture",
+	invariant: "invariants",
+	decision: "decisions",
+	gotcha: "gotchas",
+	procedure: "procedures",
+	pattern: "patterns",
+	concept: "concepts",
+	fact: "facts",
+	preference: "preferences",
+};
+
+export function suggestTopic(kind: string): string {
+	return TOPIC_BY_KIND[kind] ?? "notes";
 }

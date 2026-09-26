@@ -506,9 +506,10 @@ This is the calibration and audit substrate: per-wiki precision of auto-accepts,
   "envFile": ".env",                               // project-root, gitignored
   "model": "jev-latest",
   "wikiRoot": "docs/wiki",
+  "globalWikiRoot": null,                          // optional read-only cross-project vault (absolute or agent-dir relative)
   "writer": { "mode": "guided", "model": null },   // default; agent may adapt per item via risk
   "routing": { "shardSize": 250, "minFit": 0.6, "newPageConfidence": 0.7 },
-  "review": { "mode": "agent", "escalateCriticality": 0.85, "maxPerSession": 10 },
+  "review": { "mode": "agent", "autoAcceptUserStated": true, "escalateCriticality": 0.85, "maxPerSession": 10 },
   "sync": { "onSessionStart": "check", "onCommit": false, "backstopLintDays": 14 },
   "thresholds": { "autoAccept": 0.8, "minSupport": 0.7, "minImportance": 1, "minNovelty": 0.6 },
   "weights": { "grounded": 0.45, "importance": 0.25, "nonDerivable": 0.2, "authority": 0.1 },

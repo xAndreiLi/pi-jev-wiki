@@ -5,6 +5,7 @@
  */
 import { existsSync } from "node:fs";
 import { readFile, stat } from "node:fs/promises";
+import { isAbsolute, join } from "node:path";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import type { LoadedConfig } from "./config.ts";
@@ -81,6 +82,17 @@ export async function runDoctor(loaded: LoadedConfig): Promise<DoctorReport> {
 			? check("env file", "ok", loaded.envFilePath)
 			: check("env file", "warn", `not found: ${loaded.envFilePath}`),
 	);
+	if (config.globalWikiRoot) {
+		const vaultRoot = isAbsolute(config.globalWikiRoot) ? config.globalWikiRoot : join(loaded.agentDir, config.globalWikiRoot);
+		const vault = resolveLayout(vaultRoot, ".", config.stateRoot);
+		checks.push(
+			existsSync(vault.wikiDir)
+				? check("global vault", "ok", `${vault.root} (read-only cross-project search)`)
+				: check("global vault", "warn", `globalWikiRoot is set but no pages found at ${vault.wikiDir}`),
+		);
+	} else {
+		checks.push(check("global vault", "ok", "not configured (optional cross-project search)"));
+	}
 
 	// --- layout and state -----------------------------------------------------
 	checks.push(

@@ -236,8 +236,25 @@ interface ClaimReport {
 	files: string[];
 	pageType?: string;
 	topic?: string;
+	topicIsNew?: boolean;
 	target?: string;
+	mergeInto?: string;
 	newPage: boolean;
+}
+
+/** Best matching existing claim for a reinforcement, used when page placement abstains. */
+function bestCandidateClaim(text: string, candidates: CandidateClaim[]): CandidateClaim | undefined {
+	const tokens = new Set(text.toLowerCase().split(/[^a-z0-9]+/).filter((token) => token.length > 3));
+	let best: { candidate: CandidateClaim; score: number } | undefined;
+	for (const candidate of candidates) {
+		const candidateTokens = new Set(candidate.text.toLowerCase().split(/[^a-z0-9]+/).filter((token) => token.length > 3));
+		if (tokens.size === 0 || candidateTokens.size === 0) continue;
+		let shared = 0;
+		for (const token of tokens) if (candidateTokens.has(token)) shared++;
+		const score = shared / Math.min(tokens.size, candidateTokens.size);
+		if (!best || score > best.score) best = { candidate, score };
+	}
+	return best && best.score >= 0.3 ? best.candidate : undefined;
 }
 
 function renderBrief(title: string, reports: ClaimReport[], extras: string[] = [], options?: { guided?: boolean }): string {
@@ -256,7 +273,7 @@ function renderBrief(title: string, reports: ClaimReport[], extras: string[] = [
 		for (const report of filed) {
 			const where = report.target
 				? `merge → \`${report.target}\``
-				: `new page (${report.pageType ?? "concept"}${report.topic ? `, topic \`${report.topic}\`` : ""})`;
+				: `new page (${report.pageType ?? "concept"}${report.topic ? `, topic \`${report.topic}\`${report.topicIsNew ? " (new, suggested)" : ""}` : ""})`;
 			const trust = report.action === "file_user_stated" ? " [user-stated: use `status: user-stated`]" : "";
 			const files = report.files.length > 0 ? ` (files: ${report.files.map((file) => `\`${file}\``).join(", ")})` : "";
 			lines.push(`- ${where} — ${report.text}${trust}${files}`);
@@ -269,7 +286,9 @@ function renderBrief(title: string, reports: ClaimReport[], extras: string[] = [
 	if (reinforced.length > 0) {
 		lines.push("### Reinforce existing knowledge");
 		for (const report of reinforced) {
-			lines.push(`- ${report.target ? `\`${report.target}\`` : "existing page"} — ${report.text}`);
+			const target = report.target ? `\`${report.target}\`` : "existing page";
+			const mergeInto = report.mergeInto ? ` (merge into claim \`${report.mergeInto}\`)` : "";
+			lines.push(`- ${target}${mergeInto} — ${report.text}`);
 		}
 		lines.push("");
 	}
@@ -377,6 +396,14 @@ async function ingestSource(
 			});
 		}
 		const verdicts = { ...adjudication.verdicts, ...(placement?.verdicts ?? {}) };
+		if (decision.action === "reinforce" && (!verdicts.target || verdicts.newPage)) {
+			const match = bestCandidateClaim(claim.text, candidateClaims);
+			if (match?.page) {
+				verdicts.target = match.page;
+				verdicts.newPage = false;
+				if (match.id) verdicts.mergeInto = match.id;
+			}
+		}
 		const totalUsage = {
 			input_tokens: adjudication.usage.input_tokens + (placement?.usage.input_tokens ?? 0),
 			output_tokens: adjudication.usage.output_tokens + (placement?.usage.output_tokens ?? 0),
@@ -437,7 +464,9 @@ async function ingestSource(
 		files: claim.files ?? [],
 		pageType: verdicts.pageType,
 		topic: verdicts.topic,
+		topicIsNew: verdicts.topicIsNew,
 		target: verdicts.target,
+		mergeInto: verdicts.mergeInto,
 		newPage: verdicts.newPage,
 	}));
 
@@ -526,6 +555,14 @@ async function processInsights(
 			});
 		}
 		const verdicts = { ...adjudication.verdicts, ...(placement?.verdicts ?? {}) };
+		if (decision.action === "reinforce" && (!verdicts.target || verdicts.newPage)) {
+			const match = bestCandidateClaim(insight.text, candidateClaims);
+			if (match?.page) {
+				verdicts.target = match.page;
+				verdicts.newPage = false;
+				if (match.id) verdicts.mergeInto = match.id;
+			}
+		}
 		const totalUsage = {
 			input_tokens: adjudication.usage.input_tokens + (placement?.usage.input_tokens ?? 0),
 			output_tokens: adjudication.usage.output_tokens + (placement?.usage.output_tokens ?? 0),
@@ -627,7 +664,9 @@ async function processInsights(
 		files,
 		pageType: verdicts.pageType,
 		topic: verdicts.topic,
+		topicIsNew: verdicts.topicIsNew,
 		target: verdicts.target,
+		mergeInto: verdicts.mergeInto,
 		newPage: verdicts.newPage,
 	}));
 	const reinforcements = perInsight
@@ -1012,10 +1051,22 @@ export default function (pi: ExtensionAPI) {
 		label: "Finalize Wiki Pages",
 		description: "Update the wiki table of contents and log for pages you wrote or edited, and report broken internal links.",
 		promptSnippet: "Update wiki TOC/log after writing pages and check links",
-		promptGuidelines: ["Call wiki_finalize with every page you created or edited in the wiki, before ending the turn."],
+		promptGuidelines: [
+			"Call wiki_finalize with every page you created or edited in the wiki, before ending the turn.",
+			"If you filed a claim against Jev's advice, record it with `overrides` (claim text, reason, advised action).",
+		],
 		parameters: Type.Object({
 			pages: Type.Array(Type.String({ description: "Page paths (relative to the project or the wiki root)" })),
 			note: Type.Optional(Type.String({ description: "Short note for the log" })),
+			overrides: Type.Optional(
+				Type.Array(
+					Type.Object({
+						text: Type.String({ description: "Claim text you filed against Jev's advice" }),
+						reason: Type.String({ description: "Why you overrode the advice" }),
+						advised: Type.Optional(Type.String({ description: "Jev's advised action (e.g. reject_derivable)" })),
+					}),
+				),
+			),
 		}),
 		async execute(_id, params, _signal, _onUpdate, ctx) {
 			const { layout } = runtimeFor(ctx);
@@ -1050,11 +1101,27 @@ export default function (pi: ExtensionAPI) {
 				subject: updates.map((entry) => entry.path).join(", ").slice(0, 200),
 				outcome: broken.length ? `broken links: ${broken.length}` : "ok",
 			});
+			const overrides = params.overrides ?? [];
+			for (const override of overrides) {
+				await appendLedger(layout, {
+					actor: "agent",
+					op: "wiki.override",
+					action: "override",
+					subject: override.text.slice(0, 120),
+					reason: override.reason,
+					verdict: { advised: override.advised ?? null },
+					outcome: "filed against Jev's advice",
+				});
+			}
 			const lines = [
 				`Updated TOC for ${updates.length} page(s): ${updates.map((entry) => `\`${entry.path}\``).join(", ") || "(none)"}`,
 				broken.length ? `Broken links:\n${broken.map((item) => `- ${item}`).join("\n")}` : "No broken links found.",
 			];
-			return { content: [{ type: "text", text: lines.join("\n") }], details: { updated: updates.map((entry) => entry.path), broken } };
+			if (overrides.length > 0) lines.push(`Recorded ${overrides.length} override(s) against Jev's advice.`);
+			return {
+				content: [{ type: "text", text: lines.join("\n") }],
+				details: { updated: updates.map((entry) => entry.path), broken, overrides: overrides.map((override) => override.text.slice(0, 120)) },
+			};
 		},
 	});
 
@@ -1124,8 +1191,9 @@ export default function (pi: ExtensionAPI) {
 		parameters: Type.Object({
 			action: StringEnum(["list", "resolve"] as const),
 			id: Type.Optional(Type.String({ description: "Review item id (for resolve)" })),
+			ids: Type.Optional(Type.Array(Type.String({ description: "Review item ids to resolve in one call (bulk resolve)" }))),
 			resolution: Type.Optional(StringEnum(["accept", "reject", "supersede", "defer"] as const)),
-			note: Type.Optional(Type.String({ description: "Reasoning or evidence for the resolution" })),
+			note: Type.Optional(Type.String({ description: "Reasoning or evidence for the resolution (applies to every resolved id)" })),
 		}),
 		async execute(_id, params, _signal, _onUpdate, ctx) {
 			const { loaded, layout } = runtimeFor(ctx);
@@ -1147,55 +1215,65 @@ export default function (pi: ExtensionAPI) {
 				return { content: [{ type: "text", text: lines.filter(Boolean).join("\n") }], details: { items: open } };
 			}
 
-			if (!params.id || !params.resolution) throw new Error("wiki_review resolve needs `id` and `resolution`.");
+			const ids = params.ids && params.ids.length > 0 ? params.ids : params.id ? [params.id] : [];
+			if (ids.length === 0 || !params.resolution) throw new Error("wiki_review resolve needs `id`/`ids` and `resolution`.");
 			const all = await readReviews(layout);
-			const item = all.find((candidate) => candidate.id === params.id);
-			if (!item) throw new Error(`Review item not found: ${params.id}`);
-
-			const critical = item.criticality >= loaded.config.review.escalateCriticality;
-			if (critical && params.resolution !== "defer") {
-				if (!ctx.hasUI) {
-					await resolveReview(layout, item.id, "defer", "critical item requires user confirmation");
-					return {
-						content: [{ type: "text", text: `Item \`${item.id}\` is critical (${item.criticality.toFixed(2)}); deferred for user confirmation.` }],
-						details: { deferred: true, item },
-					};
+			const results: Array<{ id: string; resolution: string; applied?: string; deferred?: boolean; error?: string }> = [];
+			for (const id of ids) {
+				const item = all.find((candidate) => candidate.id === id);
+				if (!item) {
+					results.push({ id, resolution: params.resolution, error: "review item not found" });
+					continue;
 				}
-				const approved = await ctx.ui.confirm(
-					"Critical wiki claim",
-					`${item.claimText}\n\nResolve as "${params.resolution}"?`,
-				);
-				if (!approved) {
-					await resolveReview(layout, item.id, "defer", "user declined at escalation");
-					return { content: [{ type: "text", text: `User declined; item \`${item.id}\` deferred.` }], details: { deferred: true, item } };
+				const critical = item.criticality >= loaded.config.review.escalateCriticality;
+				if (critical && params.resolution !== "defer") {
+					if (!ctx.hasUI) {
+						await resolveReview(layout, item.id, "defer", "critical item requires user confirmation");
+						results.push({ id, resolution: "defer", deferred: true });
+						continue;
+					}
+					const approved = await ctx.ui.confirm(
+						"Critical wiki claim",
+						`${item.claimText}\n\nResolve as "${params.resolution}"?`,
+					);
+					if (!approved) {
+						await resolveReview(layout, item.id, "defer", "user declined at escalation");
+						results.push({ id, resolution: "defer", deferred: true });
+						continue;
+					}
 				}
-			}
 
-			const applied = await applyReviewResolution(layout, item, params.resolution);
-			await resolveReview(layout, item.id, params.resolution, params.note);
-			if (params.resolution === "accept") {
+				const applied = await applyReviewResolution(layout, item, params.resolution);
+				await resolveReview(layout, item.id, params.resolution, params.note);
+				if (params.resolution === "accept") {
+					await appendLedger(layout, {
+						actor: "code",
+						op: "wiki.review.accept",
+						action: "file",
+						subject: item.claimText.slice(0, 120),
+						reason: params.note ?? `reviewed as ${item.kind}`,
+						verdict: { reviewId: item.id, page: item.page ?? null, criticality: item.criticality },
+					});
+				}
 				await appendLedger(layout, {
-					actor: "code",
-					op: "wiki.review.accept",
-					action: "file",
-					subject: item.claimText.slice(0, 120),
-					reason: params.note ?? `reviewed as ${item.kind}`,
-					verdict: { reviewId: item.id, page: item.page ?? null, criticality: item.criticality },
+					actor: "agent",
+					op: "wiki.review",
+					subject: item.id,
+					action: params.resolution,
+					reason: params.note ?? item.reason,
+					outcome: applied,
+					verdict: { kind: item.kind, criticality: item.criticality, escalated: critical },
 				});
+				results.push({ id, resolution: params.resolution, applied });
 			}
-			await appendLedger(layout, {
-				actor: "agent",
-				op: "wiki.review",
-				subject: item.id,
-				action: params.resolution,
-				reason: params.note ?? item.reason,
-				outcome: applied,
-				verdict: { kind: item.kind, criticality: item.criticality, escalated: critical },
-			});
-			return {
-				content: [{ type: "text", text: `Resolved \`${item.id}\` as ${params.resolution}. ${applied}` }],
-				details: { id: item.id, resolution: params.resolution, applied },
-			};
+			const lines = results.map((entry) =>
+				entry.error
+					? `- \`${entry.id}\` — error: ${entry.error}`
+					: entry.deferred
+						? `- \`${entry.id}\` — deferred (critical; needs user confirmation)`
+						: `- \`${entry.id}\` — resolved as ${entry.resolution}. ${entry.applied ?? ""}`,
+			);
+			return { content: [{ type: "text", text: lines.join("\n") }], details: { resolved: results } };
 		},
 	});
 

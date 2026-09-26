@@ -42,10 +42,14 @@ export function slugify(input: string, maxLength = 60): string {
 	const slug = input
 		.toLowerCase()
 		.replace(/[^a-z0-9]+/g, "-")
-		.replace(/^-+|-+$/g, "")
-		.slice(0, maxLength)
-		.replace(/-+$/g, "");
-	return slug || "untitled";
+		.replace(/^-+|-+$/g, "");
+	if (slug.length <= maxLength) return slug || "untitled";
+	const clipped = slug.slice(0, maxLength);
+	const boundary = clipped.lastIndexOf("-");
+	// Prefer a clean word boundary unless it would discard most of the allowance.
+	const cut = boundary >= Math.max(8, Math.floor(maxLength * 0.6)) ? clipped.slice(0, boundary) : clipped;
+	const result = cut.replace(/-+$/g, "");
+	return result || "untitled";
 }
 
 export function todayISO(date = new Date()): string {

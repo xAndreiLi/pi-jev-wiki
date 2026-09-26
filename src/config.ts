@@ -34,7 +34,7 @@ export interface JevWikiConfig {
 	stateRoot: string;
 	writer: { mode: WriterMode; model?: string | null };
 	routing: { shardSize: number; minFit: number; newPageConfidence: number };
-	review: { mode: ReviewMode; escalateCriticality: number; maxPerSession: number };
+	review: { mode: ReviewMode; autoAcceptUserStated: boolean; escalateCriticality: number; maxPerSession: number };
 	sync: { onSessionStart: "off" | "check"; onCommit: boolean; backstopLintDays: number };
 	thresholds: {
 		autoAccept: number;
@@ -64,7 +64,7 @@ export const DEFAULT_CONFIG: JevWikiConfig = {
 	stateRoot: ".jev-wiki",
 	writer: { mode: "guided", model: null },
 	routing: { shardSize: 250, minFit: 0.6, newPageConfidence: 0.7 },
-	review: { mode: "agent", escalateCriticality: 0.85, maxPerSession: 10 },
+	review: { mode: "agent", autoAcceptUserStated: true, escalateCriticality: 0.85, maxPerSession: 10 },
 	sync: { onSessionStart: "check", onCommit: false, backstopLintDays: 14 },
 	thresholds: { autoAccept: 0.8, minSupport: 0.7, minDerivable: 0.5, framingImportance: 0.6, minNovelty: 0.6, minImportance: 1 },
 	weights: { grounded: 0.45, importance: 0.25, nonDerivable: 0.2, authority: 0.1 },

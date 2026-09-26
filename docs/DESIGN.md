@@ -398,9 +398,10 @@ Global `~/.pi/agent/jev-wiki.json`, project `<cwd>/.pi/jev-wiki.json` (project t
   "envFile": ".env",
   "model": "jev-latest",
   "wikiRoot": "docs/wiki",
+  "globalWikiRoot": null,
   "writer": { "model": null, "mode": "guided" },
   "routing": { "shardSize": 250, "minFit": 0.6, "newPageConfidence": 0.7 },
-  "review": { "mode": "agent", "escalateCriticality": 0.85, "maxPerSession": 10 },
+  "review": { "mode": "agent", "autoAcceptUserStated": true, "escalateCriticality": 0.85, "maxPerSession": 10 },
   "sync": { "onSessionStart": "check", "onCommit": false, "backstopLintDays": 14 },
   "thresholds": {
     "autoAccept": 0.8,

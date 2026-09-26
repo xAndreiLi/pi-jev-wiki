@@ -7,7 +7,7 @@ import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { JevAnswer, JevClient, JevQuestion } from "../src/jev.ts";
-import { decideClaim, chooseTarget, type ClaimVerdicts } from "../src/pipeline/adjudicate.ts";
+import { decideClaim, chooseTarget, suggestTopic, type ClaimVerdicts } from "../src/pipeline/adjudicate.ts";
 import { resolveWriterMode } from "../src/pipeline/write.ts";
 import { checkLiterals } from "../src/grounding.ts";
 import { redact } from "../src/redact.ts";
@@ -16,7 +16,7 @@ import { fileMatches } from "../src/git.ts";
 import type { LedgerEntry } from "../src/ledger.ts";
 import { buildTriageReport, remedyFor } from "../src/triage.ts";
 import { DEFAULT_CONFIG, type ResolvedConfig } from "../src/config.ts";
-import { ensureLayout, resolveLayout, writePage } from "../src/wiki/layout.ts";
+import { ensureLayout, resolveLayout, slugify, writePage } from "../src/wiki/layout.ts";
 import { parseFrontmatter, serializeFrontmatter } from "../src/wiki/frontmatter.ts";
 import { isLocked, withWikiLock } from "../src/wiki/lock.ts";
 
@@ -80,6 +80,26 @@ await check("reinforces when relation extends", () => {
 });
 await check("queues below auto-accept", () => {
 	assert.equal(decideClaim({ ...baseVerdicts, grounded: 0.74 }, config).action, "review");
+});
+await check("auto-accepts user-stated claims near the threshold", () => {
+	assert.equal(
+		decideClaim({ ...baseVerdicts, grounded: 0.74, trustTier: "user_stated" }, config).action,
+		"file_user_stated",
+	);
+});
+await check("still queues user-stated claims when auto-accept is disabled", () => {
+	const strict = { ...config, review: { ...config.review, autoAcceptUserStated: false } };
+	assert.equal(decideClaim({ ...baseVerdicts, grounded: 0.74, trustTier: "user_stated" }, strict).action, "review");
+});
+await check("slugify truncates at a word boundary", () => {
+	const slug = slugify("personal profile update location projects body goals and working preferences", 60);
+	assert.ok(slug.length <= 60, `length ${slug.length}`);
+	assert.ok(!slug.endsWith("-wor"), `ends mid-word: ${slug}`);
+	assert.ok(!slug.endsWith("-"), `trailing hyphen: ${slug}`);
+});
+await check("suggestTopic maps new topics to concrete kind-based names", () => {
+	assert.equal(suggestTopic("gotcha"), "gotchas");
+	assert.equal(suggestTopic("unknown-kind"), "notes");
 });
 await check("files user-stated decisions with the lower trust tier", () => {
 	assert.equal(decideClaim({ ...baseVerdicts, grounded: 0.4, trustTier: "user_stated" }, config).action, "file_user_stated");

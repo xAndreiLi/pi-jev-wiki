@@ -180,9 +180,10 @@ export async function lintWiki(
 	const accepted = ledger
 		.filter(
 			(entry) =>
-				entry.actor === "code" &&
-				["file", "reinforce", "file_user_stated"].includes(String(entry.action)) &&
-				entry.subject,
+				(entry.actor === "code" &&
+					["file", "reinforce", "file_user_stated"].includes(String(entry.action)) &&
+					entry.subject) ||
+				(entry.op === "wiki.override" && entry.action === "override" && entry.subject),
 		)
 		.map((entry) => ({ subject: normalize(String(entry.subject)), tokens: tokenSet(String(entry.subject)) }));
 	const referenced = new Set<string>();

@@ -84,7 +84,8 @@ you decide what the pages finally hold. Override a **Not filed** verdict when yo
 durable and useful — with a stated reason — or drop it when Jev's reminder convinces you.
 Framing-gate claims queued for review are yours to resolve with `wiki_review`; escalate to the
 user only for critical items. A rejection you agree with is a working system; one you override is
-a judgment call you own.
+a judgment call you own. Record overrides with `wiki_finalize`'s `overrides` parameter — the
+ledger keeps Jev's advice and your reason for calibration.
 
 - **Documents (research channel):** `wiki_ingest` → write or merge the accepted pages →
   `wiki_finalize`.

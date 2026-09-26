@@ -93,10 +93,15 @@ Optional overrides in `~/.pi/agent/jev-wiki.json` or project `.pi/jev-wiki.json`
   "provider": "typesafe",
   "model": "jev-latest",
   "wikiRoot": "docs/wiki",
+  "globalWikiRoot": null,
   "writer": { "mode": "guided" },
+  "review": { "autoAcceptUserStated": true },
   "thresholds": { "autoAccept": 0.8, "minDerivable": 0.5 }
 }
 ```
+
+The optional `globalWikiRoot` adds a read-only cross-project vault: `wiki_ask` also searches that
+wiki and tags its results `[global vault]`. It resolves against the pi agent dir when relative.
 
 ## Wiki layout
 
