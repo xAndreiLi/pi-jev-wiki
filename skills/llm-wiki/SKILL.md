@@ -92,6 +92,25 @@ ledger keeps Jev's advice and your reason for calibration.
 - **Session insights (work channel):** compose atomic insights with evidence — the introducing
   commit for decisions, the user's own words for policy, a verbatim quote for documents →
   `wiki_insights` → write or merge accepted pages → `wiki_finalize`.
+
+## Cross-wiki writes
+
+Reads cross wikis already (`wiki_ask scope: "all"` / `wikis: [...]`, `wiki_toc scope: "all"`).
+Writes do too: every write tool (`wiki_ingest`, `wiki_insights`, `wiki_finalize`, `wiki_sync`,
+`wiki_review`, `wiki_remove`, `wiki_lint`) takes `wiki: "<registered name>"` and then operates on
+that wiki's pages, raw sources, TOC/log, ledger, and review queue. One wiki per call; omitting
+`wiki` keeps the session's wiki. Relative page paths and ingest sources resolve against the target
+project, not the session workspace, and `wiki_sync wiki=<name>` diffs the target project's repo.
+
+Auto-capture routes itself (`capture.route`, default `subject`): when the files the session
+*edited* unambiguously belong to one other registered wiki, the capture is filed there and the
+brief says so; otherwise it stays on the session wiki and the brief carries a `⚠` warning naming
+the wiki the evidence points at, so you can re-submit with `wiki: <name>`. `capture.route:
+"session"` restores working-directory routing.
+
+A `user` evidence item is only presented to Jev as a user statement when it appears in an actual
+user turn; otherwise it is labeled `agent-stated (unverified)`. Do not attribute your own
+recommendation to the user — a pending proposal is not a decision.
 - **Rejections are reminders.** When you agree, the remedy is evidence, not prose — derivable →
   add what code cannot show (commit, quote, rationale); unsupported → attach evidence that states
   the claim; duplicate → reinforce the existing page. When you disagree, override it deliberately
@@ -127,6 +146,10 @@ Rules:
 - Frontmatter is a restricted YAML subset: flat scalars, inline arrays, and lists of flat maps with
   inline arrays. Quote values containing `:` or `#`; keep comments on their own line; never use a
   block-style nested list (a multi-line `evidence:` list round-trips into corrupt frontmatter).
+- The tools re-serialize frontmatter whenever they write a page: numeric-looking strings lose
+  redundant quotes (`support: "0.90"` → `support: 0.90`), redundant quoting around scalars is
+  dropped, and trailing whitespace is trimmed. Re-read the file after any tool write — including a
+  `wiki_review` resolution that rewrites the page — before building `edit` patterns against it.
 - `support` is Jev's grounded score. Page-level `needs_review: true` marks a page the writer's
   grounding check flagged; it is not a claim status.
 - Every load-bearing claim points at evidence that states it; a bare path does not ground intent.
@@ -163,7 +186,8 @@ docs/wiki/
   (`wiki_index action=model`), then persist it with `action=model model=performance|quality`.
   Switching presets requires `rebuild all=true`; the old vectors are purged per wiki.
 - Code or history changed since the last sync → `wiki_sync`; it queues affected file-linked claims
-  for `wiki_review`. Resolve items with accept/reject/supersede/defer. The agent owns routine
+  for `wiki_review`. Resolve items with accept/reject/supersede/defer, or `out_of_scope` (plus
+  `target: "<wiki>"`) when the claim is correct but belongs to another wiki. The agent owns routine
   upkeep; only critical items reach the user.
 - A claim invalidated by your change this session → update the page or mark it `needs_recheck`, and
   say so in your summary.

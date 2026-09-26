@@ -415,7 +415,7 @@ Global `~/.pi/agent/jev-wiki.json`, project `<cwd>/.pi/jev-wiki.json` (project t
   "privacy": { "redactPatterns": true },
   "toc": { "maxTokens": 3000 },
   "gitCommit": false,
-  "capture": { "onCompact": false, "onSettle": false },
+  "capture": { "cadence": "manual", "onCompact": false, "route": "subject" },
   "search": {
     "engine": "auto",
     "qmdCollection": null,

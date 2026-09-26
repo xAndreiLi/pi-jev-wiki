@@ -1,5 +1,50 @@
 # Changelog
 
+## 0.8.0 — 2026-09-26
+
+### Added
+
+- Cross-wiki writes: `wiki_ingest`, `wiki_insights`, `wiki_finalize`, `wiki_sync`, `wiki_review`,
+  `wiki_remove`, and `wiki_lint` accept `wiki: "<registered name>"` and operate on that wiki's
+  pages, raw sources, TOC/log, ledger, and review queue — one wiki per call, session wiki by
+  default. Cross-wiki page paths and ingest sources resolve against the target project (never the
+  session workspace), and `wiki_sync wiki=<name>` diffs the target project's repository.
+- Subject-aware auto-capture routing: `capture.route` (default `subject`) files a capture into the
+  registered wiki that owns the files the session edited, when exactly one does; otherwise the
+  capture stays on the session wiki and the brief carries a visible warning naming the wiki the
+  evidence points at. `capture.route: "session"` restores working-directory routing. Each decision
+  lands in the ledger as `capture.route` (`routed` / `warned` / `session`).
+- `wiki_review` `limit` (default 50, max 200) with a "showing N of M" header, and the
+  `out_of_scope` disposition plus `target` for correct claims that belong to another wiki.
+- `wiki_ingest` cost preflight (source size ≈ input tokens, up to 2 Jev calls per claim) and a
+  `compact` brief; `reject_unsupported` claims carry the closest matching passage with an overlap
+  score, and briefs with 3+ rejections point at `wiki_triage`.
+- `wiki_doctor` re-hashes indexed raw sources against `.jev-wiki/raw-index.json` and reports stale
+  `*.tmp-*` files left by interrupted atomic writes.
+
+### Changed
+
+- Ingest hashing and storage normalize `\r\n`/`\r` to `\n`, so Windows line endings no longer
+  break dedup or raw-index matching.
+- Ingest evidence now sends the excerpt around the claim's terms instead of the first 6 KB of the
+  source, improving groundedness for claims synthesized from headings and lists.
+- Raw sources are append-only: a same-day/same-title (or same-minute session) capture gets a
+  content-hash suffix instead of overwriting the earlier file, and session capture filenames
+  include seconds.
+- A `user`-kind evidence item that does not appear in a user turn is rendered to Jev as
+  `agent-stated (unverified)`, so the agent's own recommendation can no longer win the
+  `user_stated` trust tier (see `docs/wiki/wiki/architecture/gotcha-capture-proposals.md`).
+- Contradiction checks skip near-identical claim pairs (two revisions of one source) before
+  spending a Jev call.
+- `wiki_doctor` no longer fails the env-file check when the key file lives outside the repository.
+
+### Docs
+
+- `skills/llm-wiki/SKILL.md`: cross-wiki writes, `capture.route`, `out_of_scope`, the cost/compact
+  brief, and frontmatter re-serialization on write (`support: "0.90"` → `support: 0.90`;
+  re-read a page after any tool write before editing it).
+- `README.md`: write- and capture-side cross-wiki story; tool table refreshed.
+
 ## 0.7.1 — 2026-09-26
 
 ### Fixed

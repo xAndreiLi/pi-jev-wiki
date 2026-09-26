@@ -54,16 +54,16 @@ the agent decides and writes, with the final say, and code owns every threshold.
 | `wiki_toc` | the local wiki's contents (topic/tag/query filters), another registered wiki by name, or the cross-wiki catalog with index health (`scope: all`) |
 | `wiki_ask` | search pages and excerpts (auto / index / BM25 / vector / hybrid / qmd), with `scope: all` across registered wikis |
 | `wiki_index` | manage the semantic index: `status`, `model`, `discover`, `rebuild`, `add`/`remove`, `enable`/`disable` |
-| `wiki_ingest` | ingest a document: raw source → claims → Jev verdicts → placement brief |
+| `wiki_ingest` | ingest a document: raw source → claims → Jev verdicts → placement brief (cost preflight, `compact` brief) |
 | `wiki_insights` | capture agent insights, Jev-filtered and placed |
 | `wiki_finalize` | update TOC/log after writing pages, check links, record overrides, refresh the index |
 | `wiki_sync` | re-verify file-linked claims against commits since the last sync |
-| `wiki_review` | list or resolve review items (bulk resolve supported); critical items escalate to the user |
+| `wiki_review` | list (up to `limit` items) or resolve review items (bulk resolve; dispositions accept/reject/supersede/defer/out_of_scope); critical items escalate to the user |
 | `wiki_lint` | health checks: TOC, links, orphans, unbacked claims, contradictions, duplicates |
 | `wiki_remove` | delete obsolete pages and their TOC entries |
 | `wiki_structure` | deterministic module/dependency map and architecture coverage |
 | `wiki_triage` | explain rejected claims: scores, whether the problem is evidence or policy, and the fix |
-| `wiki_doctor` | config, key, lock, ledger, queue, git/sync, search health |
+| `wiki_doctor` | config, key, lock, ledger, queue, raw-source hashes, stale write temp files, git/sync, search health |
 | `wiki_setup` | inspect or configure the Jev API key (TypeSafe or OpenRouter) |
 | `wiki_status` | pages, raw sources, ledger, consultations, Jev usage |
 | `/wiki:ingest`, `/wiki:capture`, `/wiki:sync`, `/wiki:review`, `/wiki:lint`, `/wiki:status` | user-facing commands |
@@ -168,12 +168,23 @@ Optional overrides in `~/.pi/agent/jev-wiki.json` or project `.pi/jev-wiki.json`
     "vector": { "enabled": true, "model": "performance", "scan": { "wsl": true } },
     "jev": { "rerank": "auto", "sufficiency": true }
   },
-  "capture": { "cadence": "task" }
+  "capture": { "cadence": "task", "route": "subject" }
 }
 ```
 
+**Cross-wiki writes.** `wiki_ingest`, `wiki_insights`, `wiki_finalize`, `wiki_sync`, `wiki_review`,
+`wiki_remove`, and `wiki_lint` accept `wiki: "<registered name>"` and then operate on that wiki's
+pages, raw sources, TOC/log, ledger, and review queue — one wiki per call, with the session's wiki
+as the default. Relative page paths and ingest sources resolve against the target project (never
+the session workspace), and `wiki_sync wiki=<name>` diffs the target project's repository.
+
 The optional `globalWikiRoot` adds a read-only cross-project vault: `wiki_ask` also searches that
 wiki and tags its results `[global vault]`. It resolves against the pi agent dir when relative.
+
+Auto-capture decides where to file automatically. `capture.route` (default `subject`) routes the
+capture to the registered wiki that owns the files the session **edited**, when exactly one does;
+otherwise it stays on the session wiki and the brief carries a visible warning naming the wiki the
+evidence points at. `capture.route: "session"` restores working-directory routing.
 
 ## Keeping the wiki updated
 

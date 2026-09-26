@@ -539,7 +539,7 @@ This is the calibration and audit substrate: per-wiki precision of auto-accepts,
   "sync": { "onSessionStart": "check", "onCommit": false, "backstopLintDays": 14 },
   "thresholds": { "autoAccept": 0.8, "minSupport": 0.7, "minImportance": 1, "minNovelty": 0.6 },
   "weights": { "grounded": 0.45, "importance": 0.25, "nonDerivable": 0.2, "authority": 0.1 },
-  "capture": { "onCompact": false, "onSettle": false },
+  "capture": { "cadence": "manual", "onCompact": false, "route": "subject" },  // subject = file where the session edited; session = working directory
   "toc": { "maxTokens": 3000 },
   "gitCommit": false,
   "search": {                                   // auto | index | bm25 | vector | hybrid | qmd
