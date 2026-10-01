@@ -14,7 +14,7 @@ claims:
     evidence: [raw/sessions/2026-10-01-session-2026-10-01-032158.md, eval/run.mjs, eval/README.md]
     reviewed: 2026-10-01
     last_checked: 2026-10-01
-files: [eval/run.mjs, eval/lib.mjs, eval/candidates.mjs, eval/report.mjs]
+files: [eval/run.mjs, eval/lib.mjs, eval/candidates.mjs, eval/report.mjs, eval/grade-check.mjs, eval/selftest.mjs]
 ---
 
 # The A/B evaluation harness
@@ -109,9 +109,19 @@ the results. `eval/selftest.mjs` verifies all five in seconds with no model call
 ## What the pilot measures
 
 Not the effect — the **paired SD of the cost difference**, which decides how many tasks a real
-experiment needs. A pilot that shows no significant difference is still a success if it yields a
-usable paired SD, and the report prints the task counts implied for detecting 10/20/30/50% effects.
-Success rate is a guardrail: cheaper because it did less is not a win.
+experiment needs. The first rehearsal (`docs/studies/E1-pilot-2026-10-01.md`, three tasks) measured a
+paired SD of **0.24× the mean off-arm cost**, against a between-episode coefficient of variation near
+1.1 in the observational data: pairing by task is what makes the comparison affordable at all. On that
+figure a 20% effect needs about 12 task-instances, but the estimate rests on three pairs and is
+provisional — re-measure it before sizing R1.
+
+The same rehearsal showed the limit plainly: **every arm passed every task**, so the outcome guardrail
+carried no information and only cost was comparable. Tasks for a real run have to be ones the control arm
+sometimes fails.
+
+A pilot that shows no significant difference is still a success if it yields a usable paired SD, and the
+report prints the task counts implied for detecting 10/20/30/50% effects. Success rate is a guardrail:
+cheaper because it did less is not a win.
 
 ## Limits
 

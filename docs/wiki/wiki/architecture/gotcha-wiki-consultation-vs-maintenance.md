@@ -5,7 +5,7 @@ topic: architecture
 summary: "Counting every `wiki_*` call as consultation overstates use badly, because capture and upkeep dominate: splitting reads from writes dropped the measured rate from 93% to 30% on this repository, 87% to 60% on calisthenics, and 80% to 30% on discord-assistant."
 tags: [evaluation, measurement, consultation, maintenance, gotcha]
 updated: 2026-10-01
-sources: [raw/sessions/2026-10-01-session-2026-10-01-021352.md]
+sources: [raw/sessions/2026-10-01-session-2026-10-01-021352.md, raw/sessions/2026-10-01-session-2026-10-01-041934.md, docs/studies/E1-pilot-2026-10-01.md]
 claims:
   - id: c1
     text: "Counting any `wiki_*` call as wiki consultation overstates use badly, because capture and upkeep dominate: splitting read (`wiki_ask`, `wiki_toc`, `wiki_status`, `wiki_doctor`) from write (`wiki_review`, `wiki_ingest`, `wiki_finalize`, `wiki_sync`) dropped the measured consultation rate from 93% to 30% on this repository, 87% to 60% on calisthenics, and 80% to 30% on discord-assistant. Wiki maintenance is a real cost of the wiki and must not be read as evidence that the wiki answered anything."
@@ -44,5 +44,14 @@ the ledger next to cost per episode — not folded into a headline "the wiki is 
 Whether maintenance correlates with value is now an open question worth asking: a wiki that is never
 maintained is a wiki that is never read.
 
-**Evidence.** `docs/studies/R0-retrospective.md` §4.1 and §3; the tool histograms in its §9
-reproduction command; `packages/pi-wiki-eval` (`classify.ts`, `episodes.ts`).
+**Controlled evidence (2026-10-01).** The first A/B rehearsal — three tasks, three arms, nine runs in
+the discord-assistant repository — put numbers on this. Every wiki-arm run made **5–15 wiki calls and
+only 2–3 wiki reads**, and the wiki arm cost more than the control on two of the three tasks (+44%,
++62%, and 0%). The extra cost was upkeep: capture, review and finalize at settle, paid on every task
+whether or not the wiki was ever read. So the wiki's standing cost is a property of having it
+installed, not of using it, and an efficacy claim has to price it in. Full numbers:
+`docs/studies/E1-pilot-2026-10-01.md` §5.
+
+**Evidence.** `docs/studies/R0-retrospective.md` §4.1 and §3; `docs/studies/E1-pilot-2026-10-01.md` §3
+and §5; the tool histograms in its §9 reproduction command; `packages/pi-wiki-eval` (`classify.ts`,
+`episodes.ts`).

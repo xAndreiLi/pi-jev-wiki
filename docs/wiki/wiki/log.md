@@ -574,3 +574,15 @@
 ## [2026-10-01] finalize | Hardened the A/B harness for fairness: per-arm agent directories so the control differs only by the wiki (verified 10 shared tools + 15 wiki-only), a tool-loadout equality gate that refuses confounded runs, sparse-checkout for a clean control tree, dependency handling, grader restoration from the target commit, and a required pinned model; added eval/selftest.mjs (22 checks, no model calls) and the brief arm. Documented in the harness page and in the discord-assistant handoff (commit 0f05e6c).
 - Updated: architecture/eval-harness.md
 
+## [2026-10-01] capture | 2 insights (tool)
+- Raw: raw/sessions/2026-10-01-session-2026-10-01-041916.md
+- Filed 0 · reinforced 0 · review 0 · rejected 2
+
+## [2026-10-01] capture | 2 insights (tool)
+- Raw: raw/sessions/2026-10-01-session-2026-10-01-041934.md
+- Filed 0 · reinforced 1 · review 1 · rejected 0
+
+## [2026-10-01] finalize | E1 pilot rehearsal complete: study document docs/studies/E1-pilot-2026-10-01.md, the controlled evidence merged into the consultation-vs-maintenance page, and the measured paired SD added to the harness page as provisional.
+- Updated: architecture/gotcha-wiki-consultation-vs-maintenance.md
+- Updated: architecture/eval-harness.md
+
