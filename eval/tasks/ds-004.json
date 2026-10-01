@@ -1,0 +1,30 @@
+{
+	"id": "ds-004",
+	"repo": "C:/Coding/discord-assistant",
+	"base": "5297de569fc670f105dbe294ddcff2aa13f1f140",
+	"target": null,
+	"prompt": "The panel owns the capture session today: its own process spawns the Python agent, so nothing else in the system knows when a session is running, and a second start has nothing to stop it. Move the session lifecycle into the bot core. Add src/bot/capture-session.ts exporting a CaptureSession class with start(), stop() and status(): it spawns the agent process, reports { state, pid, startedAt } where state is one of idle, starting, running or stopping, refuses a second start while it is running and does not spawn twice, returns to idle when the child exits, and treats stop as idempotent. The process factory must be injectable as a spawnProcess option ({ command, args, cwd, spawnProcess }) so the session can be exercised without launching Python or touching an audio device.",
+	"testCommand": "npx vitest run tests/ds-004-capture-session.test.ts",
+	"graderFiles": [
+		{
+			"from": "C:/Coding/pi-jev-wiki/eval/graders/ds-004-capture-session.test.ts",
+			"to": "tests/ds-004-capture-session.test.ts"
+		}
+	],
+	"qualityCommands": {
+		"typecheck": "npm run typecheck"
+	},
+	"wikiRoot": "docs/wiki",
+	"timeoutMinutes": 10,
+	"linkDirs": [
+		"node_modules",
+		"web/node_modules",
+		".venv"
+	],
+	"notes": [
+		"Forward task: no target commit; the grader encodes the stated contract.",
+		"Hard because it is a state machine across a child process: double-start, missed exit and non-idempotent stop are the failures the tests look for.",
+		"Graded: the session state machine with an injected process factory. Not graded: the panel proxy and the wiring into the bot server, reviewed by hand.",
+		"Base must fail: the module does not exist. The wiki describes the capture strategy and the segment lifecycle, so a wiki-armed run has somewhere to look."
+	]
+}

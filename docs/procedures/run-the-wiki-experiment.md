@@ -149,5 +149,6 @@ wiki, sends nothing anywhere, makes no model calls, and never writes to the proj
 `npx pi-wiki-eval --project .` (or the `/wiki-eval` command) and gets a markdown report for themselves;
 whether any of it reaches anyone else is their decision, made per report.
 
-Distribution is still an open decision — see `docs/plans/EFFICACY.md`. Until the package is published,
-the options are a local path install, a git install, or an `npm pack` tarball sent directly.
+Distribution is **closed for now** (Andrei, 2026-10-01): this stays internal until the pipeline itself is
+trusted. The package therefore has no publishing story yet — a local path install, a git install or an
+`npm pack` tarball handed over directly are the only options, and none of them require a registry.

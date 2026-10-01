@@ -1,0 +1,30 @@
+{
+	"id": "ds-005",
+	"repo": "C:/Coding/discord-assistant",
+	"base": "5297de569fc670f105dbe294ddcff2aa13f1f140",
+	"target": null,
+	"prompt": "The configuration loader validates each value on its own, so a configuration can be full of valid values and still be wrong. Add the cross-field rules to loadConfig in src/config/index.ts: spoken prompts in wake mode (VOICE_PROMPT_MODE=wake) require a non-empty VOICE_WAKE_WORD; and ASR_ENGINE=whisper-cpp requires ASR_MODEL to name an existing file, while faster-whisper keeps taking a model name so the same value must not be rejected for that engine. Report every problem together in one ConfigError that names the variable at fault rather than throwing on the first, and keep the existing behaviour for an environment that is valid.",
+	"testCommand": "npx vitest run tests/ds-005-config-consistency.test.ts",
+	"graderFiles": [
+		{
+			"from": "C:/Coding/pi-jev-wiki/eval/graders/ds-005-config-consistency.test.ts",
+			"to": "tests/ds-005-config-consistency.test.ts"
+		}
+	],
+	"qualityCommands": {
+		"typecheck": "npm run typecheck"
+	},
+	"wikiRoot": "docs/wiki",
+	"timeoutMinutes": 10,
+	"linkDirs": [
+		"node_modules",
+		"web/node_modules",
+		".venv"
+	],
+	"notes": [
+		"Forward task: no target commit; the grader encodes the stated contract, and the baseline environment is the repository own .env.example.",
+		"Hard because per-field validation looks complete while cross-field consistency is missing, and because collecting every problem is easy to get half-right.",
+		"Graded: loadConfig against the example environment plus mocked violations. Not graded: how the failure is presented to a user.",
+		"Base must fail on the two new rules; the grader also asserts the example environment still loads, so a run cannot pass by rejecting everything."
+	]
+}
