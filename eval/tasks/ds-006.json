@@ -1,0 +1,30 @@
+{
+	"id": "ds-006",
+	"repo": "C:/Coding/discord-assistant",
+	"base": "ae2f59bc3a332a80a147907a2758fd30926eb8b5",
+	"target": null,
+	"prompt": "Raw audio accumulates: every session leaves WAVs beside its transcript, and nothing ever removes them, so the disk grows with every conversation. Add src/bot/retention.ts exporting pruneRawAudio({ sessionsRoot, retentionDays, now? }) which removes audio older than the window and reports { deleted, kept, skipped }. Audio means files ending .wav, .flac, .ogg, .mp3 or .m4a, in session directories anywhere below the root; transcripts and other artefacts (.md, .jsonl, .json, .txt) are never deleted no matter how old, audio inside the window is kept, a window of zero or less deletes nothing, a missing root is not an error, running it twice deletes what the first run deleted and nothing more, and it must never reach outside the given root.",
+	"testCommand": "npx vitest run tests/ds-006-retention.test.ts",
+	"graderFiles": [
+		{
+			"from": "C:/Coding/pi-jev-wiki/eval/graders/ds-006-retention.test.ts",
+			"to": "tests/ds-006-retention.test.ts"
+		}
+	],
+	"qualityCommands": {
+		"typecheck": "npm run typecheck"
+	},
+	"wikiRoot": "docs/wiki",
+	"timeoutMinutes": 10,
+	"linkDirs": [
+		"node_modules",
+		"web/node_modules",
+		".venv"
+	],
+	"notes": [
+		"Forward task: no target commit; the grader encodes the stated contract.",
+		"Hard because it deletes: the rails (only audio, only outside the window, never transcripts, no-op on a nonsense window, idempotent) are what is graded, and a careless implementation fails them while looking correct.",
+		"Graded: the pruning rules with an explicit now and a synthetic tree. Not graded: who calls it, and the scheduling.",
+		"Base must fail: the module does not exist."
+	]
+}

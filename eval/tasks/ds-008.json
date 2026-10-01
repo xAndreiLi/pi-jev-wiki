@@ -1,0 +1,30 @@
+{
+	"id": "ds-008",
+	"repo": "C:/Coding/discord-assistant",
+	"base": "ae2f59bc3a332a80a147907a2758fd30926eb8b5",
+	"target": null,
+	"prompt": "Secrets reach the logs today: an error message that quotes a request, a detail object carrying the config it was built from, a URL with a key in the query. Add src/bot/redact.ts exporting redactSecrets(text) for a single string and redactValue(value) applying the same rules through nested objects and arrays. It must remove Discord-shaped bot tokens (three long dot-separated segments), replace the token in Authorization: Bearer <token> while keeping the scheme, blank the values of env-style DISCORD_TOKEN=, JEV_TOKEN=, TYPESAFE_API_KEY= and OPENROUTER_API_KEY= assignments, and blank the values of api_key, apikey, key, token and access_token query parameters. Ordinary prose must be untouched — including sentences that merely contain the word token or key — and redacting already-redacted text must change nothing.",
+	"testCommand": "npx vitest run tests/ds-008-redaction.test.ts",
+	"graderFiles": [
+		{
+			"from": "C:/Coding/pi-jev-wiki/eval/graders/ds-008-redaction.test.ts",
+			"to": "tests/ds-008-redaction.test.ts"
+		}
+	],
+	"qualityCommands": {
+		"typecheck": "npm run typecheck"
+	},
+	"wikiRoot": "docs/wiki",
+	"timeoutMinutes": 10,
+	"linkDirs": [
+		"node_modules",
+		"web/node_modules",
+		".venv"
+	],
+	"notes": [
+		"Forward task: no target commit; the grader encodes the stated contract.",
+		"Hard because precision matters in both directions: missing a category fails, and an over-eager pattern that mangles ordinary prose also fails.",
+		"Graded: the function behaviour, including idempotency and pass-through of non-strings. Not graded: where it is called from.",
+		"Base must fail: no redaction module exists anywhere in this repository."
+	]
+}

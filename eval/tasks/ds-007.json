@@ -1,0 +1,30 @@
+{
+	"id": "ds-007",
+	"repo": "C:/Coding/discord-assistant",
+	"base": "ae2f59bc3a332a80a147907a2758fd30926eb8b5",
+	"target": null,
+	"prompt": "The audit log writes whatever detail an entry carries, so a token that passes through a prompt, a URL or a config object lands in the file in plain text, and a single day file can grow without bound. Harden AuditLog in src/bot/audit.ts: stamp every record with a schema version v: 1 beside ts; make sure secrets never reach the file, whatever shape they arrive in — Discord-shaped tokens, Authorization: Bearer values, and env-style DISCORD_TOKEN=, JEV_TOKEN=, TYPESAFE_API_KEY=, OPENROUTER_API_KEY= assignments or api_key/token query parameters appearing anywhere inside the entry, including nested objects and arrays; rotate the day file to <name>.1 once it passes a maxBytes option (with a sensible default) so no file grows without bound; keep the daily file name and keep appending non-fatal, as it is today.",
+	"testCommand": "npx vitest run tests/ds-007-audit.test.ts",
+	"graderFiles": [
+		{
+			"from": "C:/Coding/pi-jev-wiki/eval/graders/ds-007-audit.test.ts",
+			"to": "tests/ds-007-audit.test.ts"
+		}
+	],
+	"qualityCommands": {
+		"typecheck": "npm run typecheck"
+	},
+	"wikiRoot": "docs/wiki",
+	"timeoutMinutes": 10,
+	"linkDirs": [
+		"node_modules",
+		"web/node_modules",
+		".venv"
+	],
+	"notes": [
+		"Forward task: no target commit; the grader encodes the stated contract.",
+		"Hard because it is a safety invariant on an existing module: the file must stay valid JSONL, ordinary details must survive untouched, and rotation must actually happen at the configured size.",
+		"Graded: on-disk contents in a temp directory. Not graded: the redaction patterns beyond the categories named in the prompt.",
+		"Base must fail on the version stamp, the redaction and the rotation."
+	]
+}
