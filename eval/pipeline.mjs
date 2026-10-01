@@ -47,8 +47,8 @@ async function main() {
 	if (taskList.length === 0 || args.help) {
 		console.log("Usage: node eval/pipeline.mjs --tasks <card.json[,...]> --model <id>");
 		console.log("       [--arms off,brief,wiki,wiki-nocapture] [--repeats 1] [--runs-dir eval/runs]");
-		console.log("       [--label <name>] [--skip-checks]");
-		console.log("\nRuns self-test → grader discrimination → pilot → report, in the foreground.");
+		console.log("       [--label <name>] [--skip-checks] [--judge]");
+		console.log("\nRuns self-test → grader discrimination → pilot → report → optional quality review, in the foreground.");
 		return;
 	}
 	if (!args.model) throw new Error("--model is required: both arms must run the same model");
@@ -98,9 +98,16 @@ async function main() {
 	});
 	await writeFile(join(runsDir, id, "report.md"), report.stdout, "utf8");
 
+	if (args.judge === true) {
+		await stage(6, "blinded quality review (costs money)", node, [join(here, "judge.mjs"), "--run", id, "--runs-dir", runsDir, "--model", args.model], {
+			logPath: join(runsDir, id, "judge.log"),
+			cwd: repoRoot,
+		});
+	}
+
 	console.log(`\nDone. Everything from this run is in ${join(runsDir, id)}:`);
-	console.log("  report.md · results.jsonl · logs/ · sessions/ · pipeline.log");
-	console.log("Next: read report.md, then write the numbers up in docs/studies/.");
+	console.log("  report.md · results.jsonl · judgements.jsonl (if judged) · diffs/ · logs/ · sessions/ · pipeline.log");
+	console.log(`Quality review: node eval/judge.mjs --run ${id} --model ${args.model}   (add --judge to run it as part of the pipeline)`);
 }
 
 main().catch((error) => {

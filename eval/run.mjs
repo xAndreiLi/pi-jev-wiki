@@ -24,7 +24,7 @@ import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { analyzeProject } from "../packages/pi-wiki-eval/dist/core/analyze.js";
-import { buildBrief, compareToolsets, configureCapture, defaultAgentDir, installGraders, keepsWiki, prepareAgentDir, prepareTaskCopy, protectGrader, shellCommand, sparseExclude, TEST_PATTERN } from "./arms.mjs";
+import { buildBrief, compareToolsets, configureCapture, defaultAgentDir, installGraders, keepsWiki, prepareAgentDir, prepareTaskCopy, protectGrader, qualitySignals, savePatch, shellCommand, sparseExclude, TEST_PATTERN } from "./arms.mjs";
 import { appendJsonl, git, nowIso, parseArgs, readJson, runId, spawnCapture } from "./lib.mjs";
 
 const ARMS = ["off", "brief", "wiki", "wiki-nocapture"];
@@ -378,6 +378,10 @@ async function main() {
 				}
 				const metrics = await measure({ copy, sessionDir });
 				const diff = await diffStats(copy);
+				// Collect everything that needs the copy before it is deleted: the diff itself, and the
+				// project's own type-checker and linter over what this arm wrote.
+				const patch = await savePatch({ copy, dir: join(runsDir, id), slug });
+				const quality = await qualitySignals({ task, copy, dir: join(runsDir, id), slug, spawn: spawnCapture });
 				const row = {
 					runId: id,
 					task: task.id,
@@ -387,6 +391,7 @@ async function main() {
 					repo: task.repo,
 					base: task.base,
 					target: task.target ?? null,
+					prompt: task.prompt ?? null,
 					startedAt,
 					endedAt: nowIso(),
 					wallMs: result.wallMs,
@@ -398,6 +403,8 @@ async function main() {
 					environment: { ...environment, capture, graderRestored: grader.restored, gradersInstalled: graders, sharedDepsChanged, agentPackagesRemoved: keepsWiki(arm) ? [] : [WIKI_PACKAGE] },
 					grading,
 					diff,
+					patch,
+					quality,
 					metrics,
 					stdoutTail: result.stdout.slice(-500),
 					stderrTail: result.stderr.slice(-500),
@@ -405,7 +412,7 @@ async function main() {
 				await appendJsonl(join(runsDir, id, "results.jsonl"), row);
 				const elapsed = Math.round((Date.now() - runStart) / 1000);
 				console.log(
-					`  ${label}: done in ${elapsed}s — exit ${result.exitCode}${result.timedOut ? " (TIMEOUT)" : ""} · graded ${grading.passed === null ? "n/a" : grading.passed ? "pass" : "fail"} · $${(metrics.cost ?? 0).toFixed(4)} · wikiTools=${loadout.hasWikiTools}`,
+					`  ${label}: done in ${elapsed}s — exit ${result.exitCode}${result.timedOut ? " (TIMEOUT)" : ""} · graded ${grading.passed === null ? "n/a" : grading.passed ? "pass" : "fail"} · $${(metrics.cost ?? 0).toFixed(4)} · wikiTools=${loadout.hasWikiTools} · patch ${patch.bytes}B${Object.keys(quality).length > 0 ? ` · quality ${Object.entries(quality).map(([name, value]) => `${name}:${value.passed ? "ok" : "FAIL"}`).join(" ")}` : ""}`,
 				);
 				if (loadout.hasWikiTools !== keepsWiki(arm) && !args["allow-unverified-arm"]) {
 					throw new Error(`${label}: the ${arm} arm loaded the wrong tool set (wiki tools ${loadout.hasWikiTools ? "present" : "absent"}) — stopping so an invalid comparison is not measured`);

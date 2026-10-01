@@ -12,7 +12,7 @@ import { mkdir, mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises"
 import { existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { buildBrief, compareToolsets, configureCapture, keepsWiki, linkDependencies, prepareAgentDir, sparseExclude } from "./arms.mjs";
+import { blindOrder, buildBrief, compareToolsets, configureCapture, keepsWiki, linkDependencies, prepareAgentDir, savePatch, sparseExclude } from "./arms.mjs";
 import { git, spawnCapture } from "./lib.mjs";
 
 let passed = 0;
@@ -144,6 +144,19 @@ try {
 	const projectConfig = JSON.parse(await readFile(join(root, "copy", ".pi", "jev-wiki.json"), "utf8"));
 	check("the no-capture arm sets a manual cadence", projectConfig.capture.cadence === "manual");
 	check("the capture setting is reported back", capture.cadence === "manual");
+
+	// --- blinding and preserved diffs ----------------------------------------------------------
+	const blindA = blindOrder(["off", "brief", "wiki"], "run:task");
+	const blindB = blindOrder(["off", "brief", "wiki"], "run:task");
+	check("blinding is deterministic for the same run and task", blindA.join(",") === blindB.join(","));
+	check("blinding labels every arm exactly once", [...blindA].sort().join(",") === "brief,off,wiki");
+	const orders = new Set(["t1", "t2", "t3", "t4", "t5", "t6"].map((task) => blindOrder(["off", "brief", "wiki"], `run:${task}`).join(",")));
+	check("blinding varies across tasks", orders.size > 1, `every task produced the same order: ${[...orders][0]}`);
+
+	await writeFile(join(copy, "src", "written-by-an-arm.js"), "export const touched = true;\n", "utf8");
+	const patch = await savePatch({ copy, dir: join(root, "patch-out"), slug: "t-1" });
+	check("the arm's diff is preserved next to the results", existsSync(join(root, "patch-out", patch.path)));
+	check("the patch contains what the arm wrote", (await readFile(join(root, "patch-out", patch.path), "utf8")).includes("written-by-an-arm"));
 
 	// --- spawning ----------------------------------------------------------------------------
 	// A missing log directory used to abort the whole run with an unhandled stream error.

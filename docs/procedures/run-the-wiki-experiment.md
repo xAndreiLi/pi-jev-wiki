@@ -39,8 +39,10 @@ Runs in the **foreground**, streaming every stage to the terminal and to
 | 3. `grade-check.mjs` | free, ~1 min | every grader **fails on the untouched base** — otherwise it measures nothing |
 | 4. `run.mjs` | **money** | the pilot: N tasks × arms × repeats |
 | 5. `report.mjs` | free | paired table, Wilcoxon p, and the paired SD that sizes the next run |
+| 6. `judge.mjs` (`--judge`) | money | a blinded subagent scores each arm's diff against a rubric — the quality the grader cannot see |
 
-Skip stages 2–3 with `--skip-checks` only when you have just run them.
+Skip stages 2–3 with `--skip-checks` only when you have just run them. Stage 6 is off unless you pass
+`--judge`, because it spends money and is a review rather than a measurement.
 
 ## 3. The arms
 
@@ -82,6 +84,19 @@ capture, review, finalize at settle — rather than reading. It separates "upkee
 
 ## 5. Reading the report
 
+- **The preserved diffs are the raw material for quality review.** Every run writes
+  `diffs/<task>-<arm>-rep<n>.patch`, because the interesting artefact otherwise disappears with the copy —
+  which is exactly what happened to the first pilot, and why quality judgements can only start from the
+  next run.
+- **Objective quality signals are collected while the copy exists**: the project's own type-checker and
+  linter over what the arm wrote, declared per card as
+  `"qualityCommands": { "typecheck": "npm run typecheck", "lint": "npx biome check ." }`. A test can pass
+  while leaving the code untypeable.
+- **The blinded judge** (`node eval/judge.mjs --run <id> --model <id>`, or `--judge` on the pipeline) sends
+  each task's diffs to a subagent as labels A/B/C with the arm identity hidden, scores six dimensions
+  (correctness, conventions, scope, edge cases, clarity, restraint) on a 0–3 scale, and gives a
+  merge / merge-with-nits / rework verdict. It also flags the case that matters most: a diff that
+  **weakened the tests** it was graded by. Results go to `judgements.jsonl` next to the run.
 - **Paired Δcost per task** is the headline. The median and its bootstrap CI matter more than the mean.
 - **The paired SD** is the real deliverable of a pilot: it sets how many task-instances the next run
   needs. The report prints that table (10/20/30/50%). Re-measure it rather than reusing an old figure.

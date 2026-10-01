@@ -586,3 +586,9 @@
 - Updated: architecture/gotcha-wiki-consultation-vs-maintenance.md
 - Updated: architecture/eval-harness.md
 
+## [2026-10-01] capture | 1 insights (tool)
+- Raw: raw/sessions/2026-10-01-session-2026-10-01-042945.md
+- Filed 0 · reinforced 0 · review 0 · rejected 1
+
+## [2026-10-01] finalize | Recorded Andrei's hypothesis that the wiki pays for itself on harder tasks and the resulting direction to cut maintenance cost, from the first pilot's brief-arm numbers.
+

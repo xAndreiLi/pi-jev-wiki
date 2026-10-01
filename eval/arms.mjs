@@ -229,6 +229,54 @@ export async function buildBrief({ repo, base, wikiRoot = "docs/wiki", maxChars 
 	return { text, pages, fromCommit: base };
 }
 
+/**
+ * Order arms under blind labels, deterministically from the run and task ids. Deterministic matters: a
+ * judgement has to be reproducible, and a reviewer has to be able to un-blind it afterwards.
+ */
+export function blindOrder(arms, seedText) {
+	let seed = 2166136261;
+	for (const character of String(seedText)) seed = ((seed ^ character.charCodeAt(0)) * 16777619) >>> 0;
+	const shuffled = [...arms];
+	for (let index = shuffled.length - 1; index > 0; index -= 1) {
+		seed = (seed * 1103515245 + 12345) >>> 0;
+		const swap = seed % (index + 1);
+		[shuffled[index], shuffled[swap]] = [shuffled[swap], shuffled[index]];
+	}
+	return shuffled;
+}
+
+/**
+ * Keep the diff each arm produced. Without this the interesting artefact is deleted with the copy, and a
+ * quality review afterwards has nothing to read — which is exactly what happened to the first pilot.
+ */
+export async function savePatch({ copy, dir, slug }) {
+	await git(copy, ["add", "-A"], { allowFailure: true });
+	const patch = await git(copy, ["diff", "--cached", "--binary", "HEAD"], { allowFailure: true, trim: false });
+	const path = join(dir, "diffs", `${slug}.patch`);
+	await mkdir(dirname(path), { recursive: true });
+	await writeFile(path, patch, "utf8");
+	return { path: `diffs/${slug}.patch`, bytes: patch.length };
+}
+
+/**
+ * Objective quality signals, collected while the copy still exists: does the project's own type-checker
+ * and linter still pass on what the arm wrote? A test can pass while leaving the code untypeable.
+ */
+export async function qualitySignals({ task, copy, dir, slug, spawn }) {
+	const commands = task.qualityCommands ?? {};
+	const results = {};
+	for (const [name, command] of Object.entries(commands)) {
+		const [executable, args] = shellCommand(String(command));
+		const run = await spawn(executable, args, {
+			cwd: copy,
+			timeoutMs: (task.testTimeoutMinutes ?? 3) * 60 * 1000,
+			logPath: join(dir, "logs", `${slug}-${name}.log`),
+		});
+		results[name.replace(/[^a-z0-9_-]/gi, "")] = { command: String(command), exitCode: run.exitCode, passed: run.exitCode === 0, tail: run.stdout.slice(-400) };
+	}
+	return results;
+}
+
 /** Test-file patterns, shared by grader protection and by the diff report. */
 export const TEST_PATTERN = /(^|\/)(test|tests|spec|specs|__tests__|e2e)(\/|$)|[.\-_](test|spec)\.[cm]?[jt]sx?$|(^|\/)test_[^/]+\.py$/i;
 
