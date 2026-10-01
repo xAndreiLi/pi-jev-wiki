@@ -6,6 +6,7 @@ import { execFile, spawn } from "node:child_process";
 import { createWriteStream, mkdirSync } from "node:fs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
+import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 
 /** `--flag value`, `--bool`, `-p value`, with commas split into arrays for --roots/--tasks. */
@@ -70,6 +71,50 @@ export async function readJsonl(path) {
 export async function appendJsonl(path, row) {
 	await mkdir(join(path, ".."), { recursive: true });
 	await writeFile(path, `${JSON.stringify(row)}\n`, { encoding: "utf8", flag: "a" });
+}
+
+/**
+ * Which pi to drive: the installed one, which is the environment the experiment is about. An explicit
+ * path may be pi's package.json or a script (the self-test drives a stub this way).
+ */
+export async function resolvePiCommand(explicit) {
+	if (explicit) return await describePi(explicit);
+	if (process.env.PI_PI_BIN) return await describePi(process.env.PI_PI_BIN);
+	const roots = [
+		process.env.APPDATA ? join(process.env.APPDATA, "npm", "node_modules") : undefined,
+		process.env.npm_config_prefix ? join(process.env.npm_config_prefix, "lib", "node_modules") : undefined,
+		"/usr/local/lib/node_modules",
+		"/usr/lib/node_modules",
+		join(homedir(), ".npm-global", "lib", "node_modules"),
+	].filter(Boolean);
+	for (const root of roots) {
+		const candidate = join(root, "@earendil-works", "pi-coding-agent", "package.json");
+		if (!existsSync(candidate)) continue;
+		const described = await describePi(candidate, "global");
+		if (described.prefix.length > 0) return described;
+	}
+	console.warn("warning: no pi install found; falling back to `pi` on PATH. Shell quoting may mangle prompts — pass --pi-bin to be exact.");
+	return { command: "pi", prefix: [], shell: true, source: "path" };
+}
+
+async function describePi(pathOrCommand, source = "explicit") {
+	if (/\.[cm]?js$/i.test(pathOrCommand) && existsSync(pathOrCommand)) return { command: process.execPath, prefix: [pathOrCommand], source };
+	if (existsSync(pathOrCommand)) {
+		const packageJson = await readJson(pathOrCommand);
+		const bin = typeof packageJson.bin === "string" ? packageJson.bin : Object.values(packageJson.bin ?? {})[0];
+		if (bin) return { command: process.execPath, prefix: [join(dirname(pathOrCommand), bin)], version: packageJson.version, source };
+	}
+	return { command: pathOrCommand, prefix: [], source };
+}
+
+/**
+ * A row measures something only if its environment was what the arm claims. Rows written before the
+ * `valid` field existed are judged by their recorded tool loadout, which is how the ds-001
+ * wiki-nocapture row of r1 (no wiki tools) is still recognised as invalid.
+ */
+export function isValidRow(row) {
+	if (typeof row?.valid === "boolean") return row.valid;
+	return row?.armVerified?.expectedWikiTools === row?.armVerified?.observedWikiTools;
 }
 
 export function runId(prefix = "run") {
