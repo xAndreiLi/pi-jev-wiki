@@ -53,7 +53,9 @@ async function main() {
 	}
 	if (!args.model) throw new Error("--model is required: both arms must run the same model");
 
-	const arms = typeof args.arms === "string" ? args.arms : "off,brief,wiki";
+	// parseArgs turns --arms into an array (it is declared as a list), so accept both shapes. Getting this
+	// wrong silently dropped an arm from a run.
+	const arms = Array.isArray(args.arms) ? args.arms.join(",") : typeof args.arms === "string" ? args.arms : "off,brief,wiki";
 	const repeats = String(args.repeats ?? 1);
 	const runsDir = resolve(args["runs-dir"] ?? join(repoRoot, "eval", "runs"));
 	const id = `${typeof args.label === "string" ? args.label : "e1"}-${runId()}`;
