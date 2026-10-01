@@ -592,3 +592,21 @@
 
 ## [2026-10-01] finalize | Recorded Andrei's hypothesis that the wiki pays for itself on harder tasks and the resulting direction to cut maintenance cost, from the first pilot's brief-arm numbers.
 
+## [2026-10-01] capture | 10 insights (tool)
+- Raw: raw/sessions/2026-10-01-session-2026-10-01-060004.md
+- Filed 1 · reinforced 0 · review 2 · rejected 7
+
+## [2026-10-01] finalize | Validity audit of the A/B harness, from r1-run-2026-10-01T08-44-45 (in flight, 17/32) and the E1 pilot. Ten leak and measurement defects went into one gotcha page; eval-harness and consultation-vs-maintenance now carry caveats that E1/R1 numbers are not evidence about the wiki.
+- Updated: architecture/gotcha-eval-harness-leaks.md
+- Updated: architecture/eval-harness.md
+- Updated: architecture/gotcha-wiki-consultation-vs-maintenance.md
+
+## [2026-10-01] capture | 7 insights (tool)
+- Raw: raw/sessions/2026-10-01-session-2026-10-01-070617.md
+- Filed 2 · reinforced 2 · review 2 · rejected 1
+
+## [2026-10-01] finalize | Eval harness hardened (uncommitted, after 77b33da). Neutral temp copies and agent dirs with no registry or user context; graders installed after the agent; canaries plus a session contamination scan; read-only wiki-nocapture; blind code-only judge with samples; four-contrast log-ratio report. The self-test drives the real runner and judge with a stub pi (111 checks; three R1 defects reintroduced are each caught). New gotcha page: sparse checkout clears skip-worktree.
+- Updated: architecture/eval-harness.md
+- Updated: architecture/gotcha-eval-harness-leaks.md
+- Updated: architecture/gotcha-sparse-checkout-skip-worktree.md
+

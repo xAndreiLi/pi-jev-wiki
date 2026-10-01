@@ -52,6 +52,11 @@ whether or not the wiki was ever read. So the wiki's standing cost is a property
 installed, not of using it, and an efficacy claim has to price it in. Full numbers:
 `docs/studies/E1-pilot-2026-10-01.md` §5.
 
+**Caveat (audit 2026-10-01).** E1 later turned out to expose each task's hidden grader to every arm
+([the harness leaks](gotcha-eval-harness-leaks.md)). The upkeep *behaviour* stands, because the
+leak does not create write calls. The cost deltas above need re-measuring on a fixed harness, and
+they also leave out the wiki's own Jev spend.
+
 **Evidence.** `docs/studies/R0-retrospective.md` §4.1 and §3; `docs/studies/E1-pilot-2026-10-01.md` §3
 and §5; the tool histograms in its §9 reproduction command; `packages/pi-wiki-eval` (`classify.ts`,
 `episodes.ts`).
