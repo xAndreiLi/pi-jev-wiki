@@ -8,3 +8,6 @@ dist/
 **/.jev-wiki/*
 !**/.jev-wiki/decisions.jsonl
 *.log
+
+# evaluation harness run artefacts
+/eval/runs/
