@@ -8,6 +8,7 @@ Plans and evolving design documents for jev-wiki.
 | [../HARDENING.md](../HARDENING.md) | Hardening roadmap: security, reliability, scale, testing, operability, with statuses |
 | [../DESIGN.md](../DESIGN.md) | Detailed technical design (appendix to the plan) |
 | [../CRITIQUE.md](../CRITIQUE.md) | Pre-implementation critique, efficiency evaluation, and resolution log |
+| [EFFICACY.md](EFFICACY.md) | Measuring whether the wiki makes agents better: instruments, task design, experiments, statistics |
 
 Historical sources gathered during design live in [`../../research/`](../../research/README.md); the
 project's own knowledge wiki lives in [`../wiki/`](../wiki/index.md).
