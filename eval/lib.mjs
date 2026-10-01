@@ -3,10 +3,10 @@
  * and the pairing statistics the report needs. No dependencies, Node 22+.
  */
 import { execFile, spawn } from "node:child_process";
-import { createWriteStream } from "node:fs";
+import { createWriteStream, mkdirSync } from "node:fs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
-import { join, resolve } from "node:path";
+import { dirname, join, resolve } from "node:path";
 
 /** `--flag value`, `--bool`, `-p value`, with commas split into arrays for --roots/--tasks. */
 export function parseArgs(argv, { lists = ["tasks"] } = {}) {
@@ -91,6 +91,9 @@ export function spawnCapture(command, args, options = {}) {
 	const { cwd, timeoutMs = 60_000, env = {}, shell = false, logPath, onLine, onTick, tickMs = 15_000 } = options;
 	return new Promise((resolve) => {
 		const started = Date.now();
+		// Callers should not have to remember to create the log directory: a missing one used to kill the
+		// whole run with an unhandled stream error.
+		if (logPath) mkdirSync(dirname(logPath), { recursive: true });
 		const log = logPath ? createWriteStream(logPath, { flags: "a" }) : undefined;
 		// stdin must not be an open pipe: a CLI that reads stdin when it is not a TTY would wait forever
 		// for an EOF that never comes, and the run would look identical to a slow model.

@@ -17,10 +17,11 @@
  *
  * `assertComparableExpectations` then proves the arms match: the same tools, minus the wiki.
  */
-import { cp, mkdir, readFile, readdir, rm, symlink, writeFile } from "node:fs/promises";
+import { cp, mkdir, readdir, readFile, rm, symlink, writeFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { homedir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
+import { git, gitOk } from "./lib.mjs";
 
 /** Directories in an agent dir that are large enough to link rather than copy. */
 const LINKED_DIRS = ["npm", "jev-wiki"];
@@ -171,4 +172,78 @@ export async function buildBrief({ wikiDir, maxChars = 2000, listMarkdown }) {
 	const body = lines.join("\n");
 	const text = body.length > maxChars ? `${header}\n${body.slice(0, maxChars)}\n[... truncated ...]` : `${header}\n${body}`;
 	return { text, pages };
+}
+
+/** Test-file patterns, shared by grader protection and by the diff report. */
+export const TEST_PATTERN = /(^|\/)(test|tests|spec|specs|__tests__|e2e)(\/|$)|[.\-_](test|spec)\.[cm]?[jt]sx?$|(^|\/)test_[^/]+\.py$/i;
+
+export function shellCommand(command) {
+	return process.platform === "win32" ? ["cmd.exe", ["/d", "/s", "/c", command]] : ["/bin/sh", ["-c", command]];
+}
+
+/**
+ * Clone at base, optionally without the wiki, with the target commit pruned and dependencies present.
+ * The control arms must not contain the artifact, and must not show it as deleted either.
+ */
+export async function prepareTaskCopy({ task, dir, arm, linkDirs = [], link = true }) {
+	const wikiRoot = (task.wikiRoot ?? "docs/wiki").replace(/\\/g, "/");
+	await rm(dir, { recursive: true, force: true });
+	await mkdir(dirname(dir), { recursive: true });
+	await git(dirname(dir), ["clone", "--no-hardlinks", "--no-checkout", "--quiet", task.repo, dir]);
+	await git(dir, ["checkout", "--detach", "--quiet", task.base]);
+
+	// The control arms must not contain the artifact, and must not look like something was removed.
+	let sparse;
+	if (arm !== "wiki") sparse = await sparseExclude({ dir, git, wikiRoot });
+
+	const refs = (await git(dir, ["for-each-ref", "--format=%(refname)", "refs/heads", "refs/remotes", "refs/tags"])).split(/\r?\n/).filter(Boolean);
+	for (const ref of refs) await git(dir, ["update-ref", "-d", ref]);
+	await git(dir, ["reflog", "expire", "--expire=now", "--all"]);
+	await git(dir, ["gc", "--prune=now", "--quiet"], { allowFailure: true });
+
+	const targetReachable = task.target ? await gitOk(dir, ["cat-file", "-e", `${task.target}^{commit}`]) : false;
+	const deps = await linkDependencies({ sourceRepo: task.repo, dir, names: linkDirs, link });
+	return { targetReachable, wikiPresent: existsSync(join(dir, wikiRoot)), refsDeleted: refs.length, sparse, deps };
+}
+
+/**
+ * Restore the test files the target commit touched, straight from the source repository. Without
+ * this an arm can pass its own grader by editing the tests, and the two arms would then be graded by
+ * different graders.
+ */
+export async function protectGrader({ task, copy }) {
+	if (!task.target || task.restoreGrader === false) return { restored: [], skipped: true };
+	const changed = (await git(task.repo, ["show", "--name-only", "--format=", task.target], { allowFailure: true })).split(/\r?\n/).filter(Boolean);
+	const testFiles = changed.filter((file) => TEST_PATTERN.test(file));
+	const restored = [];
+	for (const file of testFiles) {
+		const content = await git(task.repo, ["show", `${task.target}:${file}`], { allowFailure: true, trim: false });
+		if (!content) continue;
+		await mkdir(dirname(join(copy, file)), { recursive: true });
+		await writeFile(join(copy, file), content, "utf8");
+		restored.push(file);
+	}
+	return { restored, skipped: false };
+}
+
+/**
+ * Copy hidden graders into the copy *after* the agent has finished. The agent never sees them, which
+ * is what makes them a grader rather than a hint: a card may specify an interface in its prompt but
+ * never its assertions. Entries are absolute paths, or `{ from, to }` to choose the destination; the
+ * default destination is `tests/<basename>` so the project's own runner collects it.
+ */
+export async function installGraders({ task, copy }) {
+	const entries = task.graderFiles ?? [];
+	const installed = [];
+	for (const entry of entries) {
+		const from = typeof entry === "string" ? entry : entry?.from;
+		if (!from || !existsSync(from)) throw new Error(`grader file not found: ${from}`);
+		const destination = (typeof entry === "object" && entry?.to) || join("tests", from.replace(/[\\/]+/g, "/").split("/").pop());
+		const target = join(copy, destination);
+		const overwrote = existsSync(target);
+		await mkdir(dirname(target), { recursive: true });
+		await cp(from, target);
+		installed.push({ from, to: destination.replace(/[\\/]+/g, "/"), overwrote });
+	}
+	return installed;
 }

@@ -13,7 +13,7 @@ import { existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { buildBrief, compareToolsets, linkDependencies, prepareAgentDir, sparseExclude } from "./arms.mjs";
-import { git } from "./lib.mjs";
+import { git, spawnCapture } from "./lib.mjs";
 
 let passed = 0;
 const failures = [];
@@ -125,6 +125,14 @@ try {
 	check("the brief counts pages", brief.pages === 1);
 	const tiny = await buildBrief({ wikiDir: join(root, "repo", "docs", "wiki"), maxChars: 10, listMarkdown: listMarkdownForTest });
 	check("the brief respects its character budget", tiny.text.length <= 10 + "[... truncated ...]".length + 60);
+
+	// --- spawning ----------------------------------------------------------------------------
+	// A missing log directory used to abort the whole run with an unhandled stream error.
+	const logPath = join(root, "not-created-yet", "logs", "run.log");
+	const ran = await spawnCapture(process.execPath, ["-e", "console.log('hello from child')"], { cwd: root, logPath, timeoutMs: 30_000 });
+	check("a spawned command reports its exit code", ran.exitCode === 0);
+	check("the log directory is created for the caller", existsSync(logPath));
+	check("the log holds the child's output", (await readFile(logPath, "utf8")).includes("hello from child"));
 } finally {
 	await rm(root, { recursive: true, force: true });
 }

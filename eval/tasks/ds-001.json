@@ -1,0 +1,27 @@
+{
+	"id": "ds-001",
+	"repo": "C:/Coding/discord-assistant",
+	"base": "530876975cab8ea5d12a42656d3a70ba43cfd7da",
+	"target": null,
+	"prompt": "The control panel lists bot actions it cannot perform yet: joining and leaving the voice call as 苏睿聆. The bot core already exposes POST /api/voice/join and POST /api/voice/leave on its loopback API, and web/app/api/bot/[...path]/route.ts shows how the panel talks to it. Make POST /api/actions/voice.join and POST /api/actions/voice.leave perform those actions: forward the request to the bot at BOT_URL with the same JSON body, return the bot response status and body, and answer 503 with an error field when the bot is unreachable. Actions that are still only planned must keep answering 501, as the route does today.",
+	"testCommand": "npm --workspace web run test -- ds-001-actions",
+	"graderFiles": [
+		{
+			"from": "C:/Coding/pi-jev-wiki/eval/graders/ds-001-actions.test.ts",
+			"to": "web/lib/ds-001-actions.test.ts"
+		}
+	],
+	"wikiRoot": "docs/wiki",
+	"timeoutMinutes": 10,
+	"linkDirs": [
+		"node_modules",
+		"web/node_modules",
+		".venv"
+	],
+	"notes": [
+		"Forward task: no target commit, so there is no ground-truth diff and the grader encodes the stated contract.",
+		"The interface is specified on purpose; the assertions are not. The hidden grader is copied in after the agent finishes.",
+		"Graded: the route behaviour against a stubbed bot. Not graded: how the panel UI calls it.",
+		"Base must fail: today the route answers 501 for every id."
+	]
+}

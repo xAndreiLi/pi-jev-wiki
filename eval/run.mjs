@@ -24,14 +24,13 @@ import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { analyzeProject } from "../packages/pi-wiki-eval/dist/core/analyze.js";
-import { buildBrief, compareToolsets, defaultAgentDir, linkDependencies, prepareAgentDir, sparseExclude } from "./arms.mjs";
-import { appendJsonl, git, gitOk, nowIso, parseArgs, readJson, runId, spawnCapture } from "./lib.mjs";
+import { buildBrief, compareToolsets, defaultAgentDir, installGraders, prepareAgentDir, prepareTaskCopy, protectGrader, shellCommand, sparseExclude, TEST_PATTERN } from "./arms.mjs";
+import { appendJsonl, git, nowIso, parseArgs, readJson, runId, spawnCapture } from "./lib.mjs";
 
 const ARMS = ["off", "brief", "wiki"];
 /** Dependency directories a clone will not have. */
 const DEFAULT_LINK_DIRS = ["node_modules", "web/node_modules", ".venv"];
 const WIKI_PACKAGE = "pi-jev-wiki";
-const TEST_PATTERN = /(^|\/)(test|tests|spec|specs|__tests__|e2e)(\/|$)|[.\-_](test|spec)\.[cm]?[jt]sx?$|(^|\/)test_[^/]+\.py$/i;
 
 /** Resolve which pi to drive: the installed one, which is the environment the experiment is about. */
 async function resolvePiCommand(explicit) {
@@ -83,29 +82,6 @@ async function listMarkdown(dir) {
 	}
 	await walk(dir);
 	return found.sort();
-}
-
-/** Clone at base, optionally without the wiki, with the target commit pruned and deps present. */
-async function prepareTaskCopy({ task, dir, arm, linkDirs, link = true }) {
-	const wikiRoot = (task.wikiRoot ?? "docs/wiki").replace(/\\/g, "/");
-	await rm(dir, { recursive: true, force: true });
-	await mkdir(dirname(dir), { recursive: true });
-	await git(dirname(dir), ["clone", "--no-hardlinks", "--no-checkout", "--quiet", task.repo, dir]);
-	await git(dir, ["checkout", "--detach", "--quiet", task.base]);
-
-	// The control arms must not contain the artifact: no wiki files, and no dirty working tree that
-	// hints at their removal. Sparse checkout does both.
-	let sparse;
-	if (arm !== "wiki") sparse = await sparseExclude({ dir, git, wikiRoot });
-
-	const refs = (await git(dir, ["for-each-ref", "--format=%(refname)", "refs/heads", "refs/remotes", "refs/tags"])).split(/\r?\n/).filter(Boolean);
-	for (const ref of refs) await git(dir, ["update-ref", "-d", ref]);
-	await git(dir, ["reflog", "expire", "--expire=now", "--all"]);
-	await git(dir, ["gc", "--prune=now", "--quiet"], { allowFailure: true });
-
-	const targetReachable = task.target ? await gitOk(dir, ["cat-file", "-e", `${task.target}^{commit}`]) : false;
-	const deps = await linkDependencies({ sourceRepo: task.repo, dir, names: linkDirs, link });
-	return { targetReachable, wikiPresent: existsSync(join(dir, wikiRoot)), refsDeleted: refs.length, sparse, deps };
 }
 
 /** The tool loadout pi persists in the session's first system message. */
@@ -169,10 +145,6 @@ async function preflight({ piCommand, dir, agentDir, model, arms }) {
 	return results;
 }
 
-function shellCommand(command) {
-	return process.platform === "win32" ? ["cmd.exe", ["/d", "/s", "/c", command]] : ["/bin/sh", ["-c", command]];
-}
-
 async function runArm({ task, arm, repeat, copy, piCommand, agentDir, brief, model, thinking, extraArgs, runsDir, timeoutMinutes }) {
 	const sessionDir = join(runsDir, "sessions", task.id, arm);
 	const logPath = join(runsDir, "logs", `${task.id}-${arm}-rep${repeat}.log`);
@@ -204,27 +176,6 @@ async function runArm({ task, arm, repeat, copy, piCommand, agentDir, brief, mod
 	});
 	const loadout = await readLoadout(sessionDir);
 	return { result, sessionDir, logPath, loadout };
-}
-
-/**
- * Restore the test files the target commit touched, straight from the source repository. Without
- * this, an arm can pass its own grader by editing the tests, and the two arms would have different
- * graders once either of them did.
- */
-async function protectGrader({ task, copy, runsDir, label }) {
-	if (!task.target || task.restoreGrader === false) return { restored: [], skipped: true };
-	const changed = (await git(task.repo, ["show", "--name-only", "--format=", task.target], { allowFailure: true })).split(/\r?\n/).filter(Boolean);
-	const testFiles = changed.filter((file) => TEST_PATTERN.test(file));
-	const restored = [];
-	for (const file of testFiles) {
-		const content = await git(task.repo, ["show", `${task.target}:${file}`], { allowFailure: true, trim: false });
-		if (!content) continue;
-		await mkdir(dirname(join(copy, file)), { recursive: true });
-		await writeFile(join(copy, file), content, "utf8");
-		restored.push(file);
-	}
-	if (restored.length > 0) await writeFile(join(runsDir, "logs", `${label}-grader-restored.txt`), restored.join("\n"), "utf8");
-	return { restored, skipped: false };
 }
 
 async function gradeRun({ task, copy, runsDir, label }) {
@@ -392,10 +343,11 @@ async function main() {
 				console.log(`  ${label}: preparing a copy of ${task.repo} @ ${task.base.slice(0, 8)}`);
 				const environment = await prepareTaskCopy({ task, dir: copy, arm, linkDirs: taskLinkDirs, link: !args["copy-deps"] });
 				if (environment.targetReachable) throw new Error(`${task.id}: the target commit is still reachable inside the task copy — refusing to run`);
-				const grader = await protectGrader({ task, copy, runsDir: join(runsDir, id), label: slug });
+				const grader = await protectGrader({ task, copy });
+				const graders = await installGraders({ task, copy });
 
 				console.log(
-					`  ${label}: running pi (wiki files ${environment.wikiPresent ? "present" : "absent"}, deps ${environment.deps.map((dep) => `${dep.name}:${dep.mode}`).join(" ") || "none"}, grader restored ${grader.restored.length})`,
+					`  ${label}: running pi (wiki files ${environment.wikiPresent ? "present" : "absent"}, deps ${environment.deps.map((dep) => `${dep.name}:${dep.mode}`).join(" ") || "none"}, grader restored ${grader.restored.length}, hidden graders ${graders.length})`,
 				);
 				const { result, sessionDir, loadout } = await runArm({
 					task,
@@ -430,7 +382,7 @@ async function main() {
 					model: args.model ?? null,
 					thinkingLevel: loadout.thinkingLevel,
 					armVerified: { expectedWikiTools: arm === "wiki", observedWikiTools: loadout.hasWikiTools, tools: loadout.tools.length },
-					environment: { ...environment, graderRestored: grader.restored, agentPackagesRemoved: arm === "wiki" ? [] : [WIKI_PACKAGE] },
+					environment: { ...environment, graderRestored: grader.restored, gradersInstalled: graders, agentPackagesRemoved: arm === "wiki" ? [] : [WIKI_PACKAGE] },
 					grading,
 					diff,
 					metrics,

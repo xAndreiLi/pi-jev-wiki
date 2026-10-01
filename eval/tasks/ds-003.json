@@ -1,0 +1,26 @@
+{
+	"id": "ds-003",
+	"repo": "C:/Coding/discord-assistant",
+	"base": "530876975cab8ea5d12a42656d3a70ba43cfd7da",
+	"target": null,
+	"prompt": "The panel is the only way to drive the bot today; the owner should be able to drive it from Discord as well. Add src/bot/commands.ts exporting CommandDeps ({ ownerId, startRecord(), stopRecord(), statusText(), useProject(name), reply(text) }) and handleSlashCommand(name, option, user, deps) returning { handled: boolean; reason?: string }. Support \"record\" with the option \"start\" or \"stop\", \"status\", and \"use\" with a project name; report the status by sending its text back through reply; return handled: false for a record option that is not recognised and for an unknown command. The owner check comes first: for anyone whose id is not deps.ownerId, none of the four action dependencies may be called. Register them as slash commands with the Discord client.",
+	"testCommand": "npx vitest run tests/ds-003-commands.test.ts",
+	"graderFiles": [
+		{
+			"from": "C:/Coding/pi-jev-wiki/eval/graders/ds-003-commands.test.ts",
+			"to": "tests/ds-003-commands.test.ts"
+		}
+	],
+	"wikiRoot": "docs/wiki",
+	"timeoutMinutes": 10,
+	"linkDirs": [
+		"node_modules",
+		"web/node_modules",
+		".venv"
+	],
+	"notes": [
+		"Forward task: no target commit; the grader encodes the stated contract.",
+		"Graded: handler behaviour with spy dependencies, above all that a non-owner cannot make the bot do anything. Not graded: the slash-command registration, which is reviewed by hand.",
+		"Base must fail: the module does not exist yet."
+	]
+}

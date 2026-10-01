@@ -1,0 +1,27 @@
+{
+	"id": "ds-002",
+	"repo": "C:/Coding/discord-assistant",
+	"base": "530876975cab8ea5d12a42656d3a70ba43cfd7da",
+	"target": null,
+	"prompt": "The bot joins the call as 苏睿聆 only when it is asked to. It should also notice by itself: when Andrei, the owner the bot is configured with, joins a voice channel, capture should start; when he leaves, it should stop; when he moves between channels, capture should keep running. Nobody else should be able to start or stop anything by joining a call. Add src/bot/voice-trigger.ts exporting VoiceStateLike ({ userId: string; channelId: string | null }) and voiceTriggerAction(previous, next, { ownerId }) returning \"start\", \"stop\" or \"ignore\" — a null state means the event carried no state and must be ignored. Wire it into the Discord client voice-state update so the existing start and stop paths are used.",
+	"testCommand": "npx vitest run tests/ds-002-voice-trigger.test.ts",
+	"graderFiles": [
+		{
+			"from": "C:/Coding/pi-jev-wiki/eval/graders/ds-002-voice-trigger.test.ts",
+			"to": "tests/ds-002-voice-trigger.test.ts"
+		}
+	],
+	"wikiRoot": "docs/wiki",
+	"timeoutMinutes": 10,
+	"linkDirs": [
+		"node_modules",
+		"web/node_modules",
+		".venv"
+	],
+	"notes": [
+		"Forward task: no target commit; the grader encodes the stated decision table.",
+		"Graded: the decision function, which is the part that can be wrong silently. Not graded: the gateway wiring, which is reviewed by hand.",
+		"Base must fail: the module does not exist yet.",
+		"The wiki describes the voice join path and the DAVE constraint — a real, relevant read for this task."
+	]
+}
