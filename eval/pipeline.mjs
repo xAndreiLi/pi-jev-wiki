@@ -47,7 +47,7 @@ async function main() {
 	if (taskList.length === 0 || args.help) {
 		console.log("Usage: node eval/pipeline.mjs --tasks <card.json[,...]> --model <id>");
 		console.log("       [--arms off,brief,wiki,wiki-nocapture] [--repeats 1] [--runs-dir eval/runs]");
-		console.log("       [--label <name>] [--skip-checks] [--judge]");
+		console.log("       [--label <name>] [--skip-checks] [--judge] [--resume] [--runs <id>]");
 		console.log("\nRuns self-test → grader discrimination → pilot → report → optional quality review, in the foreground.");
 		return;
 	}
@@ -58,7 +58,7 @@ async function main() {
 	const arms = Array.isArray(args.arms) ? args.arms.join(",") : typeof args.arms === "string" ? args.arms : "off,brief,wiki";
 	const repeats = String(args.repeats ?? 1);
 	const runsDir = resolve(args["runs-dir"] ?? join(repoRoot, "eval", "runs"));
-	const id = `${typeof args.label === "string" ? args.label : "e1"}-${runId()}`;
+	const id = typeof args.runs === "string" ? args.runs : `${typeof args.label === "string" ? args.label : "e1"}-${runId()}`;
 	const logPath = join(runsDir, id, "pipeline.log");
 	await mkdir(join(runsDir, id), { recursive: true });
 	const node = process.execPath;
@@ -89,7 +89,7 @@ async function main() {
 		4,
 		`pilot — ${taskList.length} task(s) × ${arms.split(",").length} arm(s) × ${repeats} repeat(s), costs money`,
 		node,
-		[join(here, "run.mjs"), "--tasks", taskList.join(","), "--arms", arms, "--repeats", repeats, "--model", args.model, "--runs-dir", runsDir, "--runs", id],
+		[join(here, "run.mjs"), "--tasks", taskList.join(","), "--arms", arms, "--repeats", repeats, "--model", args.model, "--runs-dir", runsDir, "--runs", id, ...(args.resume === true ? ["--resume"] : [])],
 		{ logPath },
 	);
 

@@ -25,7 +25,7 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { analyzeProject } from "../packages/pi-wiki-eval/dist/core/analyze.js";
 import { buildBrief, compareToolsets, configureCapture, defaultAgentDir, installGraders, keepsWiki, prepareAgentDir, prepareTaskCopy, protectGrader, qualitySignals, savePatch, shellCommand, sparseExclude, TEST_PATTERN } from "./arms.mjs";
-import { appendJsonl, git, nowIso, parseArgs, readJson, runId, spawnCapture } from "./lib.mjs";
+import { appendJsonl, git, nowIso, parseArgs, readJson, readJsonl, runId, spawnCapture } from "./lib.mjs";
 
 const ARMS = ["off", "brief", "wiki", "wiki-nocapture"];
 /** Dependency directories a clone will not have. */
@@ -281,6 +281,13 @@ async function main() {
 	const cards = [];
 	for (const cardPath of (Array.isArray(args.tasks) ? args.tasks : [args.tasks]).map((card) => resolve(card))) cards.push(await readJson(cardPath));
 
+	// With --resume, a run that died halfway continues instead of paying for the finished arms again.
+	const alreadyRun = new Set();
+	if (args.resume === true) {
+		for (const row of await readJsonl(join(runsDir, id, "results.jsonl"))) alreadyRun.add(`${row.task}|${row.arm}|${row.repeat}`);
+		if (alreadyRun.size > 0) console.log(`  resume: ${alreadyRun.size} run(s) already recorded in this run id and will be skipped`);
+	}
+
 	console.log(`run ${id} · ${cards.length} task(s) · arms ${arms.join(",")} · ${repeats} repeat(s) · model ${args.model ?? "(unpinned)"}`);
 	if (!args["dry-run"]) await mkdir(join(runsDir, id), { recursive: true });
 
@@ -289,7 +296,7 @@ async function main() {
 	if (!args["dry-run"]) {
 		console.log(`  pi: ${piCommand.command}${piCommand.prefix.length ? ` ${piCommand.prefix.join(" ")}` : ""}${piCommand.version ? ` (v${piCommand.version}, ${piCommand.source})` : ""}`);
 		const home = join(runsDir, id, "agent");
-		agentDirs = { wiki: join(home, "wiki"), off: join(home, "off"), brief: join(home, "off") };
+		agentDirs = { wiki: join(home, "wiki"), off: join(home, "off"), brief: join(home, "off"), "wiki-nocapture": join(home, "wiki") };
 		const wikiAgent = await prepareAgentDir({ target: agentDirs.wiki, excludePackages: [] });
 		const controlAgent = await prepareAgentDir({ target: agentDirs.off, excludePackages: [WIKI_PACKAGE] });
 		console.log(`  agent dirs: control excludes [${controlAgent.removedPackages.join(", ") || "nothing"}]; every other package, tool and skill stays loaded`);
@@ -336,6 +343,10 @@ async function main() {
 		for (const arm of orderedArms) {
 			for (let repeat = 1; repeat <= repeats; repeat += 1) {
 				const label = `${task.id} · ${arm} · rep${repeat}`;
+				if (alreadyRun.has(`${task.id}|${arm}|${repeat}`)) {
+					console.log(`  ${label}: already recorded, skipping`);
+					continue;
+				}
 				if (args["dry-run"]) {
 					console.log(`  would run: ${label} in a copy of ${task.repo} @ ${task.base.slice(0, 10)} (target ${task.target?.slice(0, 10) ?? "—"}, wiki ${arm === "wiki" ? "present" : "absent"})`);
 					continue;
@@ -362,7 +373,7 @@ async function main() {
 					repeat,
 					copy,
 					piCommand,
-					agentDir: agentDirs[arm] ?? agentDirs.off,
+					agentDir: agentDirs[arm] ?? (keepsWiki(arm) ? agentDirs.wiki : agentDirs.off),
 					brief: arm === "brief" ? briefs.get(task.id) ?? "" : "",
 					model: args.model,
 					thinking: args.thinking,
