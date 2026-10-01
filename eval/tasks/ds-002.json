@@ -11,6 +11,10 @@
 			"to": "tests/ds-002-voice-trigger.test.ts"
 		}
 	],
+	"canary": "EVAL-CANARY-ds002-514587",
+	"excludePaths": [
+		"handoffs"
+	],
 	"wikiRoot": "docs/wiki",
 	"timeoutMinutes": 10,
 	"linkDirs": [

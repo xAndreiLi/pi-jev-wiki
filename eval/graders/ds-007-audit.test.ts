@@ -1,3 +1,4 @@
+// eval-canary: EVAL-CANARY-ds007-b6fbfe (the harness detects any agent that saw this file)
 /**
  * ds-007 — hidden grader.
  *

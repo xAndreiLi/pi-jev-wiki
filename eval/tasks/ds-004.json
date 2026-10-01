@@ -11,6 +11,10 @@
 			"to": "tests/ds-004-capture-session.test.ts"
 		}
 	],
+	"canary": "EVAL-CANARY-ds004-75fd97",
+	"excludePaths": [
+		"handoffs"
+	],
 	"qualityCommands": {
 		"typecheck": "npm run typecheck"
 	},

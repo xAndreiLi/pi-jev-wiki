@@ -11,6 +11,10 @@
 			"to": "web/lib/ds-001-actions.test.ts"
 		}
 	],
+	"canary": "EVAL-CANARY-ds001-b04f6b",
+	"excludePaths": [
+		"handoffs"
+	],
 	"wikiRoot": "docs/wiki",
 	"timeoutMinutes": 10,
 	"linkDirs": [

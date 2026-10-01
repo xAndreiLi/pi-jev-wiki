@@ -1,86 +1,66 @@
 #!/usr/bin/env node
 /**
- * The A/B runner: one task, three arms, in throwaway copies of the repository.
+ * The A/B runner: one task, up to four arms, each in a throwaway copy of the repository.
  *
- * Fairness is enforced rather than assumed. Before a single measurement is taken the harness proves:
+ * Fairness is enforced rather than assumed, and checked from the agent's side, because R1 showed that
+ * guarantees which hold for each helper can still fail in the runner that composes them:
  *
- *   1. the answer is not reachable (`git` refs pruned, target commit pruned);
- *   2. the arms differ in exactly one thing — the wiki — by comparing their tool loadouts;
- *   3. every arm can actually run the grader (dependencies present, grader files restored).
- *
- * The control arms differ from the treatment arm only by the wiki package and the wiki files: every
- * other extension, skill, MCP server and tool stays loaded, because the naive `pi --no-extensions`
- * control also strips the web tools and unrelated skills and is therefore a less capable agent.
+ *   1. the answer is unreachable: refs and target pruned, no remote to fetch them back from, and no
+ *      hidden grader in the copy until the agent has finished;
+ *   2. the agent cannot find the harness or its own arm: the copy and the agent dir live under neutral
+ *      temp paths, the agent dir carries no wiki registry and (by default) no user context, and the
+ *      copy leaves out the card's notes about the experiment;
+ *   3. the arms differ in exactly one thing — the wiki — proven by comparing their tool loadouts;
+ *   4. every arm is graded identically after the fact, and its session is scanned for anything it
+ *      should not have reached; a contaminated run is recorded as such and kept out of the statistics.
  *
  * Usage:
  *   node eval/run.mjs --tasks eval/tasks/ds-001.json --arms off,wiki --model <id> \
- *                     [--repeats 1] [--dry-run] [--runs-dir eval/runs] [--runs <id>]
+ *                     [--repeats 1] [--dry-run] [--runs-dir eval/runs] [--runs <id>] [--resume]
  *                     [--pi-bin <path>] [--pi-arg <value>] [--link-dirs a,b] [--copy-deps]
- *                     [--brief-chars 2000] [--keep-copies] [--allow-unverified-arm]
+ *                     [--user-context none|real] [--keep-copies] [--allow-unverified-arm]
  */
-import { mkdir, readdir, readFile, rm, stat, writeFile } from "node:fs/promises";
-import { existsSync } from "node:fs";
-import { homedir } from "node:os";
-import { dirname, join, resolve } from "node:path";
+import { mkdir, mkdtemp, readdir, readFile, rm, stat } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { analyzeProject } from "../packages/pi-wiki-eval/dist/core/analyze.js";
-import { agentDirFor, blindOrder, buildBrief, compareToolsets, configureCapture, defaultAgentDir, installGraders, keepsWiki, prepareAgentDir, prepareTaskCopy, protectGrader, qualitySignals, savePatch, shellCommand, sparseExclude, TEST_PATTERN } from "./arms.mjs";
-import { appendJsonl, git, nowIso, parseArgs, readJson, readJsonl, runId, spawnCapture } from "./lib.mjs";
+import { isWikiCall, wikiCallKind } from "../packages/pi-wiki-eval/dist/core/classify.js";
+import {
+	assertCanary,
+	buildBrief,
+	compareToolsets,
+	configureCapture,
+	defaultAgentDir,
+	depsSignature,
+	graderLeaks,
+	installGraders,
+	jevUsage,
+	keepsWiki,
+	prepareAgentDir,
+	prepareTaskCopy,
+	protectGrader,
+	qualitySignals,
+	savePatch,
+	scanSession,
+	shellCommand,
+	taskMentions,
+	TEST_PATTERN,
+} from "./arms.mjs";
+import { appendJsonl, git, isValidRow, nowIso, parseArgs, readJson, readJsonl, resolvePiCommand, runId, spawnCapture } from "./lib.mjs";
 
+const harnessRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const ARMS = ["off", "brief", "wiki", "wiki-nocapture"];
 /** Dependency directories a clone will not have. */
 const DEFAULT_LINK_DIRS = ["node_modules", "web/node_modules", ".venv"];
 const WIKI_PACKAGE = "pi-jev-wiki";
 
-/** Resolve which pi to drive: the installed one, which is the environment the experiment is about. */
-async function resolvePiCommand(explicit) {
-	if (explicit) return await describePi(explicit);
-	if (process.env.PI_PI_BIN) return await describePi(process.env.PI_PI_BIN);
-	const packageRelative = ["@earendil-works", "pi-coding-agent"];
-	const roots = [
-		process.env.APPDATA ? join(process.env.APPDATA, "npm", "node_modules") : undefined,
-		process.env.npm_config_prefix ? join(process.env.npm_config_prefix, "lib", "node_modules") : undefined,
-		"/usr/local/lib/node_modules",
-		"/usr/lib/node_modules",
-		join(homedir(), ".npm-global", "lib", "node_modules"),
-	].filter(Boolean);
-	for (const root of roots) {
-		const candidate = join(root, ...packageRelative, "package.json");
-		if (!existsSync(candidate)) continue;
-		const described = await describePi(candidate, "global");
-		if (described.prefix.length > 0) return described;
-	}
-	console.warn("warning: no pi install found; falling back to `pi` on PATH. Shell quoting may mangle prompts — pass --pi-bin to be exact.");
-	return { command: "pi", prefix: [], shell: true, source: "path" };
-}
-
-async function describePi(pathOrCommand, source = "explicit") {
-	if (existsSync(pathOrCommand)) {
-		const packageJson = await readJson(pathOrCommand);
-		const bin = typeof packageJson.bin === "string" ? packageJson.bin : Object.values(packageJson.bin ?? {})[0];
-		if (bin) return { command: process.execPath, prefix: [join(dirname(pathOrCommand), bin)], version: packageJson.version, source };
-	}
-	return { command: pathOrCommand, prefix: [], source };
-}
-
 /**
- * Cheap fingerprint of the directories runs share, so that a write-back (an `npm install` inside one
- * run) is detected rather than assumed away: it would change the environment for every later run.
+ * What pi persisted about one run: the tool loadout from the session's first system message, the
+ * thinking level, and the cost of wiki upkeep — assistant messages that called a wiki write tool. That
+ * is a lower bound: the turns reading those tools' results are upkeep too.
  */
-async function fingerprint(repoDir, names) {
-	const out = {};
-	for (const name of names) {
-		try {
-			out[name] = Math.round((await stat(join(repoDir, name))).mtimeMs);
-		} catch {
-			out[name] = null;
-		}
-	}
-	return out;
-}
-
-/** The tool loadout pi persists in the session's first system message. */
-async function readLoadout(sessionDir) {
+async function readSession(sessionDir) {
 	const files = [];
 	async function walk(dir) {
 		let entries = [];
@@ -96,12 +76,12 @@ async function readLoadout(sessionDir) {
 		}
 	}
 	await walk(sessionDir);
-	if (files.length === 0) return { sessionFile: undefined, tools: [], hasWikiTools: false, thinkingLevel: null };
+	const upkeep = { messages: 0, cost: 0 };
+	if (files.length === 0) return { sessionFile: undefined, tools: [], hasWikiTools: false, thinkingLevel: null, upkeep };
 	const newest = (await Promise.all(files.map(async (file) => ({ file, mtime: (await stat(file)).mtimeMs })))).sort((a, b) => b.mtime - a.mtime)[0];
-	const text = await readFile(newest.file, "utf8");
 	const tools = [];
 	let thinkingLevel = null;
-	for (const line of text.split(/\r?\n/)) {
+	for (const line of (await readFile(newest.file, "utf8")).split(/\r?\n/)) {
 		if (!line.trim()) continue;
 		let entry;
 		try {
@@ -110,49 +90,60 @@ async function readLoadout(sessionDir) {
 			continue;
 		}
 		if (entry.type === "thinking_level_change" && entry.thinkingLevel) thinkingLevel = entry.thinkingLevel;
-		const sections = entry?.message?.sections;
-		if (entry?.type === "message" && entry?.message?.role === "system" && sections?.tools) {
-			for (const match of String(sections.tools).matchAll(/^- ([a-zA-Z0-9_]+):/gm)) tools.push(match[1]);
+		const message = entry?.type === "message" ? entry.message : undefined;
+		if (message?.role === "system" && message.sections?.tools) {
+			for (const match of String(message.sections.tools).matchAll(/^- ([a-zA-Z0-9_]+):/gm)) tools.push(match[1]);
+		}
+		if (message?.role === "assistant" && (message.content ?? []).some((part) => part?.type === "toolCall" && isWikiCall(part.name) && wikiCallKind(part.name) === "write")) {
+			upkeep.messages += 1;
+			upkeep.cost += message.usage?.cost?.total ?? 0;
 		}
 	}
-	return { sessionFile: newest.file, tools, hasWikiTools: tools.some((tool) => tool.startsWith("wiki_")), thinkingLevel };
+	return { sessionFile: newest.file, tools, hasWikiTools: tools.some(isWikiCall), thinkingLevel, upkeep };
 }
 
-/** One tiny call per arm, to prove the environment before any measurement is taken. */
-async function preflight({ piCommand, dir, agentDir, model, arms }) {
+/** What each arm must have loaded. A broken arm looks exactly like a negative result. */
+function loadoutProblem(arm, tools) {
+	const wiki = tools.filter(isWikiCall);
+	if (!keepsWiki(arm)) return wiki.length > 0 ? `the ${arm} arm loaded wiki tools (${wiki.join(", ")})` : null;
+	if (wiki.length === 0) return `the ${arm} arm loaded no wiki tools`;
+	const writes = wiki.filter((tool) => wikiCallKind(tool) === "write");
+	if (arm === "wiki-nocapture" && writes.length > 0) return `the read-only wiki arm still has wiki write tools (${writes.join(", ")})`;
+	return null;
+}
+
+/** One tiny call per arm, to prove each environment before anything is measured. */
+async function preflight({ piCommand, dir, model, arms, userContext, argsFor }) {
 	const results = {};
 	for (const arm of arms) {
 		const home = join(dir, "preflight", arm);
 		await mkdir(home, { recursive: true });
-		const sessionDir = join(home, "sessions");
-		const args = [...piCommand.prefix, "-p", "Reply with exactly: ok", "--session-dir", sessionDir];
-		if (model) args.push("--model", model);
-		const run = await spawnCapture(piCommand.command, args, {
-			cwd: home,
-			timeoutMs: 120_000,
-			shell: piCommand.shell,
-			logPath: join(home, "preflight.log"),
-			env: { PI_CODING_AGENT_DIR: agentDir[arm] },
-		});
-		const loadout = await readLoadout(sessionDir);
-		results[arm] = { ...loadout, exitCode: run.exitCode, timedOut: run.timedOut };
+		const agentDir = await mkdtemp(join(tmpdir(), "ag-"));
+		try {
+			await prepareAgentDir({ target: agentDir, excludePackages: keepsWiki(arm) ? [] : [WIKI_PACKAGE], userContext });
+			const sessionDir = join(home, "sessions");
+			const args = [...piCommand.prefix, "-p", "Reply with exactly: ok", "--session-dir", sessionDir, ...(model ? ["--model", model] : []), ...argsFor(arm)];
+			const run = await spawnCapture(piCommand.command, args, {
+				cwd: home,
+				timeoutMs: 120_000,
+				shell: piCommand.shell,
+				logPath: join(home, "preflight.log"),
+				env: { PI_CODING_AGENT_DIR: agentDir },
+			});
+			results[arm] = { ...(await readSession(sessionDir)), exitCode: run.exitCode, timedOut: run.timedOut };
+		} finally {
+			await rm(agentDir, { recursive: true, force: true });
+		}
 	}
 	return results;
 }
 
-async function runArm({ task, arm, repeat, copy, piCommand, agentDir, brief, model, thinking, extraArgs, runsDir, timeoutMinutes }) {
-	const sessionDir = join(runsDir, "sessions", task.id, arm);
-	const logPath = join(runsDir, "logs", `${task.id}-${arm}-rep${repeat}.log`);
+async function runArm({ prompt, copy, piCommand, agentDir, model, thinking, extraArgs, sessionDir, logPath, budgetMs }) {
 	await mkdir(sessionDir, { recursive: true });
-	await mkdir(dirname(logPath), { recursive: true });
-
-	const prompt = brief ? `${brief}\n\n---\n\n${task.prompt}` : task.prompt;
 	const args = [...piCommand.prefix, "-p", prompt, "--session-dir", sessionDir];
 	if (model) args.push("--model", model);
 	if (thinking) args.push("--thinking", thinking);
 	args.push(...extraArgs);
-
-	const budgetMs = (timeoutMinutes ?? task.timeoutMinutes ?? 5) * 60 * 1000;
 	let lastLine = "";
 	const result = await spawnCapture(piCommand.command, args, {
 		cwd: copy,
@@ -169,8 +160,7 @@ async function runArm({ task, arm, repeat, copy, piCommand, agentDir, brief, mod
 				`      … ${Math.round(elapsedMs / 1000)}s elapsed${lastLine ? ` · last: ${lastLine}` : ` · no output yet (print mode is silent until it finishes; quiet ${Math.round(idleMs / 1000)}s)`}`,
 			),
 	});
-	const loadout = await readLoadout(sessionDir);
-	return { result, sessionDir, logPath, loadout };
+	return { result, session: await readSession(sessionDir) };
 }
 
 async function gradeRun({ task, copy, runsDir, label }) {
@@ -193,7 +183,9 @@ async function gradeRun({ task, copy, runsDir, label }) {
 
 async function measure({ copy, sessionDir }) {
 	try {
-		const analysis = await analyzeProject({ projectDir: copy, sessionsRoot: dirname(sessionDir) });
+		// The exact session directory of this attempt: matching on the copy's path alone would add a
+		// crashed earlier attempt's cost to its re-run.
+		const analysis = await analyzeProject({ projectDir: copy, sessionDir });
 		const totals = analysis.totals;
 		return {
 			episodes: totals.episodes,
@@ -216,9 +208,10 @@ async function measure({ copy, sessionDir }) {
 	}
 }
 
-async function diffStats(dir) {
-	const paths = (await git(dir, ["diff", "--name-only", "HEAD"], { allowFailure: true })).split(/\r?\n/).filter(Boolean);
-	const numstat = await git(dir, ["diff", "--numstat", "HEAD"], { allowFailure: true });
+/** Over the staged tree (`savePatch` stages everything), so files the agent created count too. */
+async function diffStats(dir, wikiRoot) {
+	const paths = (await git(dir, ["diff", "--cached", "--name-only", "HEAD"], { allowFailure: true })).split(/\r?\n/).filter(Boolean);
+	const numstat = await git(dir, ["diff", "--cached", "--numstat", "HEAD"], { allowFailure: true });
 	let insertions = 0;
 	let deletions = 0;
 	for (const line of numstat.split(/\r?\n/).filter(Boolean)) {
@@ -226,13 +219,31 @@ async function diffStats(dir) {
 		insertions += Number(added) || 0;
 		deletions += Number(removed) || 0;
 	}
+	const tooling = paths.filter((path) => path.startsWith(`${wikiRoot}/`) || path.startsWith(".pi/"));
 	return {
 		filesChanged: paths.length,
+		codeFilesChanged: paths.length - tooling.length,
+		toolingFilesChanged: tooling.length,
 		insertions,
 		deletions,
 		paths: paths.slice(0, 40),
 		testFilesChanged: paths.filter((path) => TEST_PATTERN.test(path)),
 	};
+}
+
+/**
+ * Locations no arm has any business reaching. Each was reached in R1: the harness (task cards, graders,
+ * results), the source repository (its live working tree), the user's other wikis and sessions.
+ */
+async function forbiddenLocations({ runsDir, cards }) {
+	const agent = defaultAgentDir();
+	const out = [harnessRoot, runsDir, join(agent, "sessions"), join(agent, "AGENTS.md"), join(agent, "jev-wiki", "wikis.json"), ...cards.map((card) => card.repo)];
+	try {
+		for (const wiki of (await readJson(join(agent, "jev-wiki", "wikis.json"))).wikis ?? []) if (wiki?.root) out.push(wiki.root);
+	} catch {
+		/* no registry */
+	}
+	return [...new Set(out)];
 }
 
 async function suggestModel() {
@@ -251,12 +262,11 @@ async function main() {
 		console.log(
 			[
 				"Usage: node eval/run.mjs --tasks <card.json[,...]> --model <id>",
-				"       [--arms off,brief,wiki] [--repeats 1] [--runs-dir eval/runs] [--runs <id>]",
-				"       [--pi-bin <path>] [--pi-arg <value>] [--link-dirs a,b] [--copy-deps]",
-				"       [--brief-chars 2000] [--keep-copies] [--allow-unpinned-model] [--allow-unverified-arm]",
-				"       [--dry-run]",
+				"       [--arms off,brief,wiki,wiki-nocapture] [--repeats 1] [--runs-dir eval/runs] [--runs <id>] [--resume]",
+				"       [--pi-bin <path>] [--pi-arg <value>] [--link-dirs a,b] [--copy-deps] [--user-context none|real]",
+				"       [--brief-chars 20000] [--keep-copies] [--allow-unpinned-model] [--allow-unverified-arm] [--dry-run]",
 				"",
-				"Each task card: { id, repo, base, target, prompt, testCommand, wikiRoot, timeoutMinutes, linkDirs }",
+				"Each task card: { id, repo, base, target, prompt, testCommand, graderFiles, canary, excludePaths, wikiRoot, timeoutMinutes, linkDirs }",
 			].join("\n"),
 		);
 		return;
@@ -268,7 +278,9 @@ async function main() {
 	const id = typeof args.runs === "string" ? args.runs : runId("e1");
 	const extraArgs = args["pi-arg"] ? (Array.isArray(args["pi-arg"]) ? args["pi-arg"] : [args["pi-arg"]]) : [];
 	const linkDirs = (typeof args["link-dirs"] === "string" ? args["link-dirs"].split(",") : undefined) ?? DEFAULT_LINK_DIRS;
-	const briefChars = Number(args["brief-chars"] ?? 2000);
+	const briefChars = Number(args["brief-chars"] ?? 20000);
+	const userContext = args["user-context"] ?? "none";
+	if (!["none", "real"].includes(userContext)) throw new Error(`--user-context must be none or real, not ${userContext}`);
 
 	if (!args.model && !args["allow-unpinned-model"] && !args["dry-run"]) {
 		const suggested = await suggestModel();
@@ -280,57 +292,67 @@ async function main() {
 	const piCommand = args["dry-run"] ? { command: "pi", prefix: [], source: "dry-run" } : await resolvePiCommand(args["pi-bin"]);
 	const cards = [];
 	for (const cardPath of (Array.isArray(args.tasks) ? args.tasks : [args.tasks]).map((card) => resolve(card))) cards.push(await readJson(cardPath));
+	// Free, and before anything is spent: a grader without its canary would leak undetected.
+	for (const card of cards) await assertCanary(card);
 
-	// With --resume, a run that died halfway continues instead of paying for the finished arms again.
+	// With --resume, a run that died halfway continues instead of paying for the finished arms again. Only
+	// valid rows count as finished: an arm that ran in the wrong environment is run again.
 	const alreadyRun = new Set();
 	if (args.resume === true) {
-		for (const row of await readJsonl(join(runsDir, id, "results.jsonl"))) alreadyRun.add(`${row.task}|${row.arm}|${row.repeat}`);
-		if (alreadyRun.size > 0) console.log(`  resume: ${alreadyRun.size} run(s) already recorded in this run id and will be skipped`);
+		let invalid = 0;
+		for (const row of await readJsonl(join(runsDir, id, "results.jsonl"))) {
+			if (isValidRow(row)) alreadyRun.add(`${row.task}|${row.arm}|${row.repeat}`);
+			else invalid += 1;
+		}
+		if (alreadyRun.size > 0) console.log(`  resume: ${alreadyRun.size} valid run(s) already recorded will be skipped${invalid ? `; ${invalid} invalid row(s) will be run again` : ""}`);
 	}
 
-	console.log(`run ${id} · ${cards.length} task(s) · arms ${arms.join(",")} · ${repeats} repeat(s) · model ${args.model ?? "(unpinned)"}`);
+	console.log(`run ${id} · ${cards.length} task(s) · arms ${arms.join(",")} · ${repeats} repeat(s) · model ${args.model ?? "(unpinned)"} · user context ${userContext}`);
 	if (!args["dry-run"]) await mkdir(join(runsDir, id), { recursive: true });
 
-	let agentDirs = {};
 	const briefs = new Map();
+	let argsFor = () => [];
+	let forbidden = [];
 	if (!args["dry-run"]) {
 		console.log(`  pi: ${piCommand.command}${piCommand.prefix.length ? ` ${piCommand.prefix.join(" ")}` : ""}${piCommand.version ? ` (v${piCommand.version}, ${piCommand.source})` : ""}`);
-		const home = join(runsDir, id, "agent");
-		agentDirs = { wiki: join(home, "wiki"), off: join(home, "off"), brief: join(home, "off"), "wiki-nocapture": join(home, "wiki") };
-		// Fail before spending anything if an arm has no environment to run in.
-		for (const arm of arms) agentDirFor(arm, agentDirs);
-		const wikiAgent = await prepareAgentDir({ target: agentDirs.wiki, excludePackages: [] });
-		const controlAgent = await prepareAgentDir({ target: agentDirs.off, excludePackages: [WIKI_PACKAGE] });
-		console.log(`  agent dirs: control excludes [${controlAgent.removedPackages.join(", ") || "nothing"}]; every other package, tool and skill stays loaded`);
-		if (wikiAgent.isolated.length > 0) console.log(`  per-run state: ${wikiAgent.isolated.join(", ")} — no run inherits another run's index or session`);
-		if (controlAgent.removedPackages.length === 0) {
+		const probe = await mkdtemp(join(tmpdir(), "ag-"));
+		const control = await prepareAgentDir({ target: probe, excludePackages: [WIKI_PACKAGE], userContext });
+		await rm(probe, { recursive: true, force: true });
+		if (control.removedPackages.length === 0) {
 			throw new Error(`${WIKI_PACKAGE} is not in the agent's package list, so the control arm cannot be built by removing it — refusing to run, because disabling all extensions would make the control a less capable agent.`);
 		}
+		console.log(`  isolation: each run gets a fresh copy and agent dir under ${tmpdir()} (neutral names); no wiki registry; user context: ${userContext}${control.contextFilesSkipped.length ? ` (${control.contextFilesSkipped.join(", ")} left out)` : ""}`);
+		forbidden = await forbiddenLocations({ runsDir, cards });
 
-		const pre = await preflight({ piCommand, dir: join(runsDir, id), agentDir: agentDirs, model: args.model, arms });
-		const wikiTools = pre.wiki?.tools ?? [];
-		const offTools = pre.off?.tools ?? [];
-		for (const arm of arms) console.log(`  preflight ${arm}: ${pre[arm].tools.length} tool(s), wiki tools ${pre[arm].hasWikiTools ? "present" : "absent"}${pre[arm].timedOut ? " · TIMED OUT" : ""}`);
-		if (wikiTools.length === 0 || offTools.length === 0) {
+		const pre = await preflight({ piCommand, dir: join(runsDir, id), model: args.model, arms: ["off", "wiki"], userContext, argsFor });
+		for (const arm of ["off", "wiki"]) console.log(`  preflight ${arm}: ${pre[arm].tools.length} tool(s), wiki tools ${pre[arm].hasWikiTools ? "present" : "absent"}${pre[arm].timedOut ? " · TIMED OUT" : ""}`);
+		if (pre.wiki.tools.length === 0 || pre.off.tools.length === 0) {
 			if (!args["allow-unverified-arm"]) throw new Error("preflight could not read a tool loadout, so the arms cannot be compared — pass --allow-unverified-arm to run anyway");
-		} else if (arms.includes("wiki") && arms.includes("off")) {
-			const comparison = compareToolsets(offTools, wikiTools);
-			console.log(
-				`  fairness: arms share ${comparison.sharedCount} non-wiki tool(s); wiki arm adds ${comparison.wikiToolCount} wiki tool(s)${comparison.comparable ? " — comparable" : " — NOT COMPARABLE"}`,
-			);
+		} else {
+			const comparison = compareToolsets(pre.off.tools, pre.wiki.tools);
+			console.log(`  fairness: arms share ${comparison.sharedCount} non-wiki tool(s); wiki arm adds ${comparison.wikiToolCount} wiki tool(s)${comparison.comparable ? " — comparable" : " — NOT COMPARABLE"}`);
 			if (!comparison.comparable) {
 				console.log(`    only in off:  ${comparison.onlyOff.join(", ") || "(none)"}`);
 				console.log(`    only in wiki: ${comparison.onlyWiki.join(", ") || "(none)"}`);
 				if (!args["allow-unverified-arm"]) throw new Error("the arms do not load the same tools apart from the wiki — refusing to measure a confounded comparison");
 			}
 		}
+		// The read-only wiki arm withholds every wiki write tool the treatment loads.
+		const writeTools = pre.wiki.tools.filter((tool) => isWikiCall(tool) && wikiCallKind(tool) === "write");
+		argsFor = (arm) => (arm === "wiki-nocapture" && writeTools.length > 0 ? ["--exclude-tools", writeTools.join(",")] : []);
+		if (arms.includes("wiki-nocapture")) {
+			const readOnly = (await preflight({ piCommand, dir: join(runsDir, id), model: args.model, arms: ["wiki-nocapture"], userContext, argsFor }))["wiki-nocapture"];
+			const problem = loadoutProblem("wiki-nocapture", readOnly.tools);
+			console.log(`  preflight wiki-nocapture: ${readOnly.tools.filter(isWikiCall).join(", ") || "no wiki tools"} (withheld: ${writeTools.length})`);
+			if (problem && !args["allow-unverified-arm"]) throw new Error(`preflight: ${problem}`);
+		}
 		if (arms.includes("brief")) {
 			// Built per task, from that task's base commit: one brief for the whole run would be wrong for
 			// a second repository, and reading it from the working tree would hand the arm hindsight.
 			for (const card of cards) {
 				const built = await buildBrief({ repo: card.repo, base: card.base, wikiRoot: card.wikiRoot ?? "docs/wiki", maxChars: briefChars });
-				briefs.set(card.id, built.text);
-				console.log(`  brief arm: ${card.id} — ${built.pages} page(s), ${built.text.length} char(s), read from ${card.base.slice(0, 8)}`);
+				briefs.set(card.id, built);
+				console.log(`  brief arm: ${card.id} — ${built.source}, ${built.pages} page(s), ${built.chars} char(s)${built.truncated ? " (TRUNCATED)" : ""}, read from ${card.base.slice(0, 8)}`);
 			}
 		}
 	}
@@ -338,6 +360,8 @@ async function main() {
 	for (const task of cards) {
 		if (!task.testCommand && !args["dry-run"]) console.warn(`warning: ${task.id} has no testCommand — the run will not be graded`);
 		const taskLinkDirs = Array.isArray(task.linkDirs) && task.linkDirs.length > 0 ? task.linkDirs : linkDirs;
+		const wikiRoot = (task.wikiRoot ?? "docs/wiki").replace(/\\/g, "/").replace(/\/+$/, "");
+		const canaries = [task.canary].filter(Boolean);
 		// Rotate the arm order per task: a fixed order always runs the wiki arm last, so any drift in the
 		// provider or the machine over a long session would land on one arm.
 		const taskIndex = cards.indexOf(task);
@@ -350,87 +374,124 @@ async function main() {
 					continue;
 				}
 				if (args["dry-run"]) {
-					console.log(`  would run: ${label} in a copy of ${task.repo} @ ${task.base.slice(0, 10)} (target ${task.target?.slice(0, 10) ?? "—"}, wiki ${arm === "wiki" ? "present" : "absent"})`);
+					console.log(`  would run: ${label} in a copy of ${task.repo} @ ${task.base.slice(0, 10)} (target ${task.target?.slice(0, 10) ?? "—"}, wiki ${keepsWiki(arm) ? "present" : "absent"})`);
 					continue;
 				}
-				const copy = join(runsDir, id, "copies", `${task.id}-${arm}-rep${repeat}`);
-				const startedAt = nowIso();
 				const slug = `${task.id}-${arm}-rep${repeat}`;
+				const attempt = nowIso().replace(/[:.]/g, "-");
+				const startedAt = nowIso();
 				const runStart = Date.now();
-				console.log(`  ${label}: preparing a copy of ${task.repo} @ ${task.base.slice(0, 8)}`);
-				const environment = await prepareTaskCopy({ task, dir: copy, arm, linkDirs: taskLinkDirs, link: !args["copy-deps"] });
-				if (environment.targetReachable) throw new Error(`${task.id}: the target commit is still reachable inside the task copy — refusing to run`);
-				// The two wiki arms differ in one thing only: how much upkeep the wiki does for itself.
-				const capture = arm === "wiki-nocapture" ? await configureCapture({ task, copy, cadence: "manual" }) : null;
-				const grader = await protectGrader({ task, copy });
-				const graders = await installGraders({ task, copy });
-				const depsBefore = await fingerprint(task.repo, taskLinkDirs);
+				// Neutral paths. In R1 the copy lived at eval/runs/<run>/copies/<task>-<arm>-rep1: the agent's
+				// cwd named the harness, the run and its own arm, and two directories up held every result.
+				const workRoot = await mkdtemp(join(tmpdir(), "ws-"));
+				const copy = join(workRoot, basename(task.repo));
+				const agentDir = await mkdtemp(join(tmpdir(), "ag-"));
+				try {
+					console.log(`  ${label}: preparing a copy of ${task.repo} @ ${task.base.slice(0, 8)}`);
+					const agent = await prepareAgentDir({ target: agentDir, excludePackages: keepsWiki(arm) ? [] : [WIKI_PACKAGE], userContext });
+					const environment = await prepareTaskCopy({ task, dir: copy, arm, linkDirs: taskLinkDirs, link: !args["copy-deps"] });
+					const capture = arm === "wiki-nocapture" ? await configureCapture({ copy, cadence: "manual" }) : null;
+					// Seen from where the agent will stand, just before it starts.
+					const refusals = [];
+					if (environment.targetReachable) refusals.push("the target commit is reachable inside the copy");
+					if (environment.remotes.length > 0) refusals.push(`the copy still has remotes (${environment.remotes.join(", ")})`);
+					const leaked = await graderLeaks({ task, copy });
+					if (leaked.length > 0) refusals.push(`hidden grader(s) already in the copy: ${leaked.join(", ")}`);
+					const mentions = await taskMentions({ task, copy });
+					if (mentions.length > 0) refusals.push(`the copy names the task or carries its canary (${mentions.join(", ")}) — add those paths to the card's excludePaths`);
+					if (refusals.length > 0) throw new Error(`${label}: refusing to run — ${refusals.join("; ")}`);
+					const depsBefore = await depsSignature(task.repo, taskLinkDirs);
 
-				console.log(
-					`  ${label}: running pi (wiki files ${environment.wikiPresent ? "present" : "absent"}, deps ${environment.deps.map((dep) => `${dep.name}:${dep.mode}`).join(" ") || "none"}, grader restored ${grader.restored.length}, hidden graders ${graders.length})`,
-				);
-				const { result, sessionDir, loadout } = await runArm({
-					task,
-					arm,
-					repeat,
-					copy,
-					piCommand,
-					agentDir: agentDirFor(arm, agentDirs),
-					brief: arm === "brief" ? briefs.get(task.id) ?? "" : "",
-					model: args.model,
-					thinking: args.thinking,
-					extraArgs,
-					runsDir: join(runsDir, id),
-					timeoutMinutes: task.timeoutMinutes,
-				});
-				const grading = await gradeRun({ task, copy, runsDir: join(runsDir, id), label: slug });
-				const depsAfter = await fingerprint(task.repo, taskLinkDirs);
-				const sharedDepsChanged = taskLinkDirs.filter((name) => depsBefore[name] !== depsAfter[name]);
-				if (sharedDepsChanged.length > 0) {
-					console.log(`      ! shared dependencies changed during this run: ${sharedDepsChanged.join(", ")} — later runs now have a different environment`);
+					console.log(
+						`  ${label}: running pi (wiki files ${environment.wikiPresent ? "present" : "absent"}${environment.sparse.length ? `, sparse ${environment.sparse.slice(1).join(" ")}` : ""}, deps ${environment.deps.map((dep) => `${dep.name}:${dep.mode}`).join(" ") || "none"}${argsFor(arm).length ? ", wiki write tools withheld" : ""})`,
+					);
+					const brief = arm === "brief" ? briefs.get(task.id) : undefined;
+					const sessionDir = join(runsDir, id, "sessions", task.id, arm, `rep${repeat}-${attempt}`);
+					const { result, session } = await runArm({
+						prompt: brief ? `${brief.text}\n\n---\n\n${task.prompt}` : task.prompt,
+						copy,
+						piCommand,
+						agentDir,
+						model: args.model,
+						thinking: args.thinking,
+						extraArgs: [...extraArgs, ...argsFor(arm)],
+						sessionDir,
+						logPath: join(runsDir, id, "logs", `${slug}.log`),
+						budgetMs: (task.timeoutMinutes ?? 5) * 60 * 1000,
+					});
+
+					// Everything that judges the agent's own work comes before any grader is in the tree.
+					const { text: patchText, ...patch } = await savePatch({ copy, dir: join(runsDir, id), slug });
+					const diff = await diffStats(copy, wikiRoot);
+					const quality = await qualitySignals({ task, copy, dir: join(runsDir, id), slug, spawn: spawnCapture });
+					const jev = keepsWiki(arm) ? await jevUsage({ copy, wikiRoot }) : { calls: 0, inputTokens: 0, outputTokens: 0, cost: 0 };
+					// Only now does the agent's tree receive its grader.
+					const grader = await protectGrader({ task, copy });
+					const graders = await installGraders({ task, copy });
+					const grading = await gradeRun({ task, copy, runsDir: join(runsDir, id), label: slug });
+					const depsAfter = await depsSignature(task.repo, taskLinkDirs);
+					const metrics = await measure({ copy, sessionDir });
+					const contamination = await scanSession({ sessionFile: session.sessionFile, forbidden, canaries });
+
+					const invalidReasons = [];
+					const loadoutIssue = loadoutProblem(arm, session.tools);
+					if (loadoutIssue) invalidReasons.push(loadoutIssue);
+					if (!session.sessionFile) invalidReasons.push("pi wrote no session");
+					if (metrics.error) invalidReasons.push(`measurement failed: ${metrics.error}`);
+					const sharedDepsChanged = taskLinkDirs.filter((name) => depsBefore[name] !== depsAfter[name]);
+					if (sharedDepsChanged.length > 0) invalidReasons.push(`shared dependencies changed during the run (${sharedDepsChanged.join(", ")})`);
+
+					const row = {
+						runId: id,
+						task: task.id,
+						arm,
+						repeat,
+						attempt,
+						armOrder: orderedArms.join(","),
+						repo: task.repo,
+						base: task.base,
+						target: task.target ?? null,
+						prompt: task.prompt ?? null,
+						wikiRoot,
+						startedAt,
+						endedAt: nowIso(),
+						wallMs: result.wallMs,
+						exitCode: result.exitCode,
+						timedOut: result.timedOut,
+						model: args.model ?? null,
+						thinkingLevel: session.thinkingLevel,
+						valid: invalidReasons.length === 0,
+						invalidReasons,
+						contamination,
+						armVerified: { expectedWikiTools: keepsWiki(arm), observedWikiTools: session.hasWikiTools, tools: session.tools.length, wikiTools: session.tools.filter(isWikiCall) },
+						agent: { userContext, contextFilesSkipped: agent.contextFilesSkipped, packagesRemoved: agent.removedPackages, toolsWithheld: argsFor(arm).length ? argsFor(arm)[1].split(",") : [] },
+						brief: brief ? { source: brief.source, pages: brief.pages, chars: brief.chars, truncated: brief.truncated, sha: brief.sha } : null,
+						environment: { ...environment, copyPath: copy, capture, graderRestored: grader.restored, gradersInstalled: graders, sharedDepsChanged },
+						grading,
+						diff,
+						patch,
+						quality,
+						metrics,
+						jev,
+						upkeep: session.upkeep,
+						stdoutTail: result.stdout.slice(-500),
+						stderrTail: result.stderr.slice(-500),
+					};
+					await appendJsonl(join(runsDir, id, "results.jsonl"), row);
+					const elapsed = Math.round((Date.now() - runStart) / 1000);
+					console.log(
+						`  ${label}: done in ${elapsed}s — exit ${result.exitCode}${result.timedOut ? " (TIMEOUT)" : ""} · graded ${grading.passed === null ? "n/a" : grading.passed ? "pass" : "fail"} · $${(metrics.cost ?? 0).toFixed(4)}${jev.calls ? ` + ${jev.calls} Jev call(s) (${jev.inputTokens} in)` : ""} · wiki tools ${session.tools.filter(isWikiCall).length} · patch ${patch.bytes}B${Object.keys(quality).length > 0 ? ` · quality ${Object.entries(quality).map(([name, value]) => `${name}:${value.passed ? "ok" : "FAIL"}`).join(" ")}` : ""}${contamination.clean ? "" : ` · CONTAMINATED (${contamination.reasons.join("; ")})`}`,
+					);
+					if (invalidReasons.length > 0 && !args["allow-unverified-arm"]) {
+						throw new Error(`${label}: ${invalidReasons.join("; ")} — recorded as invalid (--resume runs it again); stopping so an invalid comparison is not measured`);
+					}
+				} finally {
+					if (args["keep-copies"]) console.log(`      kept: ${copy} · agent dir ${agentDir}`);
+					else {
+						await rm(workRoot, { recursive: true, force: true });
+						await rm(agentDir, { recursive: true, force: true });
+					}
 				}
-				const metrics = await measure({ copy, sessionDir });
-				const diff = await diffStats(copy);
-				// Collect everything that needs the copy before it is deleted: the diff itself, and the
-				// project's own type-checker and linter over what this arm wrote.
-				const patch = await savePatch({ copy, dir: join(runsDir, id), slug });
-				const quality = await qualitySignals({ task, copy, dir: join(runsDir, id), slug, spawn: spawnCapture });
-				const row = {
-					runId: id,
-					task: task.id,
-					arm,
-					repeat,
-					armOrder: orderedArms.join(","),
-					repo: task.repo,
-					base: task.base,
-					target: task.target ?? null,
-					prompt: task.prompt ?? null,
-					startedAt,
-					endedAt: nowIso(),
-					wallMs: result.wallMs,
-					exitCode: result.exitCode,
-					timedOut: result.timedOut,
-					model: args.model ?? null,
-					thinkingLevel: loadout.thinkingLevel,
-					armVerified: { expectedWikiTools: keepsWiki(arm), observedWikiTools: loadout.hasWikiTools, tools: loadout.tools.length },
-					environment: { ...environment, capture, graderRestored: grader.restored, gradersInstalled: graders, sharedDepsChanged, agentPackagesRemoved: keepsWiki(arm) ? [] : [WIKI_PACKAGE] },
-					grading,
-					diff,
-					patch,
-					quality,
-					metrics,
-					stdoutTail: result.stdout.slice(-500),
-					stderrTail: result.stderr.slice(-500),
-				};
-				await appendJsonl(join(runsDir, id, "results.jsonl"), row);
-				const elapsed = Math.round((Date.now() - runStart) / 1000);
-				console.log(
-					`  ${label}: done in ${elapsed}s — exit ${result.exitCode}${result.timedOut ? " (TIMEOUT)" : ""} · graded ${grading.passed === null ? "n/a" : grading.passed ? "pass" : "fail"} · $${(metrics.cost ?? 0).toFixed(4)} · wikiTools=${loadout.hasWikiTools} · patch ${patch.bytes}B${Object.keys(quality).length > 0 ? ` · quality ${Object.entries(quality).map(([name, value]) => `${name}:${value.passed ? "ok" : "FAIL"}`).join(" ")}` : ""}`,
-				);
-				if (loadout.hasWikiTools !== keepsWiki(arm) && !args["allow-unverified-arm"]) {
-					throw new Error(`${label}: the ${arm} arm loaded the wrong tool set (wiki tools ${loadout.hasWikiTools ? "present" : "absent"}) — stopping so an invalid comparison is not measured`);
-				}
-				if (!args["keep-copies"]) await rm(copy, { recursive: true, force: true });
 			}
 		}
 	}

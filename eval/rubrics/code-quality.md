@@ -17,12 +17,9 @@ tests is not thereby good, and the point of this review is the difference the te
 
 ## Things to look at specifically
 
-- **Wiki pages are not scope creep.** A diff may include pages under the project's own wiki directory
-  (`docs/wiki/`), because the agent's tooling writes them as the work proceeds. Those files are the
-  tooling's own output, not drive-by edits, and they **must not lower the scope score**. Mention them in
-  your notes if they are there, and score scope on the *code* the task required — unrelated source churn
-  is what this dimension measures. The same applies to other artefacts the agent's own tooling owns
-  (its session records, its ledger).
+- **You are seeing source changes only.** Files the agents' own tooling writes were removed from every
+  diff before you saw it, and no test results are shown. Score what is in front of you: scope means
+  unrelated *source* churn, and correctness is your reading of the code, not a test outcome.
 - **Did the tests get weaker?** If the diff edits test files, decide whether it *strengthened* them or
   loosened them to fit the implementation (deleted assertions, skipped cases, relaxed expectations). Set
   `test_changes_weaken_tests` to true if it weakened them — that is the single most important flag here,

@@ -11,6 +11,10 @@
 			"to": "tests/ds-003-commands.test.ts"
 		}
 	],
+	"canary": "EVAL-CANARY-ds003-28824b",
+	"excludePaths": [
+		"handoffs"
+	],
 	"wikiRoot": "docs/wiki",
 	"timeoutMinutes": 10,
 	"linkDirs": [

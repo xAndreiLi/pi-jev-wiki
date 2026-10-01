@@ -9,6 +9,7 @@
  *
  *   node eval/pipeline.mjs --tasks eval/tasks/ds-*.json --model deepseek-flash \
  *        [--arms off,brief,wiki,wiki-nocapture] [--repeats 1] [--skip-checks] [--label <name>]
+ *        [--user-context none|real] [--judge] [--judge-model <id>] [--samples 3]
  *
  * Stages, all streaming to the terminal and to <runs>/<id>/pipeline.log:
  *   1. build the measurement package if its output is missing
@@ -47,7 +48,8 @@ async function main() {
 	if (taskList.length === 0 || args.help) {
 		console.log("Usage: node eval/pipeline.mjs --tasks <card.json[,...]> --model <id>");
 		console.log("       [--arms off,brief,wiki,wiki-nocapture] [--repeats 1] [--runs-dir eval/runs]");
-		console.log("       [--label <name>] [--skip-checks] [--judge] [--resume] [--runs <id>]");
+		console.log("       [--label <name>] [--skip-checks] [--judge] [--judge-model <id>] [--samples 3] [--resume] [--runs <id>]");
+		console.log("       [--user-context none|real]");
 		console.log("\nRuns self-test → grader discrimination → pilot → report → optional quality review, in the foreground.");
 		return;
 	}
@@ -93,7 +95,12 @@ async function main() {
 			4,
 			`pilot — ${taskList.length} task(s) × ${arms.split(",").length} arm(s) × ${repeats} repeat(s), costs money`,
 			node,
-			[join(here, "run.mjs"), "--tasks", taskList.join(","), "--arms", arms, "--repeats", repeats, "--model", args.model, "--runs-dir", runsDir, "--runs", id, ...(args.resume === true ? ["--resume"] : [])],
+			[
+				join(here, "run.mjs"),
+				...["--tasks", taskList.join(","), "--arms", arms, "--repeats", repeats, "--model", args.model, "--runs-dir", runsDir, "--runs", id],
+				...(args.resume === true ? ["--resume"] : []),
+				...(typeof args["user-context"] === "string" ? ["--user-context", args["user-context"]] : []),
+			],
 			{ logPath },
 		);
 	} catch (error) {
@@ -116,15 +123,18 @@ async function main() {
 		console.error(`\n\u26a0 the report could not be written: ${error instanceof Error ? error.message : String(error)}`);
 	}
 
+	// The judge should ideally be a stronger model than the agents it reviews; it defaults to theirs.
+	const judgeModel = typeof args["judge-model"] === "string" ? args["judge-model"] : args.model;
 	if (args.judge === true) {
 		try {
-			await stage(6, "blinded quality review (costs money)", node, [join(here, "judge.mjs"), "--run", id, "--runs-dir", runsDir, "--model", args.model], {
+			const judgeArgs = [join(here, "judge.mjs"), "--run", id, "--runs-dir", runsDir, "--model", judgeModel, ...(typeof args.samples === "string" ? ["--samples", args.samples] : [])];
+			await stage(6, "blinded quality review (costs money)", node, judgeArgs, {
 				logPath: join(runsDir, id, "judge.log"),
 				cwd: repoRoot,
 			});
 		} catch (error) {
 			console.error(`\n\u26a0 the quality review did not finish: ${error instanceof Error ? error.message : String(error)}`);
-			console.error(`  re-run it with: node eval/judge.mjs --run ${id} --model ${args.model}`);
+			console.error(`  re-run it with: node eval/judge.mjs --run ${id} --model ${judgeModel}`);
 		}
 	}
 
@@ -132,7 +142,7 @@ async function main() {
 
 	console.log(`\nDone. Everything from this run is in ${join(runsDir, id)}:`);
 	console.log("  report.md · results.jsonl · judgements.jsonl (if judged) · diffs/ · logs/ · sessions/ · pipeline.log");
-	console.log(`Quality review: node eval/judge.mjs --run ${id} --model ${args.model}   (add --judge to run it as part of the pipeline)`);
+	console.log(`Quality review: node eval/judge.mjs --run ${id} --model ${judgeModel}   (add --judge to run it as part of the pipeline)`);
 }
 
 main().catch((error) => {

@@ -1,3 +1,4 @@
+// eval-canary: EVAL-CANARY-ds008-c3e0b3 (the harness detects any agent that saw this file)
 /**
  * ds-008 — hidden grader.
  *

@@ -11,6 +11,10 @@
 			"to": "tests/ds-005-config-consistency.test.ts"
 		}
 	],
+	"canary": "EVAL-CANARY-ds005-af72b1",
+	"excludePaths": [
+		"handoffs"
+	],
 	"qualityCommands": {
 		"typecheck": "npm run typecheck"
 	},

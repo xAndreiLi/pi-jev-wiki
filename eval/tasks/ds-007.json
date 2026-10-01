@@ -11,6 +11,10 @@
 			"to": "tests/ds-007-audit.test.ts"
 		}
 	],
+	"canary": "EVAL-CANARY-ds007-b6fbfe",
+	"excludePaths": [
+		"handoffs"
+	],
 	"qualityCommands": {
 		"typecheck": "npm run typecheck"
 	},

@@ -11,6 +11,10 @@
 			"to": "tests/ds-008-redaction.test.ts"
 		}
 	],
+	"canary": "EVAL-CANARY-ds008-c3e0b3",
+	"excludePaths": [
+		"handoffs"
+	],
 	"qualityCommands": {
 		"typecheck": "npm run typecheck"
 	},

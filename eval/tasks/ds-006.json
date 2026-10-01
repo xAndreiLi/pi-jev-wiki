@@ -11,6 +11,10 @@
 			"to": "tests/ds-006-retention.test.ts"
 		}
 	],
+	"canary": "EVAL-CANARY-ds006-e719bd",
+	"excludePaths": [
+		"handoffs"
+	],
 	"qualityCommands": {
 		"typecheck": "npm run typecheck"
 	},

@@ -17,7 +17,7 @@
 import { mkdir, readFile, rm } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
-import { installGraders, prepareTaskCopy, protectGrader, shellCommand } from "./arms.mjs";
+import { assertCanary, installGraders, prepareTaskCopy, protectGrader, shellCommand } from "./arms.mjs";
 import { git, parseArgs, readJson, runId, spawnCapture } from "./lib.mjs";
 
 const DEFAULT_LINK_DIRS = ["node_modules", "web/node_modules", ".venv"];
@@ -80,6 +80,8 @@ async function main() {
 
 	const rows = [];
 	for (const task of cards) {
+		// A grader the agent could see without it showing up in the session would leak undetected.
+		await assertCanary(task);
 		const linkDirs = Array.isArray(task.linkDirs) && task.linkDirs.length > 0 ? task.linkDirs : DEFAULT_LINK_DIRS;
 		const targetSha = task.target ? await git(task.repo, ["rev-parse", `${task.target}^{commit}`]) : undefined;
 		const base = await checkAt({ task, sha: task.base, label: "base", dir, runsDir, linkDirs });
