@@ -12,7 +12,7 @@ import { mkdir, mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises"
 import { existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { buildBrief, compareToolsets, linkDependencies, prepareAgentDir, sparseExclude } from "./arms.mjs";
+import { buildBrief, compareToolsets, configureCapture, keepsWiki, linkDependencies, prepareAgentDir, sparseExclude } from "./arms.mjs";
 import { git, spawnCapture } from "./lib.mjs";
 
 let passed = 0;
@@ -128,11 +128,22 @@ try {
 	check("copy mode also works", copied.length === 1 && existsSync(join(root, "copy2", "node_modules", "pkg", "index.js")));
 
 	// --- brief --------------------------------------------------------------------------------
-	const brief = await buildBrief({ wikiDir: join(root, "repo", "docs", "wiki"), maxChars: 500, listMarkdown: listMarkdownForTest });
+	// Read from the base commit, never the working tree: a brief built from what is on disk today would
+	// carry knowledge written after the task was done.
+	const brief = await buildBrief({ repo: join(root, "repo"), base, wikiRoot: "docs/wiki", maxChars: 500 });
 	check("the brief carries page titles", brief.text.includes("A"));
 	check("the brief counts pages", brief.pages === 1);
-	const tiny = await buildBrief({ wikiDir: join(root, "repo", "docs", "wiki"), maxChars: 10, listMarkdown: listMarkdownForTest });
+	check("the brief names the commit it came from", brief.fromCommit === base);
+	const tiny = await buildBrief({ repo: join(root, "repo"), base, wikiRoot: "docs/wiki", maxChars: 10 });
 	check("the brief respects its character budget", tiny.text.length <= 10 + "[... truncated ...]".length + 60);
+
+	// --- arm identity and capture configuration ------------------------------------------------
+	check("wiki arms keep the wiki", keepsWiki("wiki") && keepsWiki("wiki-nocapture"));
+	check("control arms do not", !keepsWiki("off") && !keepsWiki("brief"));
+	const capture = await configureCapture({ copy: join(root, "copy"), cadence: "manual" });
+	const projectConfig = JSON.parse(await readFile(join(root, "copy", ".pi", "jev-wiki.json"), "utf8"));
+	check("the no-capture arm sets a manual cadence", projectConfig.capture.cadence === "manual");
+	check("the capture setting is reported back", capture.cadence === "manual");
 
 	// --- spawning ----------------------------------------------------------------------------
 	// A missing log directory used to abort the whole run with an unhandled stream error.

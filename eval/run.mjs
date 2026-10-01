@@ -24,10 +24,10 @@ import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { analyzeProject } from "../packages/pi-wiki-eval/dist/core/analyze.js";
-import { buildBrief, compareToolsets, defaultAgentDir, installGraders, prepareAgentDir, prepareTaskCopy, protectGrader, shellCommand, sparseExclude, TEST_PATTERN } from "./arms.mjs";
+import { buildBrief, compareToolsets, configureCapture, defaultAgentDir, installGraders, keepsWiki, prepareAgentDir, prepareTaskCopy, protectGrader, shellCommand, sparseExclude, TEST_PATTERN } from "./arms.mjs";
 import { appendJsonl, git, nowIso, parseArgs, readJson, runId, spawnCapture } from "./lib.mjs";
 
-const ARMS = ["off", "brief", "wiki"];
+const ARMS = ["off", "brief", "wiki", "wiki-nocapture"];
 /** Dependency directories a clone will not have. */
 const DEFAULT_LINK_DIRS = ["node_modules", "web/node_modules", ".venv"];
 const WIKI_PACKAGE = "pi-jev-wiki";
@@ -61,27 +61,6 @@ async function describePi(pathOrCommand, source = "explicit") {
 		if (bin) return { command: process.execPath, prefix: [join(dirname(pathOrCommand), bin)], version: packageJson.version, source };
 	}
 	return { command: pathOrCommand, prefix: [], source };
-}
-
-async function listMarkdown(dir) {
-	const found = [];
-	async function walk(current) {
-		let entries = [];
-		try {
-			entries = await readdir(current, { withFileTypes: true });
-		} catch {
-			return;
-		}
-		for (const entry of entries) {
-			const full = join(current, entry.name);
-			if (entry.isDirectory()) {
-				if (entry.name === "raw" || entry.name.startsWith(".")) continue;
-				await walk(full);
-			} else if (entry.name.endsWith(".md")) found.push(full);
-		}
-	}
-	await walk(dir);
-	return found.sort();
 }
 
 /**
@@ -306,7 +285,7 @@ async function main() {
 	if (!args["dry-run"]) await mkdir(join(runsDir, id), { recursive: true });
 
 	let agentDirs = {};
-	let brief = "";
+	const briefs = new Map();
 	if (!args["dry-run"]) {
 		console.log(`  pi: ${piCommand.command}${piCommand.prefix.length ? ` ${piCommand.prefix.join(" ")}` : ""}${piCommand.version ? ` (v${piCommand.version}, ${piCommand.source})` : ""}`);
 		const home = join(runsDir, id, "agent");
@@ -337,16 +316,24 @@ async function main() {
 			}
 		}
 		if (arms.includes("brief")) {
-			const first = cards[0];
-			brief = (await buildBrief({ wikiDir: join(first.repo, first.wikiRoot ?? "docs/wiki"), maxChars: briefChars, listMarkdown })).text;
-			console.log(`  brief arm: ${brief.length} char(s) of wiki contents (${briefChars} max)`);
+			// Built per task, from that task's base commit: one brief for the whole run would be wrong for
+			// a second repository, and reading it from the working tree would hand the arm hindsight.
+			for (const card of cards) {
+				const built = await buildBrief({ repo: card.repo, base: card.base, wikiRoot: card.wikiRoot ?? "docs/wiki", maxChars: briefChars });
+				briefs.set(card.id, built.text);
+				console.log(`  brief arm: ${card.id} — ${built.pages} page(s), ${built.text.length} char(s), read from ${card.base.slice(0, 8)}`);
+			}
 		}
 	}
 
 	for (const task of cards) {
 		if (!task.testCommand && !args["dry-run"]) console.warn(`warning: ${task.id} has no testCommand — the run will not be graded`);
 		const taskLinkDirs = Array.isArray(task.linkDirs) && task.linkDirs.length > 0 ? task.linkDirs : linkDirs;
-		for (const arm of arms) {
+		// Rotate the arm order per task: a fixed order always runs the wiki arm last, so any drift in the
+		// provider or the machine over a long session would land on one arm.
+		const taskIndex = cards.indexOf(task);
+		const orderedArms = arms.map((_, offset) => arms[(offset + taskIndex) % arms.length]);
+		for (const arm of orderedArms) {
 			for (let repeat = 1; repeat <= repeats; repeat += 1) {
 				const label = `${task.id} · ${arm} · rep${repeat}`;
 				if (args["dry-run"]) {
@@ -360,6 +347,8 @@ async function main() {
 				console.log(`  ${label}: preparing a copy of ${task.repo} @ ${task.base.slice(0, 8)}`);
 				const environment = await prepareTaskCopy({ task, dir: copy, arm, linkDirs: taskLinkDirs, link: !args["copy-deps"] });
 				if (environment.targetReachable) throw new Error(`${task.id}: the target commit is still reachable inside the task copy — refusing to run`);
+				// The two wiki arms differ in one thing only: how much upkeep the wiki does for itself.
+				const capture = arm === "wiki-nocapture" ? await configureCapture({ task, copy, cadence: "manual" }) : null;
 				const grader = await protectGrader({ task, copy });
 				const graders = await installGraders({ task, copy });
 				const depsBefore = await fingerprint(task.repo, taskLinkDirs);
@@ -374,7 +363,7 @@ async function main() {
 					copy,
 					piCommand,
 					agentDir: agentDirs[arm] ?? agentDirs.off,
-					brief: arm === "brief" ? brief : "",
+					brief: arm === "brief" ? briefs.get(task.id) ?? "" : "",
 					model: args.model,
 					thinking: args.thinking,
 					extraArgs,
@@ -394,6 +383,7 @@ async function main() {
 					task: task.id,
 					arm,
 					repeat,
+					armOrder: orderedArms.join(","),
 					repo: task.repo,
 					base: task.base,
 					target: task.target ?? null,
@@ -404,8 +394,8 @@ async function main() {
 					timedOut: result.timedOut,
 					model: args.model ?? null,
 					thinkingLevel: loadout.thinkingLevel,
-					armVerified: { expectedWikiTools: arm === "wiki", observedWikiTools: loadout.hasWikiTools, tools: loadout.tools.length },
-					environment: { ...environment, graderRestored: grader.restored, gradersInstalled: graders, sharedDepsChanged, agentPackagesRemoved: arm === "wiki" ? [] : [WIKI_PACKAGE] },
+					armVerified: { expectedWikiTools: keepsWiki(arm), observedWikiTools: loadout.hasWikiTools, tools: loadout.tools.length },
+					environment: { ...environment, capture, graderRestored: grader.restored, gradersInstalled: graders, sharedDepsChanged, agentPackagesRemoved: keepsWiki(arm) ? [] : [WIKI_PACKAGE] },
 					grading,
 					diff,
 					metrics,
@@ -417,7 +407,7 @@ async function main() {
 				console.log(
 					`  ${label}: done in ${elapsed}s — exit ${result.exitCode}${result.timedOut ? " (TIMEOUT)" : ""} · graded ${grading.passed === null ? "n/a" : grading.passed ? "pass" : "fail"} · $${(metrics.cost ?? 0).toFixed(4)} · wikiTools=${loadout.hasWikiTools}`,
 				);
-				if (loadout.hasWikiTools !== (arm === "wiki") && !args["allow-unverified-arm"]) {
+				if (loadout.hasWikiTools !== keepsWiki(arm) && !args["allow-unverified-arm"]) {
 					throw new Error(`${label}: the ${arm} arm loaded the wrong tool set (wiki tools ${loadout.hasWikiTools ? "present" : "absent"}) — stopping so an invalid comparison is not measured`);
 				}
 				if (!args["keep-copies"]) await rm(copy, { recursive: true, force: true });

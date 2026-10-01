@@ -43,7 +43,8 @@ results. `node eval/selftest.mjs` verifies all of them in seconds, with no model
 ## Usage
 
 ```bash
-node eval/selftest.mjs                      # verify the fairness machinery (no cost)
+node eval/pipeline.mjs --tasks eval/tasks/ds-*.json --model <id>   # everything: checks, pilot, report
+node eval/selftest.mjs                      # just the fairness machinery (no cost)
 
 # Split a project's history into candidate tasks (read-only)
 node eval/candidates.mjs --repo <repo> --limit 20 --write eval/tasks

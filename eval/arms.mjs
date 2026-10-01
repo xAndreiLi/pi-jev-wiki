@@ -170,17 +170,47 @@ export function compareToolsets(offTools, wikiTools) {
 }
 
 /**
+ * Arms that keep the wiki present. The difference between `wiki` and `wiki-nocapture` is the wiki's
+ * upkeep, not its retrieval: same tools, same pages, capture cadence set to manual in the copy.
+ */
+export function keepsWiki(arm) {
+	return arm.startsWith("wiki");
+}
+
+/** Write the per-arm project config that changes how much upkeep the wiki does. */
+export async function configureCapture({ task, copy, cadence }) {
+	const path = join(copy, ".pi", "jev-wiki.json");
+	let config = {};
+	try {
+		config = JSON.parse(await readFile(path, "utf8"));
+	} catch {
+		/* no project config yet */
+	}
+	config.capture = { ...(config.capture ?? {}), cadence };
+	await mkdir(dirname(path), { recursive: true });
+	await writeFile(path, `${JSON.stringify(config, null, "\t")}\n`, "utf8");
+	return { path: ".pi/jev-wiki.json", cadence };
+}
+
+/**
  * A budget-matched brief for the `brief` arm: the wiki's own table of contents, which is the cheapest
  * useful thing a wiki gives an agent, without its retrieval machinery.
+ *
+ * Read from the **base commit**, not the working tree. A brief built from whatever is on disk today
+ * would contain knowledge written after the task was done — hindsight handed to one arm only, which is
+ * the exact leak the base commit exists to prevent.
  */
-export async function buildBrief({ wikiDir, maxChars = 2000, listMarkdown }) {
-	if (!existsSync(wikiDir)) return { text: "", pages: 0 };
+export async function buildBrief({ repo, base, wikiRoot = "docs/wiki", maxChars = 2000 }) {
+	const root = wikiRoot.replace(/[\\/]+/g, "/").replace(/\/+$/, "");
+	const listed = (await git(repo, ["ls-tree", "-r", "--name-only", base, "--", root], { allowFailure: true }))
+		.split(/\r?\n/)
+		.filter((path) => path.endsWith(".md"));
 	const lines = [];
 	let pages = 0;
-	for (const path of await listMarkdown(wikiDir)) {
+	for (const path of listed) {
 		let text;
 		try {
-			text = await readFile(path, "utf8");
+			text = await git(repo, ["show", `${base}:${path}`], { trim: false });
 		} catch {
 			continue;
 		}
@@ -196,7 +226,7 @@ export async function buildBrief({ wikiDir, maxChars = 2000, listMarkdown }) {
 	const header = "Project wiki contents (titles and one-line summaries):";
 	const body = lines.join("\n");
 	const text = body.length > maxChars ? `${header}\n${body.slice(0, maxChars)}\n[... truncated ...]` : `${header}\n${body}`;
-	return { text, pages };
+	return { text, pages, fromCommit: base };
 }
 
 /** Test-file patterns, shared by grader protection and by the diff report. */
@@ -219,7 +249,7 @@ export async function prepareTaskCopy({ task, dir, arm, linkDirs = [], link = tr
 
 	// The control arms must not contain the artifact, and must not look like something was removed.
 	let sparse;
-	if (arm !== "wiki") sparse = await sparseExclude({ dir, git, wikiRoot });
+	if (!keepsWiki(arm)) sparse = await sparseExclude({ dir, git, wikiRoot });
 
 	const refs = (await git(dir, ["for-each-ref", "--format=%(refname)", "refs/heads", "refs/remotes", "refs/tags"])).split(/\r?\n/).filter(Boolean);
 	for (const ref of refs) await git(dir, ["update-ref", "-d", ref]);
