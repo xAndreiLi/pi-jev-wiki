@@ -1,0 +1,60 @@
+{
+	"name": "pi-wiki-eval",
+	"version": "0.1.0",
+	"description": "Measure where an agent's context went, and whether a project wiki replaced codebase discovery",
+	"type": "module",
+	"license": "MIT",
+	"author": "xAndreiLi",
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/xAndreiLi/pi-jev-wiki.git",
+		"directory": "packages/pi-wiki-eval"
+	},
+	"homepage": "https://github.com/xAndreiLi/pi-jev-wiki/tree/main/packages/pi-wiki-eval#readme",
+	"bugs": {
+		"url": "https://github.com/xAndreiLi/pi-jev-wiki/issues"
+	},
+	"engines": {
+		"node": ">=22"
+	},
+	"files": [
+		"dist",
+		"src",
+		"README.md",
+		"LICENSE"
+	],
+	"keywords": [
+		"pi-package",
+		"pi",
+		"evaluation",
+		"benchmark",
+		"context",
+		"wiki",
+		"telemetry",
+		"jev"
+	],
+	"bin": {
+		"pi-wiki-eval": "./dist/cli.js"
+	},
+	"pi": {
+		"extensions": [
+			"./dist/extension.js"
+		]
+	},
+	"scripts": {
+		"build": "tsc -p tsconfig.json",
+		"typecheck": "tsc --noEmit -p tsconfig.json",
+		"test": "npm run build && node dist/tests/run.js",
+		"prepublishOnly": "npm run test"
+	},
+	"peerDependencies": {
+		"@earendil-works/pi-ai": "*",
+		"@earendil-works/pi-coding-agent": "*",
+		"typebox": "*"
+	},
+	"devDependencies": {
+		"@earendil-works/pi-coding-agent": "0.85.1",
+		"@types/node": "^26.6.2",
+		"typescript": "^5.5.4"
+	}
+}
