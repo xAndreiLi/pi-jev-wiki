@@ -3,6 +3,14 @@
 **Date:** 2026-10-01 · **Repo:** `C:/Coding/pi-jev-wiki` (the harness) · **Testbed:** `C:/Coding/discord-assistant`
 **Status:** a run is **in flight** — see §3. Everything below is committed; nothing is left uncommitted except the run's own artefacts.
 
+> **Superseded the same day.** The run in §3 finished, but an audit found it contaminated: every arm saw
+> its grader, the copy's path named the arm, and the judge was not blind. **Do not write it up as R1**
+> (`eval/runs/r1-run-2026-10-01T08-44-45/CONTAMINATED.md`). The harness was then hardened: neutral
+> temp copies, graders after the agent, canaries plus a session scan, a read-only `wiki-nocapture`, a
+> code-only blind judge, and a self-test that drives the real runner with a stub pi. The guarantees in
+> §5 and the quality table in §4 are superseded by `eval/README.md` and
+> `docs/wiki/wiki/architecture/gotcha-eval-harness-leaks.md`.
+
 Read this first if you are picking the work up in a new session. It covers what the test is, how to run
 and resume it, what has been found, every harness guarantee, and the mistakes already made so they are not
 repeated.
