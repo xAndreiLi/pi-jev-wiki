@@ -84,6 +84,22 @@ async function listMarkdown(dir) {
 	return found.sort();
 }
 
+/**
+ * Cheap fingerprint of the directories runs share, so that a write-back (an `npm install` inside one
+ * run) is detected rather than assumed away: it would change the environment for every later run.
+ */
+async function fingerprint(repoDir, names) {
+	const out = {};
+	for (const name of names) {
+		try {
+			out[name] = Math.round((await stat(join(repoDir, name))).mtimeMs);
+		} catch {
+			out[name] = null;
+		}
+	}
+	return out;
+}
+
 /** The tool loadout pi persists in the session's first system message. */
 async function readLoadout(sessionDir) {
 	const files = [];
@@ -298,6 +314,7 @@ async function main() {
 		const wikiAgent = await prepareAgentDir({ target: agentDirs.wiki, excludePackages: [] });
 		const controlAgent = await prepareAgentDir({ target: agentDirs.off, excludePackages: [WIKI_PACKAGE] });
 		console.log(`  agent dirs: control excludes [${controlAgent.removedPackages.join(", ") || "nothing"}]; every other package, tool and skill stays loaded`);
+		if (wikiAgent.isolated.length > 0) console.log(`  per-run state: ${wikiAgent.isolated.join(", ")} — no run inherits another run's index or session`);
 		if (controlAgent.removedPackages.length === 0) {
 			throw new Error(`${WIKI_PACKAGE} is not in the agent's package list, so the control arm cannot be built by removing it — refusing to run, because disabling all extensions would make the control a less capable agent.`);
 		}
@@ -345,6 +362,7 @@ async function main() {
 				if (environment.targetReachable) throw new Error(`${task.id}: the target commit is still reachable inside the task copy — refusing to run`);
 				const grader = await protectGrader({ task, copy });
 				const graders = await installGraders({ task, copy });
+				const depsBefore = await fingerprint(task.repo, taskLinkDirs);
 
 				console.log(
 					`  ${label}: running pi (wiki files ${environment.wikiPresent ? "present" : "absent"}, deps ${environment.deps.map((dep) => `${dep.name}:${dep.mode}`).join(" ") || "none"}, grader restored ${grader.restored.length}, hidden graders ${graders.length})`,
@@ -364,6 +382,11 @@ async function main() {
 					timeoutMinutes: task.timeoutMinutes,
 				});
 				const grading = await gradeRun({ task, copy, runsDir: join(runsDir, id), label: slug });
+				const depsAfter = await fingerprint(task.repo, taskLinkDirs);
+				const sharedDepsChanged = taskLinkDirs.filter((name) => depsBefore[name] !== depsAfter[name]);
+				if (sharedDepsChanged.length > 0) {
+					console.log(`      ! shared dependencies changed during this run: ${sharedDepsChanged.join(", ")} — later runs now have a different environment`);
+				}
 				const metrics = await measure({ copy, sessionDir });
 				const diff = await diffStats(copy);
 				const row = {
@@ -382,7 +405,7 @@ async function main() {
 					model: args.model ?? null,
 					thinkingLevel: loadout.thinkingLevel,
 					armVerified: { expectedWikiTools: arm === "wiki", observedWikiTools: loadout.hasWikiTools, tools: loadout.tools.length },
-					environment: { ...environment, graderRestored: grader.restored, gradersInstalled: graders, agentPackagesRemoved: arm === "wiki" ? [] : [WIKI_PACKAGE] },
+					environment: { ...environment, graderRestored: grader.restored, gradersInstalled: graders, sharedDepsChanged, agentPackagesRemoved: arm === "wiki" ? [] : [WIKI_PACKAGE] },
 					grading,
 					diff,
 					metrics,

@@ -24,9 +24,17 @@ import { dirname, join } from "node:path";
 import { git, gitOk } from "./lib.mjs";
 
 /** Directories in an agent dir that are large enough to link rather than copy. */
-const LINKED_DIRS = ["npm", "jev-wiki"];
+const LINKED_DIRS = ["npm"];
 /** Directories never carried into an arm: runs use --session-dir. */
 const SKIPPED_DIRS = ["sessions"];
+/**
+ * State that must NOT be shared between runs. The wiki's vector index is a derived cache, and a shared
+ * one accumulates entries pointing at every previous run's deleted copy — retrieval would then drift
+ * over the course of a pilot, in one arm only. The embedding-model cache next to it is read-only, so
+ * that one is linked: re-downloading 900 MB per run would be absurd, but a fresh index per run costs
+ * nothing but CPU.
+ */
+const ISOLATED_STATE = { "jev-wiki": { link: ["models"], copy: ["wikis.json"], skip: ["vector"] } };
 
 export function defaultAgentDir() {
 	return process.env.PI_CODING_AGENT_DIR?.trim() || join(homedir(), ".pi", "agent");
@@ -40,6 +48,7 @@ export async function prepareAgentDir({ source = defaultAgentDir(), target, excl
 	await rm(target, { recursive: true, force: true });
 	await mkdir(target, { recursive: true });
 	const linked = [];
+	const isolated = [];
 	let entries;
 	try {
 		entries = await readdir(source, { withFileTypes: true });
@@ -51,6 +60,22 @@ export async function prepareAgentDir({ source = defaultAgentDir(), target, excl
 		const to = join(target, entry.name);
 		if (entry.isDirectory()) {
 			if (SKIPPED_DIRS.includes(entry.name)) continue;
+			const isolation = ISOLATED_STATE[entry.name];
+			if (isolation) {
+				await mkdir(to, { recursive: true });
+				for (const child of isolation.link) {
+					const childPath = join(from, child);
+					if (!existsSync(childPath)) continue;
+					await linkDir(childPath, join(to, child));
+					linked.push(`${entry.name}/${child}`);
+				}
+				for (const child of isolation.copy) {
+					const childPath = join(from, child);
+					if (existsSync(childPath)) await cp(childPath, join(to, child));
+				}
+				isolated.push(`${entry.name} (${isolation.skip.join(", ")} left behind)`);
+				continue;
+			}
 			if (LINKED_DIRS.includes(entry.name)) {
 				await linkDir(from, to);
 				linked.push(entry.name);
@@ -77,7 +102,7 @@ export async function prepareAgentDir({ source = defaultAgentDir(), target, excl
 		}
 		await writeFile(settingsPath, `${JSON.stringify(settings, null, 2)}\n`, "utf8");
 	}
-	return { dir: target, linked, removedPackages: removed };
+	return { dir: target, linked, isolated, removedPackages: removed };
 }
 
 async function linkDir(from, to) {

@@ -60,9 +60,13 @@ try {
 	// --- agent directory ----------------------------------------------------------------------
 	const fakeAgent = join(root, "agent-src");
 	await mkdir(join(fakeAgent, "npm"), { recursive: true });
-	await mkdir(join(fakeAgent, "jev-wiki"), { recursive: true });
+	await mkdir(join(fakeAgent, "jev-wiki", "models"), { recursive: true });
+	await mkdir(join(fakeAgent, "jev-wiki", "vector"), { recursive: true });
 	await mkdir(join(fakeAgent, "sessions"), { recursive: true });
 	await writeFile(join(fakeAgent, "npm", "big.txt"), "store\n", "utf8");
+	await writeFile(join(fakeAgent, "jev-wiki", "models", "cache.bin"), "model cache\n", "utf8");
+	await writeFile(join(fakeAgent, "jev-wiki", "vector", "index.db"), "derived index\n", "utf8");
+	await writeFile(join(fakeAgent, "jev-wiki", "wikis.json"), "{}\n", "utf8");
 	await writeFile(join(fakeAgent, "auth.json"), "{}\n", "utf8");
 	await writeFile(join(fakeAgent, "AGENTS.md"), "context\n", "utf8");
 	await writeFile(
@@ -79,6 +83,10 @@ try {
 	check("user context is carried into the control", existsSync(join(control.dir, "AGENTS.md")));
 	check("sessions are not carried into the control", !existsSync(join(control.dir, "sessions")));
 	check("large directories are linked, not copied", control.linked.includes("npm"));
+	check("the embedding-model cache is linked, not copied", control.linked.includes("jev-wiki/models"));
+	check("the wiki registry is carried over", existsSync(join(control.dir, "jev-wiki", "wikis.json")));
+	check("a stale derived index is NOT carried into a run", !existsSync(join(control.dir, "jev-wiki", "vector")));
+	check("the isolation is reported", control.isolated.some((entry) => entry.includes("vector")));
 
 	const treated = await prepareAgentDir({ source: fakeAgent, target: join(root, "agent-wiki"), excludePackages: [] });
 	const treatedSettings = JSON.parse(await readFile(join(treated.dir, "settings.json"), "utf8"));
