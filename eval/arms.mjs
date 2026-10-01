@@ -246,6 +246,17 @@ export function blindOrder(arms, seedText) {
 }
 
 /**
+ * Which agent directory an arm runs from. Every arm must map to one: when the fourth arm had no mapping it
+ * silently fell back to the control's environment, loaded no wiki tools, and only the per-run verification
+ * caught it — after a full arm had been spent.
+ */
+export function agentDirFor(arm, dirs) {
+	if (!keepsWiki(arm)) return dirs.off;
+	if (!dirs.wiki) throw new Error(`no agent directory for the ${arm} arm`);
+	return dirs.wiki;
+}
+
+/**
  * Keep the diff each arm produced. Without this the interesting artefact is deleted with the copy, and a
  * quality review afterwards has nothing to read — which is exactly what happened to the first pilot.
  */

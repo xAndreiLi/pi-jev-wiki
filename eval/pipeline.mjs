@@ -85,27 +85,50 @@ async function main() {
 		});
 	}
 
-	await stage(
-		4,
-		`pilot — ${taskList.length} task(s) × ${arms.split(",").length} arm(s) × ${repeats} repeat(s), costs money`,
-		node,
-		[join(here, "run.mjs"), "--tasks", taskList.join(","), "--arms", arms, "--repeats", repeats, "--model", args.model, "--runs-dir", runsDir, "--runs", id, ...(args.resume === true ? ["--resume"] : [])],
-		{ logPath },
-	);
+	// A pilot that dies partway must not take the test with it: whatever completed is still reported and
+	// judged, and the exact command to continue is printed.
+	let pilotError = null;
+	try {
+		await stage(
+			4,
+			`pilot — ${taskList.length} task(s) × ${arms.split(",").length} arm(s) × ${repeats} repeat(s), costs money`,
+			node,
+			[join(here, "run.mjs"), "--tasks", taskList.join(","), "--arms", arms, "--repeats", repeats, "--model", args.model, "--runs-dir", runsDir, "--runs", id, ...(args.resume === true ? ["--resume"] : [])],
+			{ logPath },
+		);
+	} catch (error) {
+		pilotError = error;
+		console.error(`\n\u26a0 the pilot did not finish: ${error.message}`);
+		console.error(`  runs recorded so far: ${join(runsDir, id, "results.jsonl")}`);
+		console.error(`  continue with: node eval/pipeline.mjs --tasks ${taskList.join(",")} --model ${args.model} --arms ${arms} --runs ${id} --resume${args.judge === true ? " --judge" : ""}`);
+		console.error("  reporting and judging what did complete\n");
+	}
 
-	const report = await stage(5, "paired report", node, [join(here, "report.mjs"), "--run", id, "--runs-dir", runsDir], {
-		timeoutMs: 5 * 60 * 1000,
-		logPath: join(runsDir, id, "report.log"),
-		cwd: repoRoot,
-	});
-	await writeFile(join(runsDir, id, "report.md"), report.stdout, "utf8");
-
-	if (args.judge === true) {
-		await stage(6, "blinded quality review (costs money)", node, [join(here, "judge.mjs"), "--run", id, "--runs-dir", runsDir, "--model", args.model], {
-			logPath: join(runsDir, id, "judge.log"),
+	let report = { stdout: "" };
+	try {
+		report = await stage(5, "paired report", node, [join(here, "report.mjs"), "--run", id, "--runs-dir", runsDir], {
+			timeoutMs: 5 * 60 * 1000,
+			logPath: join(runsDir, id, "report.log"),
 			cwd: repoRoot,
 		});
+		await writeFile(join(runsDir, id, "report.md"), report.stdout, "utf8");
+	} catch (error) {
+		console.error(`\n\u26a0 the report could not be written: ${error instanceof Error ? error.message : String(error)}`);
 	}
+
+	if (args.judge === true) {
+		try {
+			await stage(6, "blinded quality review (costs money)", node, [join(here, "judge.mjs"), "--run", id, "--runs-dir", runsDir, "--model", args.model], {
+				logPath: join(runsDir, id, "judge.log"),
+				cwd: repoRoot,
+			});
+		} catch (error) {
+			console.error(`\n\u26a0 the quality review did not finish: ${error instanceof Error ? error.message : String(error)}`);
+			console.error(`  re-run it with: node eval/judge.mjs --run ${id} --model ${args.model}`);
+		}
+	}
+
+	if (pilotError) process.exitCode = 1;
 
 	console.log(`\nDone. Everything from this run is in ${join(runsDir, id)}:`);
 	console.log("  report.md · results.jsonl · judgements.jsonl (if judged) · diffs/ · logs/ · sessions/ · pipeline.log");

@@ -24,7 +24,7 @@ import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { analyzeProject } from "../packages/pi-wiki-eval/dist/core/analyze.js";
-import { buildBrief, compareToolsets, configureCapture, defaultAgentDir, installGraders, keepsWiki, prepareAgentDir, prepareTaskCopy, protectGrader, qualitySignals, savePatch, shellCommand, sparseExclude, TEST_PATTERN } from "./arms.mjs";
+import { agentDirFor, blindOrder, buildBrief, compareToolsets, configureCapture, defaultAgentDir, installGraders, keepsWiki, prepareAgentDir, prepareTaskCopy, protectGrader, qualitySignals, savePatch, shellCommand, sparseExclude, TEST_PATTERN } from "./arms.mjs";
 import { appendJsonl, git, nowIso, parseArgs, readJson, readJsonl, runId, spawnCapture } from "./lib.mjs";
 
 const ARMS = ["off", "brief", "wiki", "wiki-nocapture"];
@@ -297,6 +297,8 @@ async function main() {
 		console.log(`  pi: ${piCommand.command}${piCommand.prefix.length ? ` ${piCommand.prefix.join(" ")}` : ""}${piCommand.version ? ` (v${piCommand.version}, ${piCommand.source})` : ""}`);
 		const home = join(runsDir, id, "agent");
 		agentDirs = { wiki: join(home, "wiki"), off: join(home, "off"), brief: join(home, "off"), "wiki-nocapture": join(home, "wiki") };
+		// Fail before spending anything if an arm has no environment to run in.
+		for (const arm of arms) agentDirFor(arm, agentDirs);
 		const wikiAgent = await prepareAgentDir({ target: agentDirs.wiki, excludePackages: [] });
 		const controlAgent = await prepareAgentDir({ target: agentDirs.off, excludePackages: [WIKI_PACKAGE] });
 		console.log(`  agent dirs: control excludes [${controlAgent.removedPackages.join(", ") || "nothing"}]; every other package, tool and skill stays loaded`);
@@ -373,7 +375,7 @@ async function main() {
 					repeat,
 					copy,
 					piCommand,
-					agentDir: agentDirs[arm] ?? (keepsWiki(arm) ? agentDirs.wiki : agentDirs.off),
+					agentDir: agentDirFor(arm, agentDirs),
 					brief: arm === "brief" ? briefs.get(task.id) ?? "" : "",
 					model: args.model,
 					thinking: args.thinking,

@@ -19,6 +19,7 @@
  */
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
+import { createHash } from "node:crypto";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { blindOrder, defaultAgentDir, prepareAgentDir } from "./arms.mjs";
@@ -75,11 +76,24 @@ async function main() {
 
 	const rubricPath = resolve(typeof args.rubric === "string" ? args.rubric : join(here, "rubrics", "code-quality.md"));
 	const rubric = await readFile(rubricPath, "utf8");
+	// The rubric is part of the measurement, so a judgement only counts for the rubric that produced it.
+	// Changing the rubric therefore re-scores the tasks automatically instead of leaving two rubrics mixed
+	// in one run.
+	const rubricHash = createHash("sha1").update(rubric).digest("hex").slice(0, 8);
 
 	const wanted = Array.isArray(args.tasks) && args.tasks.length > 0 ? new Set(args.tasks) : undefined;
+	// Judgements already recorded for a task are not paid for twice: this lets the judge run over finished
+	// tasks while a pilot is still going, and then finish the rest at the end of the pipeline.
+	const alreadyJudged = new Set();
+	if (args.force !== true) {
+		for (const row of await readJsonl(join(runDir, "judgements.jsonl"))) {
+			if (row.rubricHash === rubricHash) alreadyJudged.add(row.task);
+		}
+	}
 	const byTask = new Map();
 	for (const row of rows) {
 		if (wanted && !wanted.has(row.task)) continue;
+		if (alreadyJudged.has(row.task)) continue;
 		if (!row.patch?.path) throw new Error(`${row.task} · ${row.arm}: no preserved patch — this run predates diff preservation, so there is nothing to review`);
 		if (!byTask.has(row.task)) byTask.set(row.task, []);
 		byTask.get(row.task).push(row);
@@ -92,7 +106,7 @@ async function main() {
 	const agentDir = join(judgeHome, "agent");
 	await prepareAgentDir({ source: args["agent-dir"] ? String(args["agent-dir"]) : defaultAgentDir(), target: agentDir, excludePackages: ["pi-jev-wiki"] });
 
-	console.log(`judging ${byTask.size} task(s) from ${runId}${args["dry-run"] ? " (dry run)" : ""}\n`);
+	console.log(`judging ${byTask.size} task(s) from ${runId}${args["dry-run"] ? " (dry run)" : ""} · rubric ${rubricHash}${alreadyJudged.size > 0 ? ` — skipping ${alreadyJudged.size} already judged under this rubric` : ""}\n`);
 	const judgements = [];
 
 	for (const [task, taskRows] of byTask) {
@@ -179,6 +193,7 @@ async function main() {
 				testChangesWeakenTests: entry.test_changes_weaken_tests ?? null,
 				comparison: parsed.comparison ?? null,
 				rubric: rubricPath.replace(/\\/g, "/").split("/eval/")[1] ?? rubricPath,
+				rubricHash,
 			};
 			await appendJsonl(join(runDir, "judgements.jsonl"), record);
 			judgements.push(record);

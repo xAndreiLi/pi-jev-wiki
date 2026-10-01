@@ -12,7 +12,7 @@ import { mkdir, mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises"
 import { existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { blindOrder, buildBrief, compareToolsets, configureCapture, keepsWiki, linkDependencies, prepareAgentDir, savePatch, sparseExclude } from "./arms.mjs";
+import { agentDirFor, blindOrder, buildBrief, compareToolsets, configureCapture, keepsWiki, linkDependencies, prepareAgentDir, savePatch, sparseExclude } from "./arms.mjs";
 import { git, spawnCapture } from "./lib.mjs";
 
 let passed = 0;
@@ -140,6 +140,18 @@ try {
 	// --- arm identity and capture configuration ------------------------------------------------
 	check("wiki arms keep the wiki", keepsWiki("wiki") && keepsWiki("wiki-nocapture"));
 	check("control arms do not", !keepsWiki("off") && !keepsWiki("brief"));
+	// The regression this guards: an arm with no agent directory silently ran in the control's environment.
+	const dirs = { wiki: join(root, "agent-wiki"), off: join(root, "agent-off") };
+	check("every arm resolves to an environment", ["off", "brief", "wiki", "wiki-nocapture"].every((arm) => typeof agentDirFor(arm, dirs) === "string"));
+	check("wiki arms run from the wiki environment", agentDirFor("wiki-nocapture", dirs) === dirs.wiki && agentDirFor("wiki", dirs) === dirs.wiki);
+	check("control arms run from the control environment", agentDirFor("off", dirs) === dirs.off && agentDirFor("brief", dirs) === dirs.off);
+	let missingDirThrew = false;
+	try {
+		agentDirFor("wiki", { off: dirs.off });
+	} catch {
+		missingDirThrew = true;
+	}
+	check("a missing wiki environment is refused rather than downgraded", missingDirThrew);
 	const capture = await configureCapture({ copy: join(root, "copy"), cadence: "manual" });
 	const projectConfig = JSON.parse(await readFile(join(root, "copy", ".pi", "jev-wiki.json"), "utf8"));
 	check("the no-capture arm sets a manual cadence", projectConfig.capture.cadence === "manual");
