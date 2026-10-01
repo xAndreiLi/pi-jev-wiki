@@ -11,11 +11,12 @@ claims:
     text: "`wiki_review` resolutions verify the page after the serializer round-trip: the affected claim's status is re-read and a warning is returned when it did not survive the write (accept → verified unless user-stated, reject → rejected, supersede → superseded), because frontmatter is re-serialized on every write."
     status: verified
     support: 0.87
-    evidence: [raw/sessions/2026-09-26-session-2026-09-26-010608.md, "96ca8ca"]
+    evidence: [raw/sessions/2026-09-26-session-2026-09-26-010608.md, 96ca8ca]
     reviewed: 2026-09-26
-    last_checked: 2026-09-26
+    last_checked: 2026-09-28
 files: [src/review.ts]
 ---
+
 
 # Review resolutions verify the serializer round-trip
 

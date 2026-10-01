@@ -4,7 +4,7 @@ type: architecture/flow
 topic: architecture
 summary: "At the end of work, the agent composes an insight list with evidence pointers; Jev filters and places each insight, and the agent writes the resulting updates. Capture runs on a configurable cadence (manual, task, or commit), with onCompact as an independent trigger."
 tags: [capture, insights, workflow, cadence]
-updated: 2026-09-26
+updated: 2026-09-28
 sources: [raw/jev-wiki-architecture-notes/2026-09-19-jev-wiki-architecture-notes.md, raw/knowledge-pipeline-current/2026-09-26-knowledge-pipeline-current-state.md]
 claims:
   - id: c1
@@ -12,30 +12,32 @@ claims:
     status: verified
     support: 0.98
     evidence: [raw/jev-wiki-architecture-notes/2026-09-19-jev-wiki-architecture-notes.md]
-    last_checked: 2026-09-26
+    last_checked: 2026-09-28
   - id: c2
     text: "capture.cadence has three modes: manual (default, only /wiki:capture or explicit wiki_insights), task (after each settled task, a Jev pre-screen decides whether the session is worth extracting; accepted insights are queued for the agent to write with a 10-minute debounce), and commit (only after a new git commit is detected, regardless of how it was made, with no time debounce)."
     status: verified
     support: 0.97
     evidence: [raw/knowledge-pipeline-current/2026-09-26-knowledge-pipeline-current-state.md]
-    reviewed: 2026-09-26
-    last_checked: 2026-09-26
+    reviewed: 2026-09-28
+    last_checked: 2026-09-28
   - id: c3
     text: "capture.onCompact: true is an independent trigger that captures before context compaction."
     status: verified
     support: 0.97
     evidence: [raw/knowledge-pipeline-current/2026-09-26-knowledge-pipeline-current-state.md]
     reviewed: 2026-09-26
-    last_checked: 2026-09-26
+    last_checked: 2026-09-28
   - id: c4
     text: "The legacy capture.onSettle: true still enables task capture."
     status: verified
     support: 0.98
     evidence: [raw/knowledge-pipeline-current/2026-09-26-knowledge-pipeline-current-state.md]
     reviewed: 2026-09-26
-    last_checked: 2026-09-26
+    last_checked: 2026-09-28
 files: [src/pipeline/capture.ts, src/config.ts]
 ---
+
+
 
 
 

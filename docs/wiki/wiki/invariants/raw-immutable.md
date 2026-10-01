@@ -8,20 +8,21 @@ updated: 2026-09-26
 sources: [raw/jev-wiki-architecture-notes/2026-09-19-jev-wiki-architecture-notes.md, raw/sessions/2026-09-26-session-2026-09-26-0025.md]
 claims:
   - id: c1
-    text: "Raw sources under raw/ are immutable; the wiki only ever reads them."
+    text: Raw sources under raw/ are immutable; the wiki only ever reads them.
     status: verified
     support: 0.98
     evidence: [raw/jev-wiki-architecture-notes/2026-09-19-jev-wiki-architecture-notes.md]
-    last_checked: 2026-09-19
+    last_checked: 2026-09-28
   - id: c2
     text: "Raw sources are append-only: a same-day/same-title ingest or same-minute session capture gets a content-hash suffix instead of overwriting the earlier file, and ingest normalizes CRLF/CR to LF before hashing and storing so Windows line endings cannot break dedup or raw-index matching."
     status: verified
     support: 0.92
-    evidence: [raw/sessions/2026-09-26-session-2026-09-26-0025.md, "c5e5f62"]
+    evidence: [raw/sessions/2026-09-26-session-2026-09-26-0025.md, c5e5f62]
     reviewed: 2026-09-26
-    last_checked: 2026-09-26
+    last_checked: 2026-09-28
 files: [src/wiki/layout.ts, src/extension.ts]
 ---
+
 
 # Raw sources are immutable
 

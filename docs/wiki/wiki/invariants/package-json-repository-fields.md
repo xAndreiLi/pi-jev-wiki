@@ -2,7 +2,7 @@
 title: package.json repository fields must point to the real repo before publishing
 type: invariant
 topic: invariants
-summary: The repository, homepage, and bugs fields in package.json must point at the real repository before publishing to npm.
+summary: "The repository, homepage, and bugs fields in package.json must point at the real repository before publishing to npm."
 tags: [npm, package.json, publishing, metadata]
 updated: 2026-09-20
 sources: [raw/releasing/2026-09-20-releasing.md]
@@ -10,11 +10,12 @@ claims:
   - id: c1
     text: "The repository, homepage, and bugs fields in package.json must point at the real repository before publishing."
     status: accepted
-    support: 0.80
+    support: 0.8
     evidence: [raw/releasing/2026-09-20-releasing.md]
-files:
-  - package.json
+    last_checked: 2026-09-28
+files: [package.json]
 ---
+
 
 # package.json repository fields must point to the real repo before publishing
 

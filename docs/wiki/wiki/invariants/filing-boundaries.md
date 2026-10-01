@@ -13,7 +13,7 @@ claims:
     support: 0.95
     evidence: [raw/knowledge-pipeline-current/2026-09-26-knowledge-pipeline-current-state.md, docs/wiki/wiki/invariants/filing-boundaries.md]
     reviewed: 2026-09-26
-    last_checked: 2026-09-26
+    last_checked: 2026-09-28
     corroborations: 2
     last_confirmed: 2026-09-26
   - id: c2
@@ -22,9 +22,10 @@ claims:
     support: 0.95
     evidence: [raw/knowledge-pipeline-current/2026-09-26-knowledge-pipeline-current-state.md]
     reviewed: 2026-09-26
-    last_checked: 2026-09-26
+    last_checked: 2026-09-28
 files: [src/pipeline/adjudicate.ts, src/review.ts]
 ---
+
 
 
 # Filing boundaries

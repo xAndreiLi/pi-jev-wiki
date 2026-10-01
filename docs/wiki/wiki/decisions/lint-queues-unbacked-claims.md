@@ -4,34 +4,18 @@ type: decision
 topic: decisions
 summary: "The wiki lint process queues claims lacking accepted ledger entries as review items instead of deleting or rejecting them, because a missing ledger entry may be a bookkeeping gap rather than bad knowledge."
 tags: [lint, claims, review-queue, ledger, bookkeeping]
-updated: 2026-09-20
-sources: [src/lint.ts]
+updated: 2026-09-28
+sources: [raw/sessions/2026-09-19-session-2026-09-19-1806.md, src/lint.ts]
 claims:
   - id: c1
     text: "Unbacked claims are queued as review items rather than deleted, because a missing ledger entry may indicate a bookkeeping gap rather than bad knowledge."
-    status: superseded
-    support: 0.8
-    evidence: ""
+    status: user-stated
+    support: 0.74
+    evidence: [raw/sessions/2026-09-19-session-2026-09-19-1806.md, src/lint.ts]
     reviewed: 2026-09-20
-    last_checked: 2026-09-26
-  - 0: s
-    1: r
-    2: c
-    3: /
-    4: l
-    5: i
-    6: n
-    7: t
-    8: .
-    9: t
-    10: s
+    last_checked: 2026-09-28
 files: [src/lint.ts]
 ---
-
-
-
-
-
 
 # Lint Queues Unbacked Claims
 
@@ -76,3 +60,8 @@ if (!backed && !reviewed) {
 - The review queue may accumulate low-criticality items for claims that are actually correct but simply lack ledger entries.
 - Human review (or a later backfill of ledger entries) is required to clear these items.
 - The agent must not auto-accept these items in headless mode because the default criticality (`0.45`) is below typical auto-accept thresholds.
+
+## History
+
+- 2026-09-19 — decision captured from session `raw/sessions/2026-09-19-session-2026-09-19-1806.md`; an earlier consolidation superseded this claim in favor of the mis-titled duplicate `decisions/retry-handling-in-client.md`.
+- 2026-09-28 — duplicate removed; this accurately named page with the fuller implementation detail is the canonical copy, and the claim is restored to `user-stated`.

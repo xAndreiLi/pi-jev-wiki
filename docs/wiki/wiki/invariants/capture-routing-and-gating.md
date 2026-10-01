@@ -13,7 +13,7 @@ claims:
     support: 0.87
     evidence: [raw/session-capture-2026-09-26/2026-09-26-session-capture-2026-09-26-home-session-moved-from-the-life.md, src/extension.ts]
     reviewed: 2026-09-26
-    last_checked: 2026-09-26
+    last_checked: 2026-09-28
     superseded_by: "Capture routing defaults to the subject wiki (c3); the working-directory rule now applies only when capture.route is session or no registered wiki owns the session's edits."
     superseded_at: 2026-09-26
   - id: c2
@@ -22,16 +22,17 @@ claims:
     support: 0.9
     evidence: [raw/session-capture-2026-09-26/2026-09-26-session-capture-2026-09-26-home-session-moved-from-the-life.md, src/extension.ts]
     reviewed: 2026-09-26
-    last_checked: 2026-09-26
+    last_checked: 2026-09-28
   - id: c3
     text: "Capture routing is deterministic and auditable: the target is either the subject wiki chosen from edit evidence or the session's working-directory wiki, every decision is recorded in the ledger as capture.route, and an ambiguous match produces a warning in the brief rather than a silent guess."
     status: verified
     support: 0.83
-    evidence: [raw/sessions/2026-09-26-session-2026-09-26-0025.md, "c5e5f62"]
+    evidence: [raw/sessions/2026-09-26-session-2026-09-26-0025.md, c5e5f62]
     reviewed: 2026-09-26
-    last_checked: 2026-09-26
+    last_checked: 2026-09-28
 files: [src/extension.ts, src/config.ts, src/wiki/target.ts]
 ---
+
 
 # Capture routing and gating
 

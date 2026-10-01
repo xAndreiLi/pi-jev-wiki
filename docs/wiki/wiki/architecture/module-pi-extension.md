@@ -4,7 +4,7 @@ type: architecture/module
 topic: architecture
 summary: Owns staging, Jev adjudication, placement, and TOC/log bookkeeping for the project wiki.
 tags: [pi-extension, architecture, wiki]
-updated: 2026-09-19
+updated: 2026-09-28
 sources: [raw/jev-wiki-architecture-notes/2026-09-19-jev-wiki-architecture-notes.md]
 claims:
   - id: c1
@@ -17,18 +17,31 @@ claims:
     status: verified
     support: 0.95
     evidence: [docs/plans/PLAN.md]
-files: []
+files: [src/extension.ts, src/config.ts, src/pipeline/capture.ts, src/pipeline/adjudicate.ts, src/wiki/toc.ts]
 ---
 
 # pi extension module
 
-**Responsibility.** Owns the wiki tools registered in pi sessions (`wiki_toc`, `wiki_ask`, `wiki_ingest`, `wiki_insights`, `wiki_finalize`). It stages sources, runs Jev adjudication, decides placement, and maintains the table of contents and log.
+**Responsibility.** Owns the wiki tools registered in pi sessions. It stages sources, runs Jev adjudication, decides placement, and maintains the table of contents and log.
 
-**Public surface.** The five wiki tool contracts exposed to agents.
+**Public surface.** Fifteen `wiki_*` tools exposed to agents, grouped by job:
 
-**Dependencies.** A separate Jev client that speaks to TypeSafe's System One API.
+- **Knowledge** — `wiki_toc`, `wiki_ask`, `wiki_status`.
+- **Writing** — `wiki_ingest`, `wiki_insights`, `wiki_finalize`, `wiki_remove`.
+- **Maintenance** — `wiki_sync`, `wiki_review`, `wiki_lint`, `wiki_structure`, `wiki_index`, `wiki_doctor`, `wiki_setup`, `wiki_triage`.
 
-**Key files.** None documented (extension code not yet mapped).
+Every tool accepts an optional `wiki: "<registered name>"` and targets exactly one registered wiki per call; omitting it keeps the session wiki ([cross-wiki writes](../decisions/cross-wiki-writes.md)).
+
+**Dependencies.** A provider-agnostic Jev client (`src/jev.ts`) speaking to System One, plus the local vector stack (PGlite + pgvector, `@huggingface/transformers`) used by retrieval and the catalog.
+
+**Key files.**
+
+- `src/extension.ts` — tool registration, session hooks, and orchestration.
+- `src/config.ts` — configuration schema and defaults (`.pi/jev-wiki.json`).
+- `src/pipeline/` — capture/extraction (`capture.ts`, `extract.ts`), adjudication (`adjudicate.ts`), page writing (`write.ts`).
+- `src/wiki/` — layout, lock, frontmatter, TOC/manifest, search, links, cross-wiki target resolution.
+- `src/vector/` — chunking, embeddings, index, judgments, registry, discovery.
+- `src/review.ts`, `src/sync.ts`, `src/lint.ts`, `src/doctor.ts`, `src/triage.ts`, `src/structure.ts` — maintenance flows.
 
 ## Invariants
 
@@ -49,3 +62,7 @@ files: []
 
 - [Jev typed decisions](../invariants/jev-typed-decisions.md)
 - [Capture flow](../architecture/flow-capture.md)
+- [Cross-wiki write routing](../decisions/cross-wiki-writes.md)
+- [One install source only](../pi/one-install-source.md)
+- [Structure coverage check](structure-coverage.md)
+- [Provider-agnostic Jev client schema](../decisions/provider-agnostic-schema.md)

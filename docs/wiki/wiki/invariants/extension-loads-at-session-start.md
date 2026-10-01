@@ -13,16 +13,17 @@ claims:
     support: 0.9
     evidence: [raw/session-capture-2026-09-26/2026-09-26-session-capture-2026-09-26-home-session-moved-from-the-life.md, src/extension.ts]
     reviewed: 2026-09-26
-    last_checked: 2026-09-26
+    last_checked: 2026-09-28
   - id: c2
     text: "Config files are re-read per event (loadConfig caches nothing), so editing capture.cadence or another config value takes effect on the next settled task without a reload; only plugin code is fixed for the session."
     status: verified
     support: 0.85
     evidence: [raw/session-capture-2026-09-26/2026-09-26-session-capture-2026-09-26-home-session-moved-from-the-life.md, src/config.ts, src/extension.ts]
     reviewed: 2026-09-26
-    last_checked: 2026-09-26
+    last_checked: 2026-09-28
 files: [src/config.ts, src/extension.ts]
 ---
+
 
 # Extension loads at session start
 

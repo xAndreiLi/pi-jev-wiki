@@ -13,16 +13,17 @@ claims:
     support: 0.91
     evidence: [raw/sessions/2026-09-26-session-2026-09-26-0025.md, "Andrei, 2026-09-26: \"Lets plan with cross wiki writes in mind and implement that first.\""]
     reviewed: 2026-09-26
-    last_checked: 2026-09-26
+    last_checked: 2026-09-28
   - id: c2
     text: "Auto-capture routes by subject by default: `capture.route: subject` files the capture into the registered wiki that owns the files the session actually edited when exactly one does; ambiguous, missing, or evidence-only matches keep the session wiki and add a visible warning to the brief. `capture.route: session` restores the working-directory rule."
     status: verified
     support: 0.83
     evidence: [raw/sessions/2026-09-26-session-2026-09-26-0025.md, "Andrei, 2026-09-26: \"Then the auto routing can work by default and warn if it is ambiguous.\""]
     reviewed: 2026-09-26
-    last_checked: 2026-09-26
+    last_checked: 2026-09-28
 files: [src/extension.ts, src/wiki/target.ts, src/config.ts]
 ---
+
 
 
 

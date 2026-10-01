@@ -30,3 +30,4 @@ files: []
 ## Related
 
 - [Granular tokens require All Packages for initial creation](../invariants/granular-token-all-packages.md)
+- [Bypass-2FA token restrictions since August 2026](../decisions/bypass-2fa-token-restrictions.md)

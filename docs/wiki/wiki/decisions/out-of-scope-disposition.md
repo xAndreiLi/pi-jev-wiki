@@ -13,9 +13,10 @@ claims:
     support: 0.57
     evidence: [raw/sessions/2026-09-26-session-2026-09-26-0025.md, src/review.ts]
     reviewed: 2026-09-26
-    last_checked: 2026-09-26
+    last_checked: 2026-09-28
 files: [src/review.ts, src/extension.ts]
 ---
+
 
 
 # Out-of-scope review disposition

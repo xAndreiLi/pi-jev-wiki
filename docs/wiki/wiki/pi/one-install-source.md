@@ -13,7 +13,7 @@ claims:
     support: 0.9299999999999999
     evidence: [raw/sessions/2026-09-26-session-2026-09-26-2307.md, README.md, docs/wiki/wiki/pi/one-install-source.md]
     reviewed: 2026-09-26
-    last_checked: 2026-09-26
+    last_checked: 2026-09-28
     corroborations: 4
     last_confirmed: 2026-09-26
   - id: c2
@@ -22,11 +22,12 @@ claims:
     support: 0.9099999999999999
     evidence: [raw/sessions/2026-09-26-session-2026-09-26-2307.md, pi -ne -e …, docs/wiki/wiki/pi/one-install-source.md]
     reviewed: 2026-09-26
-    last_checked: 2026-09-26
+    last_checked: 2026-09-28
     corroborations: 3
     last_confirmed: 2026-09-26
 files: [README.md]
 ---
+
 
 
 

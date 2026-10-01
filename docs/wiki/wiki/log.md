@@ -480,3 +480,97 @@
 - Updated: decisions/finalize-before-decisions.md
 - Updated: decisions/review-round-trip-verification.md
 
+## [2026-09-28] sync | 35 claim(s) checked
+- Baseline: afbcc1a → fd88e40
+- Changed files: 24
+- Applied: architecture/flow-capture.md#c2 → needs_recheck
+- Applied: architecture/gotcha-skill-schema-drift.md#c1 → supersede
+
+## [2026-09-28] remove | 1 page(s)
+- Reason: Duplicate of decisions/lint-queues-unbacked-claims.md: Jev's duplicate check scored similarity 1 / same 0.90 (ledger 2026-09-19 and 2026-09-20) and recommended consolidate. The page's title ("Retry Handling in Client") never matched its lint-queue content, and the surviving page carries the same decision plus implementation detail. Its claim is restored to user-stated and the history note records the consolidation.
+- Removed: decisions/retry-handling-in-client.md
+
+## [2026-09-28] lint | 0 added, 0 broken links, 0 unbacked claims
+- Pages: 36
+- TOC updated: 4 · missing files: 0
+- Orphans: 5 · raw backlog: 0
+- Contradiction checks: 8 · duplicate candidates: 1
+
+## [2026-09-28] lint | 0 added, 0 broken links, 0 unbacked claims
+- Pages: 36
+- TOC updated: 0 · missing files: 0
+- Orphans: 0 · raw backlog: 0
+- Contradiction checks: 8 · duplicate candidates: 1
+
+## [2026-09-28] finalize | Hardening pass: sync baseline caught up (afbcc1a→fd88e40) and both impacts resolved; module-pi-extension refreshed to the 15-tool surface and key-file map; corrupted retry-handling-in-client duplicate removed and lint-queues-unbacked-claims repaired (canonical claim restored to user-stated); five orphan pages wired in; lint clean.
+- Updated: architecture/module-pi-extension.md
+- Updated: architecture/table-of-contents.md
+- Updated: decisions/lint-queues-unbacked-claims.md
+- Updated: decisions/bypass-2fa-token-restrictions.md
+- Updated: invariants/oidc-requires-existing-package.md
+
+## [2026-10-01] capture | 4 insights (tool)
+- Raw: raw/sessions/2026-10-01-session-2026-10-01-014049.md
+- Filed 0 · reinforced 0 · review 1 · rejected 3
+
+## [2026-10-01] capture | 3 insights (tool)
+- Raw: raw/sessions/2026-10-01-session-2026-10-01-014102.md
+- Filed 1 · reinforced 0 · review 0 · rejected 2
+
+## [2026-10-01] capture | 2 insights (tool)
+- Raw: raw/sessions/2026-10-01-session-2026-10-01-014110.md
+- Filed 1 · reinforced 0 · review 0 · rejected 1
+- Promoted 1 recurring candidate(s) to review
+
+## [2026-10-01] capture | 1 insights (tool)
+- Raw: raw/sessions/2026-10-01-session-2026-10-01-014120.md
+- Filed 0 · reinforced 0 · review 0 · rejected 1
+
+## [2026-10-01] capture | 1 insights (tool)
+- Raw: raw/sessions/2026-10-01-session-2026-10-01-014128.md
+- Filed 0 · reinforced 0 · review 0 · rejected 1
+
+## [2026-10-01] finalize | Added the efficacy-measurement substrate and the rediscovery-metric decision while writing docs/plans/EFFICACY.md (measurement plan: instruments, history-replay tasks, arms, statistics, kill criteria).
+- Updated: architecture/flow-eval-substrate.md
+- Updated: decisions/eval-mechanism-metric.md
+
+## [2026-10-01] finalize | Corrected a wrong explanation on the eval-substrate page: four evidence rejections were caused by unresolved file refs that the brief does not report, not by Jev being unable to ground installed-package citations. Full bug report in handoffs/2026-10-01-search-fallback-and-evidence-diagnostics.md.
+- Updated: architecture/flow-eval-substrate.md
+
+## [2026-10-01] capture | 2 insights (tool)
+- Raw: raw/sessions/2026-10-01-session-2026-10-01-015135.md
+- Filed 1 · reinforced 0 · review 1 · rejected 0
+
+## [2026-10-01] finalize | Recorded the silent-search-degradation gotcha and the decision to preserve the corrupt index for a triage session, plus the handoff's friction log.
+- Updated: architecture/gotcha-silent-search-degradation.md
+
+## [2026-10-01] capture | 3 insights (tool)
+- Raw: raw/sessions/2026-10-01-session-2026-10-01-020321.md
+- Filed 0 · reinforced 0 · review 2 · rejected 1
+
+## [2026-10-01] finalize | Documented the pi-wiki-eval measurement package (module page + the decision to ship it separately) alongside the implementation in packages/pi-wiki-eval.
+- Updated: architecture/module-pi-wiki-eval.md
+- Updated: decisions/eval-separate-package.md
+
+## [2026-10-01] capture | 3 insights (tool)
+- Raw: raw/sessions/2026-10-01-session-2026-10-01-021352.md
+- Filed 2 · reinforced 0 · review 0 · rejected 1
+
+## [2026-10-01] finalize | R0 complete: study document at docs/studies/R0-retrospective.md; corrected the consultation metric (read vs maintenance) in the tool and in every doc that carried the old 93% figure; recorded the maintenance/consultation gotcha and extended the rediscovery decision with its code-wiki scope limit.
+- Updated: architecture/gotcha-wiki-consultation-vs-maintenance.md
+- Updated: decisions/eval-mechanism-metric.md
+- Updated: architecture/module-pi-wiki-eval.md
+
+## [2026-10-01] capture | 2 insights (tool)
+- Raw: raw/sessions/2026-10-01-session-2026-10-01-032158.md
+- Filed 0 · reinforced 0 · review 1 · rejected 1
+
+## [2026-10-01] finalize | Documented the A/B evaluation harness (invariants, the local-vs-global pi finding, what the pilot measures) alongside the implementation in eval/.
+- Updated: architecture/eval-harness.md
+
+## [2026-10-01] finalize | Added the branch-per-task convention for the experiment and the wiki-side invalidation hazard (a page about a task written before it runs) to the harness page, matching the handoff committed in discord-assistant as 0a2acac.
+- Updated: architecture/eval-harness.md
+
+## [2026-10-01] finalize | Hardened the A/B harness for fairness: per-arm agent directories so the control differs only by the wiki (verified 10 shared tools + 15 wiki-only), a tool-loadout equality gate that refuses confounded runs, sparse-checkout for a clean control tree, dependency handling, grader restoration from the target commit, and a required pinned model; added eval/selftest.mjs (22 checks, no model calls) and the brief arm. Documented in the harness page and in the discord-assistant handoff (commit 0f05e6c).
+- Updated: architecture/eval-harness.md
+

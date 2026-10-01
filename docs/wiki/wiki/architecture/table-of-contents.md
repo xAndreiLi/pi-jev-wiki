@@ -102,3 +102,4 @@ files: [src/wiki/toc.ts, src/wiki/manifest.ts, src/vector/catalog.ts, src/vector
 ## See also
 
 - [Adjudication policy](adjudication-policy.md)
+- [Generated files are never hand-edited](../invariants/generated-files.md)

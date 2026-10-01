@@ -13,11 +13,12 @@ claims:
     support: 0.97
     evidence: [raw/sessions/2026-09-26-session-2026-09-26-0041.md, docs/RELEASING.md, "Observed 2026-09-26: @latest reported success while the store copy stayed 0.7.1; @0.8.0 installed 0.8.0 and rewrote the spec.", pi/npm-minor-version-pin.md]
     reviewed: 2026-09-26
-    last_checked: 2026-09-26
+    last_checked: 2026-09-28
     corroborations: 4
     last_confirmed: 2026-09-26
 files: [docs/RELEASING.md]
 ---
+
 
 
 

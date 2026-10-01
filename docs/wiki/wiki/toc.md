@@ -1,17 +1,17 @@
 # Wiki TOC
 
-> 37 pages across 4 topics. Per-topic tables: `toc/<topic>.md`. Full machine index: `index.md`.
+> 43 pages across 4 topics. Per-topic tables: `toc/<topic>.md`. Full machine index: `index.md`.
 
 | Topic | Pages | Table |
 |-------|-------|-------|
-| architecture | 10 | [toc/architecture.md](toc/architecture.md) |
-| decisions | 13 | [toc/decisions.md](toc/decisions.md) |
+| architecture | 15 | [toc/architecture.md](toc/architecture.md) |
+| decisions | 14 | [toc/decisions.md](toc/decisions.md) |
 | invariants | 11 | [toc/invariants.md](toc/invariants.md) |
 | pi | 3 | [toc/pi.md](toc/pi.md) |
 
 ## Recently updated
-- [Adjudication policy computed in code](architecture/adjudication-policy.md) — Thresholds and composite scores are computed in code, making Jev verdicts advisory and policy changes model-free. (2026-09-26)
-- [Capture can file the agent's proposals as the user's words](architecture/gotcha-capture-proposals.md) — Historical: session extraction could label an assistant recommendation as `user:` evidence with no code check that the words came from a user turn, and Jev then scored trustTier user_stated; 0.8.0 closes the pathway by validating user evidence against actual user turns. (2026-09-26)
-- [Capture evidence resolves from the session cwd](architecture/gotcha-capture-evidence-resolution.md) — Insight evidence refs are read relative to the capture session's working directory — files via resolve(cwd, ref), commits via git show in cwd — so a capture session outside the project reads no evidence and Jev grounds verifiable file/commit claims at 0.03–0.05 instead of ~0.9. (2026-09-26)
-- [Capture flow](architecture/flow-capture.md) — At the end of work, the agent composes an insight list with evidence pointers; Jev filters and places each insight, and the agent writes the resulting updates. Capture runs on a configurable cadence (manual, task, or commit), with onCompact as an independent trigger. (2026-09-26)
-- [Claim schema drift between the skill and code](architecture/gotcha-skill-schema-drift.md) — Historical: the llm-wiki skill was the only documentation of the page-claim schema and its status list had drifted from the code; SKILL.md now documents needs_recheck, reviewed, last_checked, needs_review, the YAML subset, and the rule to update it alongside the code. (2026-09-26)
+- [Degraded search is indistinguishable from an empty wiki](architecture/gotcha-silent-search-degradation.md) — A wiki_ask whose vector half fails returns local-wiki results, tagged and scored like real matches, with no warning in the default hybrid path — so an agent reading a low-recall result set concludes the knowledge is absent and re-derives what the wiki already holds. (2026-10-01)
+- [Efficacy measurement substrate](architecture/flow-eval-substrate.md) — Agent-side cost, context, and discovery accounting derives from pi's own session JSONL rather than from instrumenting the package, and because the wiki is committed alongside the code, code and knowledge can be rewound to the same commit for a hindsight-free comparison. (2026-10-01)
+- [pi-wiki-eval — the measurement package](architecture/module-pi-wiki-eval.md) — A separate npm package that measures where an agent's context went and whether the wiki replaced codebase discovery: it derives episodes, cost, tool buckets, and the rediscovery join entirely from pi's session JSONL and the wiki's on-disk state, with no dependency on this extension. (2026-10-01)
+- [The A/B evaluation harness](architecture/eval-harness.md) — The controlled wiki-on/wiki-off experiment: task cards replayed from a repository's own commits, run in throwaway clones whose target commit is pruned to be unreachable, with each arm's tool loadout verified from the session before any number is trusted. (2026-10-01)
+- [Wiki maintenance is not wiki consultation](architecture/gotcha-wiki-consultation-vs-maintenance.md) — Counting every `wiki_*` call as consultation overstates use badly, because capture and upkeep dominate: splitting reads from writes dropped the measured rate from 93% to 30% on this repository, 87% to 60% on calisthenics, and 80% to 30% on discord-assistant. (2026-10-01)

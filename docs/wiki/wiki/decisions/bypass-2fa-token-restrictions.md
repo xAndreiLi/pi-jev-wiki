@@ -47,3 +47,8 @@ files: []
 ## Evidence
 
 - `docs/RELEASING.md` — "Since August 2026 bypass-2FA tokens cannot perform account or package-governance actions, and direct publishing with them is scheduled to be removed in January 2027."
+
+## Related
+
+- [OIDC trusted publishing requires an existing npm package](../invariants/oidc-requires-existing-package.md)
+- [package.json repository fields must point to the real repo before publishing](../invariants/package-json-repository-fields.md)

@@ -13,16 +13,17 @@ claims:
     support: 0.96
     evidence: [raw/sessions/2026-09-26-session-2026-09-26-005931.md, "The response that you make for me at the end of your task where you ask for my decisions need to always be after the wiki finalize step. Right now, (not this time at least) the wiki finalize step runs and then my terminal is flooded with your decision making about maintaining the wiki. Add this to the wiki skill."]
     reviewed: 2026-09-26
-    last_checked: 2026-09-26
+    last_checked: 2026-09-28
   - id: c2
     text: "Auto-capture delivery is advisory by default (`capture.triggerTurn: false`): the settle hook writes the brief to `pending-capture.md` and delivers it when the next turn begins, instead of forcing a follow-up turn that repeated wiki maintenance and a second answer after every finished response; `capture.triggerTurn: true` restores the forced turn."
     status: verified
     support: 0.94
-    evidence: [raw/sessions/2026-09-26-session-2026-09-26-010608.md, "96ca8ca", "Andrei, 2026-09-26: \"I saw you give me a response but then the wiki_finalize tool triggered and then you had to give it to me again.\""]
+    evidence: [raw/sessions/2026-09-26-session-2026-09-26-010608.md, 96ca8ca, "Andrei, 2026-09-26: \"I saw you give me a response but then the wiki_finalize tool triggered and then you had to give it to me again.\""]
     reviewed: 2026-09-26
-    last_checked: 2026-09-26
+    last_checked: 2026-09-28
 files: [skills/llm-wiki/SKILL.md, src/extension.ts, src/config.ts]
 ---
+
 
 # Finalize the wiki before presenting decisions
 

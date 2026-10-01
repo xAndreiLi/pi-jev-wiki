@@ -13,9 +13,10 @@ claims:
     support: 0.75
     evidence: [raw/sessions/2026-09-26-session-2026-09-26-2317.md, src/vector/embed.ts]
     reviewed: 2026-09-26
-    last_checked: 2026-09-26
+    last_checked: 2026-09-28
 files: [src/vector/embed.ts, src/vector/index.ts, src/extension.ts]
 ---
+
 
 
 # Embedding model emits progress for cached loads
