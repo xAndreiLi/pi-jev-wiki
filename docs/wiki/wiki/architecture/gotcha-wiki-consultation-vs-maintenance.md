@@ -13,9 +13,10 @@ claims:
     support: 0.95
     evidence: [raw/sessions/2026-10-01-session-2026-10-01-021352.md, docs/studies/R0-retrospective.md, packages/pi-wiki-eval/src/core/classify.ts]
     reviewed: 2026-10-01
-    last_checked: 2026-10-01
+    last_checked: 2026-10-02
 files: [packages/pi-wiki-eval/src/core/classify.ts, packages/pi-wiki-eval/src/core/episodes.ts]
 ---
+
 
 # Wiki maintenance is not wiki consultation
 

@@ -27,6 +27,15 @@ files: []
 
 **How to verify.** Audit page frontmatter for non-empty `evidence` arrays; spot-check that quoted text exists in the cited raw source.
 
+## Incident claims
+
+Reproduced command output is not one of the four admissible kinds, so an incident claim whose only
+support is a captured trace needs the session raw as a `source` with the verbatim excerpt — the raw
+is itself a raw source, and the trace is inside it. With command-kind evidence alone, the 2026-10-02
+vector-store recovery claims scored grounded 0.48–0.64 and the adjudicator advised rejection; the
+page was filed with a recorded override. Prefer `source` whenever the evidence is something that
+happened rather than something that is written down.
+
 ## Related
 
 - [Raw sources are immutable](../invariants/raw-immutable.md)

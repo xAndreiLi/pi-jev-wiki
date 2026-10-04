@@ -4,49 +4,50 @@ type: architecture/flow
 topic: architecture
 summary: "The controlled wiki-on/wiki-off experiment: task cards run in throwaway clones under neutral temp paths, with the answer pruned, graders installed only after the agent, each arm's tool loadout verified, every session scanned for contamination, and fairness self-tested from the agent's side with a stub pi."
 tags: [evaluation, measurement, harness, benchmark, experiment]
-updated: 2026-10-01
+updated: 2026-10-02
 sources: [raw/sessions/2026-10-01-session-2026-10-01-021352.md, raw/sessions/2026-10-01-session-2026-10-01-032158.md, raw/sessions/2026-10-01-session-2026-10-01-070617.md]
 claims:
   - id: c1
     text: "The A/B harness refuses to measure an experiment it cannot verify: it clones the repository and prunes every ref so the target commit is unreachable (a worktree would expose the answer through the shared object database), reads the tool loadout pi persists in the session's first system message to prove each arm had the tools it should, and runs a preflight that aborts the whole run when the wiki arm would have no wiki tools."
-    status: verified
+    status: needs_recheck
     support: 0.85
     evidence: [raw/sessions/2026-10-01-session-2026-10-01-032158.md, eval/run.mjs, eval/README.md]
     reviewed: 2026-10-01
-    last_checked: 2026-10-01
+    last_checked: 2026-10-02
   - id: c2
     text: "Each eval run (one task, arm and repeat) gets a fresh agent directory and a fresh copy under neutral temp paths (%TEMP%/ag-*, %TEMP%/ws-*/<repo>). The agent directory has no wiki registry and, by default, no user-level AGENTS.md; --user-context real keeps the user's context. The reason is R1: the copy's path named the arm and sat inside the run directory, the inherited registry exposed the live testbed wiki and this repository's notes on the experiment, and the user's AGENTS.md told every arm to keep the wiki current and to consult a life wiki."
     status: verified
     evidence: [eval/run.mjs, eval/arms.mjs, raw/sessions/2026-10-01-session-2026-10-01-070617.md]
     reviewed: 2026-10-01
-    last_checked: 2026-10-01
+    last_checked: 2026-10-02
   - id: c3
     text: "The wiki-nocapture eval arm is a read-only wiki. Capture cadence is set to manual, and the arm runs with pi's --exclude-tools for every wiki write tool the treatment's preflight loadout shows. The cadence flag alone left agent-initiated capture in place: 4–10 wiki writes per run in R1."
-    status: verified
+    status: needs_recheck
     support: 0.41
     evidence: [eval/run.mjs, "pi docs/cli.md: --exclude-tools <list> disables comma-separated tool names after all other selection options", raw/sessions/2026-10-01-session-2026-10-01-070617.md]
     reviewed: 2026-10-01
-    last_checked: 2026-10-01
+    last_checked: 2026-10-02
   - id: c4
     text: "The eval quality judge sees only code-only diffs pasted inline under arbitrary labels: paths under the wiki root and .pi/ are stripped, and no file names or test results are shown. It runs with --no-tools --no-context-files in an empty temp directory, and is sampled several times with a fresh label order each time, so the spread between samples is reported next to the mean. R1's judge saw the arm in each patch's file name and read results.jsonl."
     status: verified
     evidence: [eval/judge.mjs, raw/sessions/2026-10-01-session-2026-10-01-070617.md]
     reviewed: 2026-10-01
-    last_checked: 2026-10-01
+    last_checked: 2026-10-02
   - id: c5
     text: "Eval fairness is verified from the agent's side. eval/selftest.mjs drives the real run.mjs, report.mjs and judge.mjs with a stub pi (eval/stub-pi.mjs), which calls no model and records what an agent in its working directory can see: files on disk, remotes, git status, registry, user context, the path names, and the judge's prompt. Reintroducing three R1 defects in a scratch copy fails 10 checks (graders installed before the agent), 4 (copies inside the run directory) and 1 (patch paths in the judge prompt)."
     status: verified
     evidence: [eval/selftest.mjs, eval/stub-pi.mjs, raw/sessions/2026-10-01-session-2026-10-01-070617.md]
     reviewed: 2026-10-01
-    last_checked: 2026-10-01
+    last_checked: 2026-10-02
   - id: c6
     text: "Eval runs are checked for contamination after the fact rather than sandboxed. Each card has a canary that every one of its graders contains. A run is recorded as contaminated, and kept out of the statistics, if any tool output carries that canary, or if any tool call's arguments name the harness, the source repository, a registered wiki, or the user's sessions, AGENTS.md or registry. An OS-level sandbox is the upgrade if contamination keeps recurring."
     status: verified
     evidence: [eval/arms.mjs, eval/README.md, raw/sessions/2026-10-01-session-2026-10-01-070617.md]
     reviewed: 2026-10-01
-    last_checked: 2026-10-01
+    last_checked: 2026-10-02
 files: [eval/run.mjs, eval/arms.mjs, eval/lib.mjs, eval/judge.mjs, eval/candidates.mjs, eval/report.mjs, eval/grade-check.mjs, eval/selftest.mjs, eval/stub-pi.mjs]
 ---
+
 
 # The A/B evaluation harness
 

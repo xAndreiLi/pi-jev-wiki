@@ -13,9 +13,10 @@ claims:
     support: 0.86
     evidence: [raw/sessions/2026-10-01-session-2026-10-01-070617.md, eval/arms.mjs]
     reviewed: 2026-10-01
-    last_checked: 2026-10-01
+    last_checked: 2026-10-02
 files: [eval/arms.mjs]
 ---
+
 
 # Sparse checkout clears skip-worktree
 

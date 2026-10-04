@@ -10,12 +10,13 @@ claims:
   - id: c1
     text: "Three pi session-format facts decide how any session analysis must be written: assistant messages carry no `endTurn` field, so a task boundary is the first message after a prompt whose `stopReason` is not `toolUse`; wiki briefs enter the transcript as `custom_message` entries and must not be counted as user prompts; and `nestedCalls` on a tool result is an object `{ calls: [...] }` whose entries carry names and arguments, so tool calls made inside codemode are recoverable and counting only the top-level `codemode` call would hide most of a codemode-heavy session's work."
     status: verified
-    support: 0.60
+    support: 0.6
     evidence: [raw/sessions/2026-10-01-session-2026-10-01-020321.md, packages/pi-wiki-eval/src/core/episodes.ts, packages/pi-wiki-eval/src/core/sessions.ts]
     reviewed: 2026-10-01
-    last_checked: 2026-10-01
+    last_checked: 2026-10-02
 files: [packages/pi-wiki-eval]
 ---
+
 
 # pi-wiki-eval — the measurement package
 

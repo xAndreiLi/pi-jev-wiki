@@ -1,0 +1,35 @@
+{
+	"id": "ds-009",
+	"repo": "C:/Coding/discord-assistant",
+	"base": "d77f7f53fa52ee424dad12655e86775ddebb81cd",
+	"target": null,
+	"prompt": "苏睿聆 can hear and speak, but she cannot see. Give her a way to look at this Windows machine's monitors whenever a request needs it.\n\n- `scripts/screenshot.mjs` — the script her session runs. `node scripts/screenshot.mjs --list` prints to stdout one JSON object of the form `{\"displays\":[{\"id\":0,\"width\":1920,\"height\":1080,\"primary\":true}]}` listing every monitor, and captures nothing. With no arguments it captures every monitor to a PNG and prints the same list with an absolute `path` added to each display. stdout carries that JSON and nothing else; a failure explains itself on stderr and exits non-zero. Captures stay on this machine — nothing is uploaded anywhere.\n- `skills/screenshot/SKILL.md` — a new pi skill named `screenshot`, written like the others. It says when looking at the screen is appropriate (a request that depends on what is visible, not idle curiosity) and how the image reaches her: the JSON only gives paths, so she reads the PNG she needs with her file-reading tool, which attaches the image to her context. Her working directory is `memory/`, not the repository, so the script's absolute path must reach her session in the environment as `LING_SCREENSHOT_SCRIPT`, the way `LING_SAY_SCRIPT` already does for the speak skill.\n- Register the skill in `src/bot/skills.ts` so pi advertises it and the boot check catches a moved directory.\n\nEvery monitor, not just the primary one.",
+	"testCommand": "npx vitest run tests/ds-009-screenshot.test.ts",
+	"graderFiles": [
+		{
+			"from": "C:/Coding/pi-jev-wiki/eval/graders/ds-009-screenshot.test.ts",
+			"to": "tests/ds-009-screenshot.test.ts"
+		}
+	],
+	"canary": "EVAL-CANARY-ds009-6c5d96",
+	"excludePaths": [
+		"handoffs"
+	],
+	"qualityCommands": {
+		"typecheck": "npm run typecheck"
+	},
+	"wikiRoot": "docs/wiki",
+	"timeoutMinutes": 10,
+	"linkDirs": [
+		"node_modules",
+		"web/node_modules",
+		".venv"
+	],
+	"notes": [
+		"Forward task: no target commit, so there is no ground-truth diff and the grader encodes the stated contract.",
+		"Graded: --list JSON shape with one primary; the real capture of this machine's two monitors (a PNG per listed display, PNG magic, dimensions matching the list, distinct paths); the skill is in SKILL_NAMES, loadable, and mentions LING_SCREENSHOT_SCRIPT, PNG and reading the file; src/bot/index.ts sets LING_SCREENSHOT_SCRIPT.",
+		"Not graded: how the script talks to the OS, where the PNGs are written, or the skill's wording beyond those anchors.",
+		"Base must fail: no screenshot script, skill or wiring exists anywhere in the repository at the base commit.",
+		"Verified 2026-10-01 against a reference implementation in a scratch clone: 5/5 grader tests pass, npm run typecheck clean, tests/skills.test.ts still passes."
+	]
+}

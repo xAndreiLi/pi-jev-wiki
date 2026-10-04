@@ -13,9 +13,10 @@ claims:
     support: 0.62
     evidence: [raw/sessions/2026-10-01-session-2026-10-01-020321.md, docs/plans/EFFICACY.md, packages/pi-wiki-eval/README.md]
     reviewed: 2026-10-01
-    last_checked: 2026-10-01
+    last_checked: 2026-10-02
 files: [packages/pi-wiki-eval, docs/plans/EFFICACY.md]
 ---
+
 
 # The evaluator ships as a separate package
 

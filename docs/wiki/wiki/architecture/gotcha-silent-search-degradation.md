@@ -51,13 +51,18 @@ result set meant missing knowledge.
 **How to tell, until this is fixed.** `wiki_toc wiki="<name>"` reads a specific wiki directly and is
 not affected by the search path; the explicit `search: "semantic"` request surfaces the underlying
 error in a note; and the recorded engine in `metrics.jsonl` cannot be trusted as evidence that
-hybrid retrieval ran.
+hybrid retrieval ran. `wiki_ask` also has no `wiki` parameter — a single-wiki lookup is
+`wikis: ["<name>"]` (or `scope: "all"`); a `wiki:` key is silently ignored and the local wiki
+answers (observed 2026-10-02: a query meant for `discord-assistant` returned three local pages at
+0.44–0.48, and the same query with `wikis: ["discord-assistant"]` returned the intended page at 0.65).
 
-**Current state (2026-10-01).** The user-level vector index (`~/.pi/agent/jev-wiki/vector`) is
-corrupt: reads throw `missing chunk number 0 for toast value … in pg_toast_…`. It is **deliberately
-preserved** — rebuilding would clear the symptom and destroy the evidence of the cause — with
-diagnosis deferred to a dedicated triage session. Do not rebuild it before that diagnosis. Full
-report, including the friction this caused: `handoffs/2026-10-01-search-fallback-and-evidence-diagnostics.md`.
+**Current state (2026-10-02).** The store this page described as deliberately preserved was deleted
+and rebuilt during maintenance: by 2026-10-02 it no longer opened at all (PGlite aborted with
+`PANIC: could not locate a valid checkpoint record at 0/246FC18`), so the preservation period ended
+without the deeper toast diagnosis it was kept for. All seven registered wikis were re-embedded
+(1,385 chunks) and `wiki_index status` reports `database: ok`; the panic output and the recovery
+procedure are in [the recovery gotcha](gotcha-corrupt-vector-store-recovery.md). Earlier report:
+`handoffs/2026-10-01-search-fallback-and-evidence-diagnostics.md`.
 
 **Related.** `architecture/flow-retrieval.md` documents the intended pipeline; this page documents
 how it fails silently. `architecture/gotcha-capture-evidence-resolution.md` covers the adjacent case

@@ -13,16 +13,17 @@ claims:
     support: 0.89
     evidence: [raw/sessions/2026-10-01-session-2026-10-01-014102.md, docs/plans/EFFICACY.md]
     reviewed: 2026-10-01
-    last_checked: 2026-10-01
+    last_checked: 2026-10-02
   - id: c2
     text: "Rediscovery rate is a code-wiki metric: it is computable only where retrieved pages declare `files:` links and where retrieval was recorded, which on this machine is two of six wikis. Prose wikis (a person, a training routine) declare no files at all — 0% coverage on calisthenics and discord-assistant against 76–92% on the code wikis — so any efficacy measurement for them needs a different mechanism measure, and an absent metrics.jsonl makes retrieval unmeasurable rather than empty."
     status: verified
     support: 0.93
     evidence: [raw/sessions/2026-10-01-session-2026-10-01-021352.md, docs/studies/R0-retrospective.md]
     reviewed: 2026-10-01
-    last_checked: 2026-10-01
+    last_checked: 2026-10-02
 files: [docs/plans/EFFICACY.md, docs/studies/R0-retrospective.md]
 ---
+
 
 # Rediscovery rate as the efficacy mechanism metric
 

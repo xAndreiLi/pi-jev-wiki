@@ -13,23 +13,24 @@ claims:
     support: 0.87
     evidence: [raw/sessions/2026-10-01-session-2026-10-01-014102.md, docs/plans/EFFICACY.md]
     reviewed: 2026-10-01
-    last_checked: 2026-10-01
+    last_checked: 2026-10-02
   - id: c2
     text: "The wiki-on/wiki-off control arm is a CLI switch rather than a code change: `pi --no-extensions` (-ne) disables extension discovery so the package's tools and skill never load, while `--tools` and `--exclude-tools` give an otherwise identical allowlist."
     status: verified
-    support: 0.50
+    support: 0.5
     evidence: [raw/sessions/2026-10-01-session-2026-10-01-014128.md]
     reviewed: 2026-10-01
-    last_checked: 2026-10-01
+    last_checked: 2026-10-02
   - id: c3
     text: "Wiki pages are committed to the repository alongside the code — only .jev-wiki/* runtime state is gitignored — so `git checkout` rewinds code and knowledge to the same instant, which removes hindsight from history-replay benchmarking by construction rather than by filtering."
     status: verified
     support: 0.57
     evidence: [raw/sessions/2026-10-01-session-2026-10-01-014049.md]
     reviewed: 2026-10-01
-    last_checked: 2026-10-01
+    last_checked: 2026-10-02
 files: [docs/plans/EFFICACY.md]
 ---
+
 
 # Efficacy measurement substrate
 

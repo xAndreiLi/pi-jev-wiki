@@ -610,3 +610,52 @@
 - Updated: architecture/gotcha-eval-harness-leaks.md
 - Updated: architecture/gotcha-sparse-checkout-skip-worktree.md
 
+## [2026-10-02] capture | 1 insights (tool)
+- Raw: raw/sessions/2026-10-02-session-2026-10-02-233340.md
+- Filed 1 · reinforced 0 · review 0 · rejected 0
+
+## [2026-10-02] finalize | Authored ds-009 (screenshot capability for 苏睿聆: real-capture grader, forward card, base d77f7f5) and its grader. First single-task run on the hardened harness, s1-run-2026-10-02T03-17-34: valid and clean, all three arms passed; off $0.054/226s, brief $0.043/154s, wiki $0.133/446s with 8 Jev calls, 2 wiki reads and 16 writes. n=1 — no effect read. The gitignored-AGENTS.md trap that the card nearly shipped is captured in the new gotcha page.
+- Updated: architecture/gotcha-eval-cards-ignored-files.md
+
+## [2026-10-02] capture | 1 insights (tool)
+- Raw: raw/sessions/2026-10-02-session-2026-10-02-002535.md
+- Filed 0 · reinforced 0 · review 0 · rejected 1
+
+## [2026-10-02] capture | 1 insights (tool)
+- Raw: raw/sessions/2026-10-02-session-2026-10-02-002551.md
+- Filed 0 · reinforced 0 · review 0 · rejected 1
+
+## [2026-10-02] finalize | Recorded the corrupt-vector-store incident and its recovery: delete ~/.pi/agent/jev-wiki/vector and rebuild all seven wikis (1,385 chunks). Overrode Jev's reject_unsupported because the evidence is reproduced runtime output — the panic from a direct PGlite probe, the denied rename, the successful deletion and the per-wiki rebuild reports — which the groundedness check does not accept as evidence; no pre-existing file can state an incident that happened in this session, and the claim links to gotcha-silent-search-degradation.md.
+- Updated: architecture/gotcha-corrupt-vector-store-recovery.md
+
+## [2026-10-02] sync | 26 claim(s) checked
+- Baseline: fd88e40 → 12a88a3
+- Changed files: 103
+- Applied: architecture/eval-harness.md#c1 → needs_recheck
+- Applied: architecture/eval-harness.md#c3 → needs_recheck
+- Applied: architecture/gotcha-eval-harness-leaks.md#c1 → needs_recheck
+- Applied: architecture/gotcha-eval-harness-leaks.md#c2 → needs_recheck
+- Applied: architecture/gotcha-eval-harness-leaks.md#c3 → needs_recheck
+- Applied: architecture/gotcha-eval-harness-leaks.md#c4 → needs_recheck
+- Applied: architecture/gotcha-eval-harness-leaks.md#c7 → needs_recheck
+- Applied: architecture/gotcha-eval-harness-leaks.md#c8 → needs_recheck
+- Applied: architecture/gotcha-eval-harness-leaks.md#c9 → needs_recheck
+- Applied: architecture/gotcha-eval-harness-leaks.md#c10 → needs_recheck
+
+## [2026-10-02] finalize | Maintenance pass close-out. wiki_sync fd88e40→12a88a3: 103 files, 26 matched claims, 10 needs_recheck queued (all in the eval-harness and leak pages, to be read against the post-audit fixes). Updated gotcha-silent-search-degradation (corrected the obsolete 'do not rebuild' state; added the wiki_ask scope-parameter trap), gotcha-corrupt-vector-store-recovery (a Before-deleting warning about preserved artefacts), and invariants/claim-evidence (incident claims need a source quote from the session raw). Pain points from the whole maintenance are written up in handoffs/2026-10-02-maintenance-pain-points.md: the preserved-store deletion, the silent wiki_ask scope, cross-wiki finalize paths, incident-claim grounding, blocking rebuilds, and the sync backlog.
+- Updated: architecture/gotcha-silent-search-degradation.md
+- Updated: architecture/gotcha-corrupt-vector-store-recovery.md
+- Updated: invariants/claim-evidence.md
+
+## [2026-10-04] capture | 3 insights (tool)
+- Raw: raw/sessions/2026-10-04-session-2026-10-04-181406.md
+- Filed 2 · reinforced 0 · review 0 · rejected 1
+
+## [2026-10-04] capture | 1 insights (tool)
+- Raw: raw/sessions/2026-10-04-session-2026-10-04-181435.md
+- Filed 0 · reinforced 0 · review 1 · rejected 0
+
+## [2026-10-04] finalize | Recorded the auto-retrieval decision (inject by default, Jev-gated, session-wiki-only, fail-closed, op:auto) and the pi before_agent_start injection mechanism it rests on. Amended PLAN §0/§4.1 and CRITIQUE §1.10 from "no injection" to "no ungated injection". Implemented in src/auto-retrieve.ts + hooks.autoRetrieve; unit/integration/vector suites pass, no live Jev call made.
+- Updated: decisions/auto-retrieval-injection.md
+- Updated: pi/before-agent-start-injection.md
+
