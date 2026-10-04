@@ -178,7 +178,8 @@ Optional overrides in `~/.pi/agent/jev-wiki.json` or project `.pi/jev-wiki.json`
     "vector": { "enabled": true, "model": "performance", "scan": { "wsl": true } },
     "jev": { "rerank": "auto", "sufficiency": true }
   },
-  "capture": { "cadence": "task", "route": "subject" }
+  "capture": { "cadence": "task", "route": "subject" },
+  "hooks": { "autoRetrieve": { "mode": "inject", "maxTokens": 800, "budgetMs": 2500 } }
 }
 ```
 
@@ -190,6 +191,16 @@ the session workspace), and `wiki_sync wiki=<name>` diffs the target project's r
 
 The optional `globalWikiRoot` adds a read-only cross-project vault: `wiki_ask` also searches that
 wiki and tags its results `[global vault]`. It resolves against the pi agent dir when relative.
+
+**Automatic prompt-time retrieval.** `hooks.autoRetrieve` (default `mode: "inject"`) searches the
+session wiki on every prompt; when Jev judges the candidates sufficient, a short `<auto-retrieval>`
+brief is injected with the prompt — after the user message, before the first provider request. It is
+gated on `search.jev.minSufficiency`, capped at `maxTokens`, bounded by `budgetMs`, and **fails
+closed**: no verdict, low sufficiency, or a timeout injects nothing (unlike `wiki_ask`, which
+degrades to keyword results). It searches the **session wiki only** — `globalWikiRoot` and other
+registered wikis stay a deliberate `wiki_ask`. Every run is logged to `.jev-wiki/metrics.jsonl` as
+`op: "auto"`, never as `ask`, so the consultation metric keeps meaning "someone chose to consult".
+Set `mode: "off"` to disable it.
 
 Auto-capture decides where to file automatically. `capture.route` (default `subject`) routes the
 capture to the registered wiki that owns the files the session **edited**, when exactly one does;

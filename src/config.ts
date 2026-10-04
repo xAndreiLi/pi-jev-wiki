@@ -51,6 +51,18 @@ export interface JevWikiConfig {
 	lint: { orphanMinAgeDays: number; duplicateSimilarity: number };
 	gitCommit: boolean;
 	capture: { cadence: CaptureCadence; onCompact: boolean; onSettle?: boolean; route?: CaptureRoute; triggerTurn?: boolean };
+	hooks: {
+		autoRetrieve: {
+			/** `inject` returns a Jev-gated brief to the model; `off` disables the hook. */
+			mode: "off" | "inject";
+			/** Candidate pages retrieved before Jev judges them. */
+			limit: number;
+			/** Approximate token budget for the injected brief (chars ≈ tokens × 4). */
+			maxTokens: number;
+			/** Hard timeout for the whole hook. On expiry nothing is injected. */
+			budgetMs: number;
+		};
+	};
 	search: {
 		engine: "auto" | "index" | "bm25" | "vector" | "hybrid" | "qmd";
 		qmdCollection?: string;
@@ -90,6 +102,7 @@ export const DEFAULT_CONFIG: JevWikiConfig = {
 	lint: { orphanMinAgeDays: 7, duplicateSimilarity: 0.72 },
 	gitCommit: false,
 	capture: { cadence: "manual", onCompact: false, route: "subject", triggerTurn: false },
+	hooks: { autoRetrieve: { mode: "inject", limit: 6, maxTokens: 800, budgetMs: 2500 } },
 	search: {
 		engine: "auto",
 		vector: {

@@ -25,6 +25,9 @@ export interface RetrievalJudgment {
 
 const NEUTRAL_RELEVANCE = 0.5;
 
+/** The midpoint of a noul question — candidates at or above it lean "helpful". */
+export const RELEVANCE_MIDPOINT = NEUTRAL_RELEVANCE;
+
 export async function judgeRetrieval(options: RetrievalJudgmentOptions): Promise<RetrievalJudgment> {
 	const { client, query } = options;
 	const candidates = options.results.slice(0, Math.max(1, Math.min(options.maxCandidates ?? 8, options.results.length)));

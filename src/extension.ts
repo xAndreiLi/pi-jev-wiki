@@ -13,6 +13,7 @@ import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-a
 import { StringEnum } from "@earendil-works/pi-ai";
 import { Type } from "typebox";
 import { loadConfig, resolveCaptureTriggers, type LoadedConfig, type JevWikiConfig, type WriterMode } from "./config.ts";
+import { buildAutoQuery, lastUserPrompt, retrieveForPrompt, warmEmbeddingProvider } from "./auto-retrieve.ts";
 import { git, headCommit, isGitRepo } from "./git.ts";
 import { appendLedger, readLedger, summarizeLedger } from "./ledger.ts";
 import { lintWiki } from "./lint.ts";
@@ -2165,6 +2166,10 @@ export default function (pi: ExtensionAPI) {
 		if (!loaded.apiKey) {
 			ctx.ui.notify(`jev-wiki: no Jev token found (expected JEV_TOKEN in ${loaded.envFilePath})`, "warning");
 		}
+		// Warm the embedder so the first prompt does not pay the model load. Never awaits, never
+		// downloads — the guards are inside.
+		const warmLayout = resolveLayout(ctx.cwd, loaded.config.wikiRoot, loaded.config.stateRoot);
+		void warmEmbeddingProvider(loaded, warmLayout.wikiDir).catch(() => undefined);
 		lastCommitSeen = await headCommit(ctx.cwd).catch(() => undefined);
 		try {
 			if (loaded.config.sync.onSessionStart !== "check") return;
@@ -2180,6 +2185,67 @@ export default function (pi: ExtensionAPI) {
 			}
 		} catch {
 			/* sync check is best-effort */
+		}
+	});
+
+	// --- automatic prompt-time retrieval ----------------------------------------
+
+	// One prompt, one search: a repeated query in the same session is not searched twice.
+	let autoQuerySession = "";
+	let autoQueryText = "";
+	let autoRetrieveWarned = false;
+
+	pi.on("before_agent_start", async (event, ctx) => {
+		const loaded = loadConfig(ctx.cwd);
+		const settings = loaded.config.hooks.autoRetrieve;
+		if (settings.mode === "off" || !loaded.apiKey) return;
+		const layout = resolveLayout(ctx.cwd, loaded.config.wikiRoot, loaded.config.stateRoot);
+		if (!existsSync(layout.wikiDir)) return;
+		const previousUser = lastUserPrompt(ctx.sessionManager.getBranch());
+		const query = buildAutoQuery(event.prompt, previousUser);
+		if (!query) return;
+		const sessionId = ctx.sessionManager.getSessionId();
+		if (autoQuerySession === sessionId && autoQueryText === query) return;
+		autoQuerySession = sessionId;
+		autoQueryText = query;
+		const startedAt = Date.now();
+		try {
+			const client = await requireClient(loaded, ctx);
+			const signal = AbortSignal.any([AbortSignal.timeout(settings.budgetMs), ...(ctx.signal ? [ctx.signal] : [])]);
+			const outcome = await retrieveForPrompt({ loaded, layout, client, prompt: event.prompt, previousUser, signal });
+			await recordMetric(layout, {
+				op: "auto",
+				query: outcome.query,
+				pages: outcome.pages,
+				detail: { mode: settings.mode, ...outcome.detail, latencyMs: Date.now() - startedAt },
+			});
+			if (!outcome.brief) return;
+			return {
+				message: {
+					customType: "jev-wiki-auto",
+					content: outcome.brief,
+					display: true,
+					details: { pages: outcome.pages, ...outcome.detail },
+				},
+			};
+		} catch (error) {
+			// A retrieval failure must never break the prompt. The budget is a promise to the turn,
+			// not to the embedder: an ONNX encode is not abortable, so a timeout can land late.
+			const timedOut = error instanceof Error && (error.name === "TimeoutError" || error.name === "AbortError");
+			await recordMetric(layout, {
+				op: "auto",
+				query,
+				detail: {
+					mode: settings.mode,
+					outcome: timedOut ? "timeout" : "error",
+					error: error instanceof Error ? error.message : String(error),
+					latencyMs: Date.now() - startedAt,
+				},
+			}).catch(() => undefined);
+			if (!timedOut && !autoRetrieveWarned) {
+				autoRetrieveWarned = true;
+				ctx.ui.notify(`jev-wiki: automatic retrieval failed — ${error instanceof Error ? error.message : String(error)}`, "warning");
+			}
 		}
 	});
 

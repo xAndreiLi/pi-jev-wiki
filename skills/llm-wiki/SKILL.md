@@ -24,6 +24,14 @@ term is unclear; before answering "how does X work here?":
    read the page — and its claim `status`/`updated` — before relying on it.
 3. Cite the page paths you used. Never invent wiki content; if it is missing, say so.
 
+The session wiki is also searched **automatically on every prompt**: when Jev judges the evidence
+sufficient, a short `<auto-retrieval>` brief arrives with your prompt. That brief covers the
+**session wiki only** — other registered wikis and the global vault are never auto-searched, so when
+the work touches another project, call `wiki_ask` with `scope: "all"` or `wikis: ["<name>"]`
+yourself. An empty brief means "not enough evidence", not "nothing exists": the gate fails closed, and
+below-gate searches are logged rather than injected. Refine the query and ask explicitly before
+concluding the wiki lacks the knowledge.
+
 `wiki_structure` maps modules and architecture coverage: use it before large refactors, or to find
 what is undocumented in an unfamiliar repo.
 

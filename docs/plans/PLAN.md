@@ -30,9 +30,12 @@
 - **Two intake channels, one pipeline:** (A) user-requested **research intake**; (B) **agent
   insights** captured after work — the agent composes a list of key insights, Jev organizes them
   into existing pages or, failing that, new ones.
-- **No injection.** The wiki is never pushed into a session. Its **table of contents is available
-  like a skill** (`wiki_toc` + the `llm-wiki` skill), and the agent reads what it needs, when it
-  needs it.
+- **No injection, with one gated exception.** The wiki is not pushed into a session; its **table of
+  contents is available like a skill** (`wiki_toc` + the `llm-wiki` skill) and the agent reads what it
+  needs. Since 2026-10-04 the session wiki *is* auto-searched on every prompt and a **Jev-gated**
+  brief is injected when the evidence is sufficient (`hooks.autoRetrieve`, see
+  [AUTO-RETRIEVAL.md](plans/AUTO-RETRIEVAL.md)); it fails closed, is capped and bounded, and never
+  reaches across projects.
 - **The agent maintains the wiki; the user adds knowledge.** Review queues are worked by the agent,
   with Jev's risk ranking visible to the agent. The user is only brought in for critical items
   (security, breaking APIs, data loss, high blast radius).
@@ -181,8 +184,9 @@ is how the TOC becomes discoverable) · pi-web-access for URL fetching.
                                                                                        sync map · ledger · git
 ```
 
-The wiki is consulted **on demand** via `wiki_toc` / `wiki_ask` / `wiki_impact`; nothing is
-injected into the session.
+The wiki is consulted **on demand** via `wiki_toc` / `wiki_ask` / `wiki_impact`; the only thing
+injected into a session is a relevance-gated auto-retrieval brief (amended 2026-10-04 —
+[AUTO-RETRIEVAL.md](plans/AUTO-RETRIEVAL.md)).
 
 ### 3.1 Package layout
 
@@ -229,7 +233,7 @@ Obsidian/Dataview for free.
 
 ## 4. Retrieval and routing at any scale
 
-### 4.1 The TOC is the skill-visible surface (no injection)
+### 4.1 The TOC is the skill-visible surface (one gated exception)
 
 - `wiki/index.md` is the canonical table of contents: grouped, typed, one line per page, tags, and
   `updated`. It is kept short by construction — summaries are one line, and at scale the TOC
@@ -237,9 +241,11 @@ Obsidian/Dataview for free.
 - The `llm-wiki` skill tells the agent the TOC exists, where it is, and **when** to consult it
   ("before architectural or unfamiliar changes, before planning, when a term is unclear").
 - `wiki_toc` returns the TOC (optionally filtered by tag/topic) for programmatic browsing.
-- Nothing is auto-injected; the agent decides when knowledge is needed. This avoids context
-  pollution entirely and makes the efficiency story honest: value accrues only when the agent
-  actually consults the frame.
+- The TOC remains the on-demand surface; the agent decides when knowledge is needed beyond the
+  automatic brief. Auto-retrieval is gated on Jev's sufficiency verdict, capped by `maxTokens`, and
+  bounded by `budgetMs`, so a weak or absent verdict injects nothing. **Amended 2026-10-04** — the
+  original rule read "nothing is auto-injected"; see [AUTO-RETRIEVAL.md](plans/AUTO-RETRIEVAL.md) for
+  the mechanism, the failure modes, and the measurement that decides whether it stays.
 
 ### 4.2 Paged choice: target selection with unlimited pages
 

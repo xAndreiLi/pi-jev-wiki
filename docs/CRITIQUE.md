@@ -27,7 +27,7 @@ design. What was decided:
 | 1.7 Adversarial content | **Accepted.** Structured state, deterministic quote checks, `injection` flag; content can never trigger tool execution. |
 | 1.8 Trust cliff | **Resolved.** Jev's `risk`/`criticality` scores are shown to the agent, which chooses guided/draft/auto per item; user only for critical cases. |
 | 1.9 Scope creep | **Accepted.** P0 stays narrow; later features gated on ledger/eval evidence. |
-| 1.10 Context pollution | **Eliminated.** Nothing is injected. The TOC is available like a skill (`wiki_toc` + `llm-wiki` skill); the agent consults on demand. |
+| 1.10 Context pollution | **Amended 2026-10-04.** Nothing was injected on demand; the session wiki is now auto-searched per prompt and a **Jev-gated**, budgeted brief is injected when the evidence is sufficient (`hooks.autoRetrieve`, [AUTO-RETRIEVAL.md](plans/AUTO-RETRIEVAL.md)). The TOC stays the on-demand surface. |
 | 1.11 Value hypothesis | **Steered into the vision.** The wiki stores the project's high-level framing — structure, code flow, invariants, decisions, impact — to improve agent decision quality on large codebases. Decision quality is now the primary success metric; token savings are secondary. |
 
 ---
@@ -143,6 +143,12 @@ generative models.
 **Fix.** Relevance-gate the digest with Jev (`relevance`/`digest_rank`, §3.1) and cap it to a token
 budget (e.g., ≤2–3k). Instrument whether injected sessions actually perform better; if not, inject
 less.
+
+**Implemented 2026-10-04.** The mechanism is `hooks.autoRetrieve` (`mode: "inject"` by default):
+the session wiki is searched on every prompt, `judgeRetrieval` supplies the relevance order and the
+sufficiency verdict, and below `search.jev.minSufficiency` nothing is injected. Budgets are
+`hooks.autoRetrieve.maxTokens` and `budgetMs`; the metric is `op: "auto"`. See
+[AUTO-RETRIEVAL.md](plans/AUTO-RETRIEVAL.md); the A/B that decides whether it stays is P4 there.
 
 ### 1.11 The honest meta-critique
 

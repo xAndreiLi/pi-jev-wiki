@@ -1,5 +1,17 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- Automatic prompt-time retrieval (`hooks.autoRetrieve`, `mode: "inject"` by default). On every
+  prompt the session wiki is searched, Jev judges the candidates, and a short `<auto-retrieval>`
+  brief is injected with the prompt — after the user message, before the first provider request —
+  when the evidence is sufficient. Fail-closed: no verdict, low sufficiency, or `budgetMs` expiry
+  injects nothing. Session wiki only (other wikis stay a manual `wiki_ask`); the embedding model is
+  warmed at `session_start` but never downloaded by a prompt; logged as `op: "auto"`, deliberately
+  not `ask`. Design and measurement: `docs/plans/AUTO-RETRIEVAL.md`.
+
 ## 0.8.1 — 2026-09-26
 
 ### Fixed

@@ -25,6 +25,7 @@ import { verifyRawSources } from "../src/doctor.ts";
 import { isLocked, withWikiLock } from "../src/wiki/lock.ts";
 import { matchRegisteredWikis, projectRootFor, registeredProjectRoots, resolvePageFile, resolveSourceFile, resolveWriteTarget } from "../src/wiki/target.ts";
 import { registerWiki } from "../src/vector/registry.ts";
+import { buildAutoQuery, dedupeByPage, lastUserPrompt, renderBrief } from "../src/auto-retrieve.ts";
 
 let failures = 0;
 async function check(name: string, fn: () => Promise<void> | void): Promise<void> {
@@ -525,6 +526,69 @@ await check("maps the expected claim status per resolution", () => {
 await check("capture delivery is advisory by default", () => {
 	assert.equal(DEFAULT_CONFIG.capture.triggerTurn, false);
 	assert.equal(DEFAULT_CONFIG.capture.route, "subject");
+});
+
+console.log("\nautomatic retrieval — query construction");
+await check("uses the prompt itself as the query", () => {
+	assert.equal(buildAutoQuery("Where does the capture brief get written?"), "Where does the capture brief get written?");
+});
+await check("answers a continuation from the previous user prompt", () => {
+	assert.equal(buildAutoQuery("continue", "how does the review queue drain?"), "how does the review queue drain?");
+	assert.equal(buildAutoQuery("yes please", "how does the review queue drain?"), "how does the review queue drain?");
+	// No previous turn to borrow from: the prompt stands.
+	assert.equal(buildAutoQuery("go ahead", undefined), "go ahead");
+});
+await check("drops a long paste but keeps the instruction", () => {
+	const query = buildAutoQuery(`why does this fail?\n\n\`\`\`ts\n${"const x = 1;\n".repeat(200)}\`\`\``);
+	assert.ok(query.includes("why does this fail?"));
+	assert.ok(query.length < 200, `kept ${query.length} chars of paste`);
+});
+await check("caps a long prompt at both ends", () => {
+	const query = buildAutoQuery(`${"a".repeat(2000)}END`);
+	assert.ok(query.length <= 1200, `query was ${query.length} chars`);
+	assert.ok(query.endsWith("END"), "lost the trailing restatement");
+});
+await check("reads the last user prompt, never injected content", () => {
+	const entries = [
+		{ type: "message", message: { role: "user", content: [{ type: "text", text: "first" }] } },
+		{ type: "message", message: { role: "assistant", content: [{ type: "text", text: "reply" }] } },
+		{ type: "custom_message", customType: "jev-wiki-auto", content: "brief" },
+		{ type: "message", message: { role: "user", content: [{ type: "text", text: "second" }] } },
+	];
+	assert.equal(lastUserPrompt(entries), "second");
+	assert.equal(lastUserPrompt([{ type: "custom_message", customType: "jev-wiki", content: "brief" }]), undefined);
+});
+await check("renders a brief with claim status inside the token budget", () => {
+	const brief = renderBrief(
+		[
+			{
+				result: { path: "architecture/flow-retrieval.md", title: "Retrieval", score: 0.9, excerpt: "Fusion fuses BM25 and vector ranks.", anchor: "c10", status: "verified", kind: "claim" },
+				relevance: 0.9,
+			},
+			{
+				result: { path: "architecture/other.md", title: "Other", score: 0.5, excerpt: "x".repeat(900) },
+				relevance: 0.6,
+			},
+		],
+		{ wiki: "pi-jev-wiki", sufficiency: 0.61, lexicalOnly: false, maxChars: 300 },
+	);
+	assert.ok(brief.startsWith('<auto-retrieval wiki="pi-jev-wiki" sufficiency="0.61" engine="bm25+vector">'));
+	assert.ok(brief.includes("architecture/flow-retrieval.md#c10 (verified)"));
+	assert.ok(brief.endsWith("</auto-retrieval>"));
+	assert.ok(brief.length < 700, `brief was ${brief.length} chars`);
+	assert.ok(!brief.includes("x".repeat(500)), "kept an over-budget excerpt");
+	// A degraded run says so rather than passing lexical results off as hybrid.
+	const degraded = renderBrief([], { wiki: "w", sufficiency: 0.6, lexicalOnly: true, maxChars: 300 });
+	assert.ok(degraded.includes("keyword matches only"));
+});
+
+await check("keeps the best-ranked hit per page", () => {
+	const hit = (path: string, anchor?: string) => ({
+		result: { path, title: path, score: 1, excerpt: "x", ...(anchor ? { anchor } : {}) },
+		relevance: 0.9,
+	});
+	const deduped = dedupeByPage([hit("a.md", "c1"), hit("b.md"), hit("a.md", "c2")]);
+	assert.deepEqual(deduped.map((entry) => entry.result.anchor ?? entry.result.path), ["c1", "b.md"]);
 });
 
 if (failures > 0) {
