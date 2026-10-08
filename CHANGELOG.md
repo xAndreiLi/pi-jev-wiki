@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.0.2 — 2026-10-08
+
+### Fixed
+
+- `wiki_index action=stop` reported "No shared embedder was running" from any session that had not
+  searched or indexed yet: `stopEmbedder` sent its shutdown request through a socket it had never
+  opened, so the one session state where stopping the daemon matters most was the one where it could
+  not. It now attaches first — without spawning a daemon — and reports nothing only when nothing is
+  listening.
+
 ## 1.0.1 — 2026-10-08
 
 ### Fixed
