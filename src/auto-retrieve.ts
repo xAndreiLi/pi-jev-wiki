@@ -19,9 +19,10 @@ import type { LoadedConfig } from "./config.ts";
 import type { JevClient } from "./jev.ts";
 import type { WikiLayout } from "./wiki/layout.ts";
 import { createSearchEngine, tokenize, VectorSearchEngine, type SearchResult } from "./wiki/search.ts";
-import { modelsDir, resolvePreset } from "./vector/embed.ts";
+import { fingerprintFor, modelsDir, resolvePreset } from "./vector/embed.ts";
+import { warmEmbedder } from "./vector/embedder/client.ts";
 import { judgeRetrieval, RELEVANCE_MIDPOINT } from "./vector/judgments.ts";
-import { providerFor, vectorEnabled, vectorSearch } from "./vector/query.ts";
+import { embedderOptionsFor, providerFor, vectorEnabled, vectorSearch } from "./vector/query.ts";
 import { vectorDbFor } from "./vector/db.ts";
 import { registerWiki, vectorDataDir } from "./vector/registry.ts";
 
@@ -198,10 +199,15 @@ export async function warmEmbeddingProvider(loaded: LoadedConfig, wikiDir: strin
 	if (!existsSync(wikiDir)) return;
 	const preset = resolvePreset(loaded.config.search.vector.model);
 	if (!existsSync(join(modelsDir(loaded.agentDir), preset.repo))) return;
+	const fingerprint = fingerprintFor(loaded.config.search.vector.model, {
+		dtype: loaded.config.search.vector.dtype ?? null,
+		dimensions: loaded.config.search.vector.dimensions ?? null,
+	});
 	try {
 		const counts = await vectorDbFor(vectorDataDir(loaded.agentDir)).counts();
-		if (!counts.some((entry) => entry.model === loaded.config.search.vector.model && entry.chunks > 0)) return;
-		await providerFor(loaded.agentDir, loaded.config);
+		if (!counts.some((entry) => entry.fingerprint === fingerprint && entry.chunks > 0)) return;
+		// The daemon loads the model once for the whole machine; this session only pays for the handshake.
+		await warmEmbedder(embedderOptionsFor(loaded.agentDir, loaded.config));
 	} catch {
 		/* warming is best-effort */
 	}

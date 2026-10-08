@@ -14,7 +14,7 @@
     "url": "https://github.com/xAndreiLi/pi-jev-wiki/issues"
   },
   "engines": {
-    "node": ">=22"
+    "node": ">=22.13"
   },
   "files": [
     "src",
@@ -46,6 +46,7 @@
     "test:unit": "jiti scripts/unit-test.ts",
     "test:integration": "jiti scripts/integration-test.ts",
     "test:vector": "jiti scripts/vector-test.ts",
+    "rebuild": "jiti scripts/rebuild-all.ts",
     "test:all": "tsc --noEmit && jiti scripts/unit-test.ts && jiti scripts/integration-test.ts && jiti scripts/scale-test.ts && jiti scripts/vector-test.ts",
     "release": "jiti scripts/release.ts",
     "toc:refresh": "jiti scripts/refresh-toc.ts",
@@ -57,15 +58,11 @@
     "typebox": "*"
   },
   "optionalDependencies": {
-    "@electric-sql/pglite": "^0.5.8",
-    "@electric-sql/pglite-pgvector": "^0.0.9",
     "@huggingface/transformers": "^4.3.0"
   },
   "devDependencies": {
     "@earendil-works/pi-ai": "0.85.1",
     "@earendil-works/pi-coding-agent": "0.85.1",
-    "@electric-sql/pglite": "^0.5.8",
-    "@electric-sql/pglite-pgvector": "^0.0.9",
     "@types/node": "^26.6.2",
     "jiti": "^2.7.0",
     "typebox": "^1.3.34",

@@ -1,14 +1,17 @@
 /**
- * Index orchestration: pages → chunks → embeddings → PGlite. Incremental by
- * content hash; a model change purges the previous model's rows for that wiki.
+ * Index orchestration: pages → chunks → embeddings via the shared embedder → the SQLite store.
+ * Incremental by content hash; a change of embedder identity purges the previous one's rows for
+ * that wiki.
  */
 import { existsSync } from "node:fs";
 import { readdir, stat } from "node:fs/promises";
 import { join, relative } from "node:path";
 import { listMarkdownFiles, readPage, resolveLayout } from "../wiki/layout.ts";
 import { chunkPage, type WikiPageInput } from "./chunks.ts";
-import { createLocalProvider, modelsDir, resolvePreset, type EmbeddingProvider } from "./embed.ts";
+import { createLocalProvider, fingerprintFor, fingerprintOf, modelsDir, resolvePreset, type EmbeddingProvider } from "./embed.ts";
+import { sharedEmbedderFor } from "./embedder/client.ts";
 import { vectorDbFor, type IndexState } from "./db.ts";
+import { storeBytes, storePath } from "./sqlite.ts";
 import { readRegistry, vectorDataDir } from "./registry.ts";
 
 export interface IndexOptions {
@@ -17,6 +20,8 @@ export interface IndexOptions {
 	root: string;
 	model: string;
 	dimensions?: number;
+	/** Preset dtype override; must match the query path or the fingerprints will not line up. */
+	dtype?: string;
 	/** Restrict reindexing to these page paths (relative to the wiki dir). */
 	paths?: string[];
 	/** Use this provider instead of loading a local model (tests, future backends). */
@@ -44,6 +49,9 @@ export async function indexWiki(options: IndexOptions): Promise<IndexReport> {
 	if (!existsSync(layout.wikiDir)) throw new Error(`Wiki pages not found at ${layout.wikiDir}`);
 	const preset = resolvePreset(options.model);
 	const dimensions = options.dimensions ?? preset.dimensions;
+	const dtype = options.dtype ?? preset.dtype;
+	// The identity every row written by this run carries; also what an injected test provider declares.
+	const fingerprint = options.provider?.fingerprint ?? fingerprintOf(preset, dtype, dimensions);
 
 	const scope = options.paths && options.paths.length > 0 ? new Set(options.paths.map(normalizePath)) : undefined;
 	const files = (await listMarkdownFiles(layout.wikiDir))
@@ -60,7 +68,7 @@ export async function indexWiki(options: IndexOptions): Promise<IndexReport> {
 
 	const db = vectorDbFor(vectorDataDir(options.agentDir));
 	await db.init();
-	const existing = await db.hashes(options.wiki, options.model, scope ? [...scope] : undefined);
+	const existing = await db.hashes(options.wiki, fingerprint, scope ? [...scope] : undefined);
 
 	const pending: Array<{ path: string; chunk: (typeof chunks)[number]["chunk"] }> = [];
 	let skipped = 0;
@@ -79,16 +87,27 @@ export async function indexWiki(options: IndexOptions): Promise<IndexReport> {
 	if (pending.length > 0) {
 		const provider =
 			options.provider ??
-			(await createLocalProvider({
-				preset,
-				...(options.dimensions !== undefined ? { dimensions: options.dimensions } : {}),
-				cacheDir: modelsDir(options.agentDir),
-				...(options.onProgress ? { onProgress: options.onProgress } : {}),
-			}));
-		const vectors = await provider.embed(
-			pending.map((entry) => ({ title: entry.chunk.title, text: entry.chunk.text })),
-			"document",
-		);
+			sharedEmbedderFor({
+				agentDir: options.agentDir,
+				model: options.model,
+				dtype,
+				dimensions: options.dimensions ?? null,
+				// A rebuild is the one path allowed to fetch the model from the hub.
+				allowDownload: true,
+			});
+		// Batch the work so progress is visible and a rebuild cannot look hung: the shared embedder
+		// answers in order, and each group is reported as it lands.
+		const groupSize = 64;
+		const vectors: Float32Array[] = [];
+		for (let start = 0; start < pending.length; start += groupSize) {
+			const group = pending.slice(start, start + groupSize);
+			const embedded = await provider.embed(
+				group.map((entry) => ({ title: entry.chunk.title, text: entry.chunk.text })),
+				"document",
+			);
+			vectors.push(...embedded);
+			options.onProgress?.(`embedded ${Math.min(start + group.length, pending.length)}/${pending.length} chunks`);
+		}
 		const rows = pending.map((entry, index) => ({
 			wiki: options.wiki,
 			path: entry.path,
@@ -100,6 +119,7 @@ export async function indexWiki(options: IndexOptions): Promise<IndexReport> {
 			text: entry.chunk.text,
 			hash: entry.chunk.hash,
 			model: options.model,
+			fingerprint,
 			dim: provider.dimensions,
 			embedding: vectors[index],
 		}));
@@ -107,11 +127,12 @@ export async function indexWiki(options: IndexOptions): Promise<IndexReport> {
 		embedded = rows.length;
 	}
 
-	if (!scope) await db.purgeOtherModels(options.wiki, options.model);
-	const totals = await db.hashes(options.wiki, options.model);
+	if (!scope) await db.purgeOtherIdentities(options.wiki, fingerprint);
+	const totals = await db.hashes(options.wiki, fingerprint);
 	const state: IndexState = {
 		wiki: options.wiki,
 		model: options.model,
+		fingerprint,
 		dim: dimensions,
 		chunks: totals.size,
 		updatedAt: new Date().toISOString(),
@@ -133,19 +154,26 @@ export interface VectorStatus {
 	preset: string;
 	repo: string;
 	dimensions: number;
+	dtype: string;
+	/** Identity the query path would use right now; compare with each wiki's stored fingerprint. */
+	fingerprint: string;
 	downloadBytes: number;
 	modelsDir: string;
 	modelsBytes: number;
+	storePath: string;
+	storeBytes: number;
 	registry: Awaited<ReturnType<typeof readRegistry>>;
 	states: Array<IndexState & { name: string; root: string; enabled: boolean }>;
 	dbAvailable: boolean;
 	error?: string;
 }
 
-export async function vectorStatus(agentDir: string, model: string, dimensions?: number): Promise<VectorStatus> {
+export async function vectorStatus(agentDir: string, model: string, dimensions?: number, dtype?: string): Promise<VectorStatus> {
 	const preset = resolvePreset(model);
+	const effectiveDtype = dtype ?? preset.dtype;
 	const registry = await readRegistry(agentDir);
-	const db = vectorDbFor(vectorDataDir(agentDir));
+	const dataDir = vectorDataDir(agentDir);
+	const db = vectorDbFor(dataDir);
 	const states: VectorStatus["states"] = [];
 	let dbAvailable = true;
 	let error: string | undefined;
@@ -161,11 +189,15 @@ export async function vectorStatus(agentDir: string, model: string, dimensions?:
 	}
 	return {
 		preset: preset.id,
-		repo: preset.repo,
+	repo: preset.repo,
 		dimensions: dimensions ?? preset.dimensions,
+		dtype: effectiveDtype,
+		fingerprint: fingerprintFor(model, { dtype: effectiveDtype, dimensions }),
 		downloadBytes: preset.expectedBytes,
 		modelsDir: modelsDir(agentDir),
 		modelsBytes: await modelsCacheBytes(modelsDir(agentDir)),
+		storePath: storePath(dataDir),
+		storeBytes: await storeBytes(dataDir),
 		registry,
 		states,
 		dbAvailable,
@@ -173,14 +205,14 @@ export async function vectorStatus(agentDir: string, model: string, dimensions?:
 	};
 }
 
-/** True when the wiki has been indexed for this model (an empty index still counts). */
-export async function hasWarmIndex(agentDir: string, wiki: string, model: string): Promise<boolean> {
+/** True when the wiki has been indexed for this embedder identity (an empty index still counts). */
+export async function hasWarmIndex(agentDir: string, wiki: string, fingerprint: string): Promise<boolean> {
 	const db = vectorDbFor(vectorDataDir(agentDir));
 	await db.init();
 	const state = await db.state(wiki);
-	if (state && state.model === model) return true;
+	if (state && state.fingerprint === fingerprint) return true;
 	const counts = await db.counts();
-	return counts.some((entry) => entry.wiki === wiki && entry.model === model && entry.chunks > 0);
+	return counts.some((entry) => entry.wiki === wiki && entry.fingerprint === fingerprint && entry.chunks > 0);
 }
 
 /** True when any wiki has chunks or build state in the index database. */

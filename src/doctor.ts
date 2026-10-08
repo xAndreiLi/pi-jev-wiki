@@ -132,7 +132,7 @@ export async function runDoctor(loaded: LoadedConfig): Promise<DoctorReport> {
 	if (config.search.jev.maxCandidates < 1 || config.search.jev.maxCandidates > 50) invalid.push(`search.jev.maxCandidates=${config.search.jev.maxCandidates} (1..50)`);
 	if (!["auto", "index", "bm25", "vector", "hybrid", "qmd"].includes(config.search.engine)) invalid.push(`search.engine=${config.search.engine}`);
 	if (!MODEL_PRESETS[config.search.vector.model]) invalid.push(`search.vector.model=${config.search.vector.model} (presets: ${Object.keys(MODEL_PRESETS).join(", ")})`);
-	if (config.search.vector.db !== "embedded") invalid.push(`search.vector.db=${config.search.vector.db} (only "embedded" is supported in P1)`);
+	if (!(config.search.vector.embedder?.idleExitMs >= 0)) invalid.push(`search.vector.embedder.idleExitMs=${config.search.vector.embedder?.idleExitMs} (0 disables the idle exit)`);
 	if (config.search.vector.dimensions != null) {
 		const dimensions = config.search.vector.dimensions;
 		const max = MODEL_PRESETS[config.search.vector.model]?.dimensions ?? 0;

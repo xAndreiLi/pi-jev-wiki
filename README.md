@@ -73,10 +73,10 @@ tokens are the scarce budget — `skills/llm-wiki/SKILL.md` says so explicitly f
 | `wiki_status` | pages, raw sources, ledger, consultations, Jev usage |
 | `/wiki:ingest`, `/wiki:capture`, `/wiki:sync`, `/wiki:review`, `/wiki:lint`, `/wiki:status` | user-facing commands |
 
-**Semantic search is local-first.** Embeddings run on your machine (`@huggingface/transformers`)
-and vectors live in an embedded Postgres with pgvector (`@electric-sql/pglite`). No API keys, no
-Docker, no Python, and nothing leaves the machine. If the optional dependencies or the index are
-missing, everything degrades gracefully to keyword search.
+**Semantic search is local-first.** Embeddings run on your machine (`@huggingface/transformers`) in
+one shared local process, and vectors live in an SQLite file (the built-in `node:sqlite`, no
+dependency). No API keys, no Docker, no Python, and nothing leaves the machine. If the embedder or
+the index are missing, everything degrades to keyword search and says why.
 
 ## Install
 
@@ -153,7 +153,14 @@ answer with `wiki_index action=model`:
 
 First run: `wiki_index action=rebuild` downloads the model once into `<agent dir>/jev-wiki/models`
 and builds the index; afterwards `wiki_finalize` keeps touched pages in sync automatically. Queries
-never trigger a download — a cold index silently falls back to keyword search. Model loads report
+never trigger a download — a cold index falls back to keyword search and says so. The embedding
+model loads once per machine in a shared process (`wiki_index status` shows its pid; `action=stop`
+ends it, `action=restart` replaces it, and it exits after 30 minutes idle), so sessions stay small:
+~70 MB instead of ~800 MB each. Every stored vector carries the embedder's fingerprint, and a query
+only compares vectors with a matching fingerprint — change the preset, dtype or dimensions and
+`wiki_index status` reports that a rebuild is required. The store is disposable:
+`wiki_index action=reset` deletes it while pi keeps running, and `npm run rebuild` re-embeds every
+registered wiki. Model loads report
 progress as a single footer status line in interactive sessions (one stable line in print/JSON
 runs), not as per-file console output. Existing wikis are
 found with `wiki_index action=discover` (scans the home directory and WSL distros), adopted with
@@ -175,7 +182,7 @@ Optional overrides in `~/.pi/agent/jev-wiki.json` or project `.pi/jev-wiki.json`
   "thresholds": { "autoAccept": 0.8, "minDerivable": 0.5 },
   "search": {
     "engine": "auto",
-    "vector": { "enabled": true, "model": "performance", "scan": { "wsl": true } },
+    "vector": { "enabled": true, "model": "performance", "embedder": { "idleExitMs": 1800000 }, "scan": { "wsl": true } },
     "jev": { "rerank": "auto", "sufficiency": true }
   },
   "capture": { "cadence": "task", "route": "subject" },

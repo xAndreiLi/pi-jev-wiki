@@ -659,3 +659,45 @@
 - Updated: decisions/auto-retrieval-injection.md
 - Updated: pi/before-agent-start-injection.md
 
+## [2026-10-08] capture | 2 insights (tool)
+- Raw: raw/sessions/2026-10-08-session-2026-10-08-065156.md
+- Filed 0 · reinforced 0 · review 1 · rejected 1
+
+## [2026-10-08] capture | 2 insights (tool)
+- Raw: raw/sessions/2026-10-08-session-2026-10-08-065213.md
+- Filed 1 · reinforced 0 · review 0 · rejected 1
+
+## [2026-10-08] capture | 1 insights (tool)
+- Raw: raw/sessions/2026-10-08-session-2026-10-08-065227.md
+- Filed 1 · reinforced 0 · review 0 · rejected 0
+
+## [2026-10-08] finalize | New gotcha: PGlite 0.5.8 locks nothing and the store is opened at session_start / closed at session_shutdown, so concurrent sessions are unguarded openers. Filed under architecture/ with the other PGlite and vector pages rather than the suggested new gotchas/ or invariants/ topics; cross-linked from the corrupt-store recovery page.
+- Updated: architecture/gotcha-vector-store-single-owner.md
+- Updated: architecture/gotcha-corrupt-vector-store-recovery.md
+
+## [2026-10-08] capture | 3 insights (tool)
+- Raw: raw/sessions/2026-10-08-session-2026-10-08-070016.md
+- Filed 1 · reinforced 0 · review 2 · rejected 0
+
+## [2026-10-08] finalize | New page with the pre-swap measurements: SQLite store constraints (short-lived connections for resettability, busy_timeout before WAL, local-FS requirement, missing store must read as empty) and the candidate cost comparison against PGlite at the real corpus size, plus the per-session model cost. Filed under architecture/ to sit with the other index pages rather than the suggested new gotchas/ topic. Measurements are marked needs_review since they are machine- and corpus-specific; the ranking-equivalence check is named as the outstanding test.
+- Updated: architecture/vector-store-swap-constraints.md
+
+## [2026-10-08] capture | 3 insights (tool)
+- Raw: raw/sessions/2026-10-08-session-2026-10-08-070753.md
+- Filed 2 · reinforced 0 · review 1 · rejected 0
+
+## [2026-10-08] finalize | Recorded the two decisions from 2026-10-08: the index store moves to SQLite with per-operation connections (merged into architecture/vector-store-swap-constraints.md, which now carries the decision and a pointer to docs/plans/INDEX-SERVICE.md), and one shared embedder process with an explicit fingerprint identity (new decisions/shared-embedder-parity.md, placed under decisions/ with the other decision records rather than the suggested architecture/ topic).
+- Updated: architecture/vector-store-swap-constraints.md
+- Updated: decisions/shared-embedder-parity.md
+
+## [2026-10-08] capture | 4 insights (tool)
+- Raw: raw/sessions/2026-10-08-session-2026-10-08-074620.md
+- Filed 1 · reinforced 0 · review 0 · rejected 3
+
+## [2026-10-08] finalize | Implementation record. New page: the shared embedder's two singleton traps (a pipe name is not a single instance on Windows; the pipe hash needs a canonicalised agent dir) plus the batch-retry fix, and the migration's verified numbers. Updated to historical: gotcha-vector-store-single-owner and gotcha-corrupt-vector-store-recovery (PGlite is gone). vector-store-swap-constraints carries the outcome section; decisions/shared-embedder-parity notes it is implemented. Overrides: Jev called the two pipe traps derivable from code — the code shows the fixes, but not the platform behaviour that made them necessary (empirically observed: two daemons, ~2,400 CPU-seconds spent, one pipe name), so they are recorded here with the command evidence rather than dropped.
+- Updated: architecture/gotcha-embedder-restarts.md
+- Updated: architecture/gotcha-vector-store-single-owner.md
+- Updated: architecture/gotcha-corrupt-vector-store-recovery.md
+- Updated: architecture/vector-store-swap-constraints.md
+- Updated: decisions/shared-embedder-parity.md
+

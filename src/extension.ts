@@ -60,10 +60,12 @@ import { matchRegisteredWikis, projectRootFor, registeredProjectRoots, resolvePa
 import { appendLog, entryFromPage, isWikiMetaFile, parseIndex, readIndex, readRecentLog, renderCompactToc, renderIndex, topicSlug, updateIndex, upsertEntries, writeIndex, type TocEntry } from "./wiki/toc.ts";
 import { createSearchEngine, VectorSearchEngine, type SearchResult } from "./wiki/search.ts";
 import { forgetWikiIndex, hasWarmIndex, indexExists, indexWiki, vectorStatus } from "./vector/index.ts";
-import { MODEL_PRESETS, resolvePreset } from "./vector/embed.ts";
+import { MODEL_PRESETS, fingerprintFor, resolvePreset } from "./vector/embed.ts";
+import { resetStore, storePath } from "./vector/sqlite.ts";
 import { modelChoiceSource, writeModelSetting } from "./vector/settings.ts";
-import { vectorEnabled, vectorSearch } from "./vector/query.ts";
+import { embedderOptionsFor, vectorEnabled, vectorSearch } from "./vector/query.ts";
 import { closeVectorDbs, vectorDbFor } from "./vector/db.ts";
+import { embedderLogPath, embedderStatusFor, stopEmbedder, warmEmbedder } from "./vector/embedder/client.ts";
 import { buildCatalog, renderCatalog } from "./vector/catalog.ts";
 import { judgeRetrieval } from "./vector/judgments.ts";
 import { discoverWikis, maxScanDepth, scanRoots } from "./vector/discover.ts";
@@ -131,6 +133,11 @@ function truncate(text: string, maxChars: number): string {
  * when the model is cached. With a UI the latest message replaces the footer status
  * entry (throttled); without one, at most a single line is printed.
  */
+function formatBytes(bytes: number): string {
+	if (bytes <= 0) return "empty";
+	return bytes >= 1_000_000 ? `${(bytes / 1_000_000).toFixed(1)} MB` : `${Math.max(1, Math.round(bytes / 1024))} KB`;
+}
+
 function modelProgressSink(ctx: ExtensionContext): { onProgress: (message: string) => void; done: () => void } {
 	const key = "jev-wiki";
 	let lastText = "";
@@ -1395,7 +1402,7 @@ export default function (pi: ExtensionAPI) {
 			if (vector.enabled && vector.sync.onFinalize && updates.length > 0) {
 				try {
 					const { registration } = await registerWiki(loaded.agentDir, layout.root);
-					if (await hasWarmIndex(loaded.agentDir, registration.name, vector.model)) {
+					if (await hasWarmIndex(loaded.agentDir, registration.name, fingerprintFor(vector.model, { dtype: vector.dtype ?? null, dimensions: vector.dimensions ?? null }))) {
 						const progress = modelProgressSink(ctx);
 						try {
 							const report = await indexWiki({
@@ -1403,6 +1410,7 @@ export default function (pi: ExtensionAPI) {
 								wiki: registration.name,
 								root: layout.root,
 								model: vector.model,
+								...(vector.dtype ? { dtype: vector.dtype } : {}),
 								...(vector.dimensions ? { dimensions: vector.dimensions } : {}),
 								paths: updates.map((entry) => entry.path),
 								onProgress: progress.onProgress,
@@ -1711,16 +1719,18 @@ export default function (pi: ExtensionAPI) {
 		name: "wiki_index",
 		label: "Manage the Semantic Index",
 		description:
-			"Manage the cross-wiki semantic search index (PGlite + pgvector): status, discover existing wikis, choose the embedding model, rebuild, add/remove registered wikis, or enable/disable indexing.",
+			"Manage the cross-wiki semantic search index (SQLite store + one shared embedder process): status, discover existing wikis, choose the embedding model, rebuild, reset, stop/restart the embedder, add/remove registered wikis, or enable/disable indexing.",
 		promptSnippet: "Manage the cross-wiki semantic index",
 		promptGuidelines: [
 			"Use wiki_index status to check index health; rebuild after changing search.vector.model or when doctor reports a stale index.",
 			"Before the first index build, ask the user which embedding preset to use (performance vs quality) and set it with wiki_index action=model — ingestion must not start until the choice is made.",
 			"Use wiki_index discover to find existing wikis on the machine, then register=true and rebuild all=true to adopt and index them.",
 			"The semantic index is a derived cache — a model change re-embeds the whole wiki.",
+			"Use wiki_index action=reset to delete the index store outright (it is rebuilt from the pages) — safe while pi is running, unlike the old PGlite store.",
+			"The embedding model runs in one shared local process (wiki_index status shows its pid; action=stop stops it, action=restart replaces it). Sessions never load the model themselves.",
 		],
 		parameters: Type.Object({
-			action: StringEnum(["status", "model", "discover", "rebuild", "add", "remove", "enable", "disable"] as const),
+			action: StringEnum(["status", "model", "discover", "rebuild", "reset", "stop", "restart", "add", "remove", "enable", "disable"] as const),
 			wiki: Type.Optional(Type.String({ description: "Registered wiki name (defaults to the current wiki)" })),
 			path: Type.Optional(Type.String({ description: "Wiki root path for action=add (defaults to the current wiki root)" })),
 			paths: Type.Optional(Type.Array(Type.String({ description: "Scan root paths for action=discover (defaults to configured roots, then home)" }))),
@@ -1732,7 +1742,7 @@ export default function (pi: ExtensionAPI) {
 			const { loaded, layout } = runtimeFor(ctx);
 			const vector = loaded.config.search.vector;
 			if (params.action === "status") {
-				const status = await vectorStatus(loaded.agentDir, vector.model, vector.dimensions ?? undefined);
+				const status = await vectorStatus(loaded.agentDir, vector.model, vector.dimensions ?? undefined, vector.dtype ?? undefined);
 				const downloadMb = Math.round(status.downloadBytes / 1_000_000);
 				const cachedMb = Math.round(status.modelsBytes / 1_000_000);
 				const cacheLabel =
@@ -1741,19 +1751,43 @@ export default function (pi: ExtensionAPI) {
 						: status.modelsBytes >= status.downloadBytes * 0.5
 							? `cached (~${cachedMb} MB)`
 							: `partial (~${cachedMb} MB of ~${downloadMb} MB)`;
+				const stale = status.states.filter((state) => state.fingerprint !== status.fingerprint);
 				const lines = [
 					"# Semantic index",
-					`- preset: ${vector.model} (${status.repo}), ${status.dimensions}d — ${cacheLabel}`,
+					`- preset: ${vector.model} (${status.repo}), ${status.dimensions}d, ${status.dtype} — ${cacheLabel}`,
+					`- embedder identity: ${status.fingerprint}`,
 					`- models dir: ${status.modelsDir}`,
-					`- database: ${status.dbAvailable ? "ok" : `unavailable — ${status.error}`}`,
+					`- store: ${status.dbAvailable ? `ok — ${status.storePath} (${formatBytes(status.storeBytes)})` : `unavailable — ${status.error}`}`,
+				];
+				if (!status.dbAvailable) {
+					lines.push(
+						"",
+						"Semantic search is unavailable: wiki_ask falls back to keyword results and the index is not maintained until this is fixed. The store is a derived cache — `wiki_index action=reset` then `action=rebuild all=true` rebuilds it from the pages.",
+					);
+				}
+				const daemon = await embedderStatusFor(embedderOptionsFor(loaded.agentDir, loaded.config));
+				lines.push(
+					daemon
+						? `- embedder process: pid ${daemon.pid}, started ${daemon.startedAt}, queued ${daemon.queue.interactive + daemon.queue.batch}, serving ${daemon.fingerprint}`
+						: `- embedder process: not running (starts on demand; log: ${embedderLogPath(loaded.agentDir)})`,
+				);
+				if (stale.length > 0) {
+					lines.push(
+						"",
+						`REBUILD REQUIRED: ${stale.map((state) => `\`${state.name}\``).join(", ")} ${stale.length === 1 ? "was" : "were"} indexed by a different embedder identity. Run \`wiki_index action=rebuild all=true\`.`,
+					);
+				}
+				lines.push(
 					"",
 					`Registered wikis (${status.registry.wikis.length}):`,
 					...status.registry.wikis.map((entry) => {
 						const state = status.states.find((candidate) => candidate.name === entry.name);
-						const detail = state ? `${state.chunks} chunks, ${state.model} ${state.dim}d, updated ${state.updatedAt}` : "not indexed yet";
+						const detail = state
+							? `${state.chunks} chunks, ${state.model} ${state.dim}d${state.fingerprint === status.fingerprint ? "" : ", different embedder"}, updated ${state.updatedAt}`
+							: "not indexed yet";
 						return `- ${entry.name}${entry.enabled ? "" : " (disabled)"} — ${entry.root} — ${detail}`;
 					}),
-				];
+				);
 				return { content: [{ type: "text", text: lines.join("\n") }], details: status };
 			}
 			if (params.action === "discover") {
@@ -1837,7 +1871,7 @@ export default function (pi: ExtensionAPI) {
 				await db.init();
 				for (const entry of registry.wikis) {
 					const state = await db.state(entry.name);
-					if (!state || state.model !== params.model) stale.push(entry.name);
+					if (!state || state.fingerprint !== fingerprintFor(params.model, { dtype: vector.dtype ?? null, dimensions: vector.dimensions ?? null })) stale.push(entry.name);
 				}
 				return {
 					content: [
@@ -1847,6 +1881,50 @@ export default function (pi: ExtensionAPI) {
 						},
 					],
 					details: { model: params.model, stale },
+				};
+			}
+			if (params.action === "stop" || params.action === "restart") {
+				const options = embedderOptionsFor(loaded.agentDir, loaded.config);
+				const stopped = await stopEmbedder(options);
+				if (params.action === "stop") {
+					return {
+						content: [
+							{
+								type: "text",
+								text: stopped ? "Stopped the shared embedder. It restarts on the next search or rebuild." : "No shared embedder was running.",
+							},
+						],
+						details: { stopped },
+					};
+				}
+				const restarted = await warmEmbedder(options);
+				return {
+					content: [
+						{
+							type: "text",
+							text: restarted
+								? `Restarted the shared embedder (log: ${embedderLogPath(loaded.agentDir)}).`
+								: `The shared embedder did not start — see ${embedderLogPath(loaded.agentDir)}.`,
+						},
+					],
+					details: { restarted },
+				};
+			}
+			if (params.action === "reset") {
+				// The store is a derived cache and is never held open between operations, so this needs no
+				// coordination with other sessions: the next operation re-creates an empty store.
+				const dataDir = vectorDataDir(loaded.agentDir);
+				const existed = await resetStore(dataDir);
+				return {
+					content: [
+						{
+							type: "text",
+							text: existed
+								? `Deleted the semantic index store at ${storePath(dataDir)}. Every wiki reads as "not indexed yet" until \`wiki_index action=rebuild all=true\` re-embeds it.`
+								: `No index store at ${storePath(dataDir)} — nothing to delete.`,
+						},
+					],
+					details: { store: storePath(dataDir), existed },
 				};
 			}
 			if (params.action === "rebuild") {
@@ -1879,6 +1957,7 @@ export default function (pi: ExtensionAPI) {
 									wiki: entry.name,
 									root,
 									model: vector.model,
+									...(vector.dtype ? { dtype: vector.dtype } : {}),
 									...(vector.dimensions ? { dimensions: vector.dimensions } : {}),
 									onProgress: progress.onProgress,
 								});
@@ -1902,6 +1981,7 @@ export default function (pi: ExtensionAPI) {
 						wiki: target.name,
 						root,
 						model: vector.model,
+						...(vector.dtype ? { dtype: vector.dtype } : {}),
 						...(vector.dimensions ? { dimensions: vector.dimensions } : {}),
 						onProgress: progress.onProgress,
 					});

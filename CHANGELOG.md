@@ -1,6 +1,59 @@
 # Changelog
 
-## Unreleased
+## 1.0.0 — 2026-10-08
+
+First stable release. The index is no longer embedded Postgres: it is SQLite, and the embedding model
+lives in one shared local process.
+
+### Breaking
+
+- `engines.node` is now `>=22.13` (the built-in `node:sqlite` module must be available without a flag).
+- The optional dependencies `@electric-sql/pglite` and `@electric-sql/pglite-pgvector` are gone, along
+  with the never-read `search.vector.db` and `search.vector.url` config fields. An existing index
+  built with PGlite is not migrated: run `wiki_index action=reset` (or delete
+  `<agent dir>/jev-wiki/vector`) and `npm run rebuild`.
+- A project-level preset that differs from the global one is refused with a warning naming both,
+  instead of being indexed under a second embedder identity.
+- `wiki_index status` no longer reports a `database:` line; it reports the store path, the embedder
+  identity and the live embedder process.
+
+### Changed
+
+- **The index store is SQLite now** (built-in `node:sqlite`), replacing embedded Postgres with
+  pgvector. Every operation opens and closes its own connection, so several pi sessions share one
+  store safely, a corrupt or unwanted index is removed with `wiki_index action=reset` while pi is
+  running, and a store that disappears mid-session reads as "not indexed yet" instead of failing.
+  Vectors are normalized BLOBs and KNN is an exact cosine scan — 9 ms per query at 1,385×1024
+  against 12.6 ms for pgvector, 0.8 ms to open instead of 1,683 ms of WASM boot, and a 7.8 MB file
+  instead of a 67 MB data directory. `engines.node` is now `>=22.13`.
+- **Every chunk row carries an embedder fingerprint** (`preset@version:dtype:dimensions`) and queries
+  filter on it, so changing dtype, dimensions, pooling or a prompt template forces a rebuild instead
+  of silently comparing vectors produced by two different embedders. `wiki_index status` reports the
+  stored identity against the live embedder's and names the wikis that need a rebuild; `wiki_ask`
+  states why when no vectors can be compared. Presets gained a `version` that must be bumped with
+  their templates.
+- **The embedding model lives in one shared local process.** Sessions no longer load it (measured
+  ~800 MB RSS per session before, ~70 MB after); it starts on demand over a local pipe, survives the
+  session that started it, exits after `search.vector.embedder.idleExitMs` (default 30 minutes) with
+  no clients, and logs to `<agent dir>/jev-wiki/embedder.log`. There is deliberately no inline mode —
+  a second embedder is exactly what parity cannot survive — and when it cannot start, semantic
+  search reports the reason and keyword search continues.
+- Indexing, querying and status all read the embedder identity from one shared mapping, so the index
+  and the query path can no longer disagree about dtype or dimensions (the indexer used to ignore
+  `search.vector.dtype` entirely).
+
+### Added
+
+- `wiki_index` actions `reset` (delete the store), `stop` and `restart` (the shared embedder), and
+  `search.vector.embedder` (`idleExitMs`, `logMaxBytes`).
+- `npm run rebuild [wiki...]` re-embeds every registered wiki — the migration and recovery path.
+- Tests: the store's ranking against an independent cosine scan, byte-exact vector round-trip,
+  identity isolation, a reset under a live handle, and two processes writing one store at once.
+
+### Removed
+
+- `@electric-sql/pglite` and `@electric-sql/pglite-pgvector`, and the never-read
+  `search.vector.db` / `search.vector.url` config fields.
 
 ### Added
 

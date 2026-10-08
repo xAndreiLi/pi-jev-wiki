@@ -1,17 +1,21 @@
 /**
  * Vector pipeline tests: prompt templates, chunking, RRF fusion, the wiki
- * registry, and a PGlite + pgvector integration pass with a fake embedder.
+ * registry, and an index integration pass over the SQLite store with a fake embedder.
  * Run: npm run test:vector
  */
 import assert from "node:assert/strict";
+import { spawn } from "node:child_process";
 import { mkdtemp, readFile, rm, utimes, writeFile, mkdir } from "node:fs/promises";
+import { existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { chunkPage, hashChunk, splitSections } from "../src/vector/chunks.ts";
 import { MODEL_PRESETS, previewEmbedText, truncateAndNormalize, type EmbedInput, type EmbeddingProvider } from "../src/vector/embed.ts";
 import { forgetWikiIndex, hasWarmIndex, indexWiki } from "../src/vector/index.ts";
 import { enabledWikiNames, readRegistry, registerWiki, setWikiEnabled, unregisterWiki } from "../src/vector/registry.ts";
 import { vectorDbFor } from "../src/vector/db.ts";
+import { resetStore, storePath } from "../src/vector/sqlite.ts";
 import { vectorDataDir } from "../src/vector/registry.ts";
 import { discoverWikis } from "../src/vector/discover.ts";
 import { buildCatalog } from "../src/vector/catalog.ts";
@@ -161,7 +165,7 @@ await check("registers, dedupes, renames collisions, toggles, and removes", asyn
 	await rm(agentDir, { recursive: true, force: true });
 });
 
-console.log("index integration (PGlite + pgvector)");
+console.log("index integration (SQLite store)");
 await check("indexes, skips unchanged chunks, and re-embeds edits", async () => {
 	const agentDir = await mkdtemp(join(tmpdir(), "jev-index-"));
 	const wikiDir = join(agentDir, "wiki");
@@ -186,12 +190,12 @@ await check("indexes, skips unchanged chunks, and re-embeds edits", async () => 
 	assert.equal(third.skipped, 1);
 
 	const db = vectorDbFor(vectorDataDir(agentDir));
-	const hashes = await db.hashes("testwiki", "performance");
+	const hashes = await db.hashes("testwiki", provider.fingerprint);
 	assert.ok([...hashes.keys()].some((key) => key === "notes/alpha.md\u0000claim:c1"));
 	assert.ok(![...hashes.keys()].some((key) => key.includes("superseded")));
 
-	const [queryVector] = await provider.embed([{ text: "alpha" }], "query");
-	const hits = await db.knn(queryVector, { model: "performance", dim: 4, limit: 3 });
+const [queryVector] = await provider.embed([{ text: "alpha" }], "query");
+	const hits = await db.knn(queryVector, { fingerprint: provider.fingerprint, dim: 4, limit: 3 });
 	assert.equal(hits[0].key, "claim:c1");
 	assert.equal(hits[0].wiki, "testwiki");
 
@@ -202,10 +206,183 @@ await check("indexes, skips unchanged chunks, and re-embeds edits", async () => 
 	await mkdir(join(emptyRoot, "wiki"), { recursive: true });
 	const empty = await indexWiki({ agentDir, wiki: "emptywiki", root: emptyRoot, model: "performance", dimensions: 4, provider });
 	assert.equal(empty.total, 0);
-	assert.equal(await hasWarmIndex(agentDir, "emptywiki", "performance"), true);
+	assert.equal(await hasWarmIndex(agentDir, "emptywiki", provider.fingerprint), true);
 	await db.close();
 	await rm(agentDir, { recursive: true, force: true });
 });
+
+console.log("index store (SQLite)");
+await check("a reset is a file delete that a live session handle does not block", async () => {
+	const agentDir = await mkdtemp(join(tmpdir(), "jev-reset-"));
+	await mkdir(join(agentDir, "wiki", "notes"), { recursive: true });
+	await writeFile(join(agentDir, "wiki", "notes", "alpha.md"), page("Alpha page", "c1", "Alpha claim about widgets.", "widget body text ".repeat(20)));
+	const provider = fakeProvider();
+	const dataDir = vectorDataDir(agentDir);
+	const db = vectorDbFor(dataDir);
+	const base = { agentDir, wiki: "resetwiki", root: agentDir, model: "performance", dimensions: 4, provider };
+
+	await indexWiki(base);
+	assert.ok(await db.hasAny(), "store should hold chunks after indexing");
+	assert.equal(await hasWarmIndex(agentDir, "resetwiki", provider.fingerprint), true);
+
+	// The whole point of the store: no open handle, so a delete works while sessions run.
+	assert.equal(await resetStore(dataDir), true);
+	assert.equal(await db.hasAny(), false, "a reset store must read as empty, not fail");
+	assert.deepEqual(await db.counts(), []);
+	assert.equal(await hasWarmIndex(agentDir, "resetwiki", provider.fingerprint), false);
+
+	await indexWiki(base);
+	assert.equal(await hasWarmIndex(agentDir, "resetwiki", provider.fingerprint), true);
+	await db.close();
+	await rm(agentDir, { recursive: true, force: true });
+});
+
+await check("stores the vectors it was given and ranks them by exact cosine", async () => {
+	const agentDir = await mkdtemp(join(tmpdir(), "jev-cos-"));
+	await mkdir(join(agentDir, "wiki", "notes"), { recursive: true });
+	const dims = 8;
+	const produced: Float32Array[] = [];
+	const provider: EmbeddingProvider = {
+		id: "det8",
+		fingerprint: `det8@v1:f32:${dims}`,
+		dimensions: dims,
+		async embed(inputs: EmbedInput[]): Promise<Float32Array[]> {
+			return inputs.map((input) => {
+				const vector = deterministicVector(input.text, dims);
+				produced.push(vector);
+				return vector;
+			});
+		},
+	};
+	for (let i = 0; i < 6; i += 1) {
+		await writeFile(
+			join(agentDir, "wiki", "notes", `page${i}.md`),
+			page(`Page ${i}`, "c1", `Claim ${i} about topic ${i * 7}.`, `body text for page ${i} `.repeat(6)),
+		);
+	}
+	await indexWiki({ agentDir, wiki: "coswiki", root: agentDir, model: "performance", dimensions: dims, provider });
+
+	// What landed on disk must be exactly what the provider produced.
+	const rows = await rawRows(vectorDataDir(agentDir));
+	const stored = new Set(rows.map((row) => Buffer.from(row.embedding as Uint8Array).toString("base64")));
+	const expected = new Set(produced.map((vector) => Buffer.from(vector.buffer, vector.byteOffset, vector.byteLength).toString("base64")));
+	assert.deepEqual(stored, expected, "stored vectors must round-trip byte for byte");
+
+	// Ranking is re-derived here, independently of the store's own scorer.
+	const db = vectorDbFor(vectorDataDir(agentDir));
+	for (let i = 0; i < 5; i += 1) {
+		const query = deterministicVector(`query ${i} topic ${i}`, dims);
+		const hits = await db.knn(query, { fingerprint: provider.fingerprint, dim: dims, limit: 4 });
+		const reference = rows
+			.filter((row) => row.fingerprint === provider.fingerprint)
+			.map((row) => {
+				const bytes = row.embedding as Uint8Array;
+				return { key: String(row.key), score: cosine(query, new Float32Array(bytes.buffer, bytes.byteOffset, bytes.byteLength / 4)) };
+			})
+			.sort((a, b) => b.score - a.score)
+			.slice(0, 4);
+		assert.deepEqual(
+			hits.map((hit) => [hit.key, Number(hit.score.toFixed(6))]),
+			reference.map((entry) => [entry.key, Number(entry.score.toFixed(6))]),
+			`ranking for query ${i} must match an independent cosine scan`,
+		);
+	}
+
+	// Another identity's rows are invisible, whatever their vector similarity.
+	const foreign = await db.knn(deterministicVector("claim", dims), { fingerprint: "det8@v2:f32:8", dim: dims, limit: 4 });
+	assert.deepEqual(foreign, [], "rows from another embedder identity must never be returned");
+	await db.close();
+	await rm(agentDir, { recursive: true, force: true });
+});
+
+await check("two processes share one store without a single owner", async () => {
+	const agentDir = await mkdtemp(join(tmpdir(), "jev-multi-"));
+	const dataDir = vectorDataDir(agentDir);
+	const db = vectorDbFor(dataDir);
+	await db.init();
+
+	const here = dirname(fileURLToPath(import.meta.url));
+	const childScript = existsSync(join(here, "store-child.mjs")) ? join(here, "store-child.mjs") : join(process.cwd(), "scripts", "store-child.mjs");
+	assert.ok(existsSync(childScript), `concurrency child script not found at ${childScript}`);
+	const child = spawn(process.execPath, [childScript, storePath(dataDir), "childwiki", "4"], { stdio: ["ignore", "pipe", "pipe"] });
+	let childOut = "";
+	let childErr = "";
+	child.stdout.on("data", (chunk) => (childOut += String(chunk)));
+	child.stderr.on("data", (chunk) => (childErr += String(chunk)));
+	const childDone = new Promise<number>((resolve, reject) => {
+		child.on("exit", (value) => resolve(value ?? -1));
+		child.on("error", reject);
+	});
+
+	const vector = new Float32Array(4).fill(0.5);
+	for (let i = 0; i < 60; i += 1) {
+		await db.upsert([
+			{
+				wiki: "parentwiki",
+				path: `notes/parent-${i % 5}.md`,
+				key: `k${i}`,
+				kind: "section",
+				claimId: null,
+				status: "verified",
+				title: "t",
+				text: "b",
+				hash: `h${i}`,
+				model: "performance",
+				fingerprint: "parent@v1:q8:4",
+				dim: 4,
+				embedding: vector,
+			},
+		]);
+		assert.ok((await db.counts()).length > 0, "reads must keep working while another process writes");
+	}
+
+	const code = await childDone;
+	assert.equal(code, 0, `child process failed: ${childErr}`);
+	const report = JSON.parse(childOut.trim() || "{}") as { writes: number; reads: number; errors: string[] };
+	assert.deepEqual(report.errors, [], `child saw errors: ${report.errors.join(", ")}`);
+	assert.ok(report.writes > 200 && report.reads > 200, `child did too little: ${JSON.stringify(report)}`);
+
+	const counts = await db.counts();
+	assert.equal(counts.find((entry) => entry.wiki === "childwiki")?.chunks, 250, "the child's writes must all be visible");
+	assert.equal(counts.find((entry) => entry.wiki === "parentwiki")?.chunks, 60, "the parent's writes must all survive");
+	const integrity = await rawRows(dataDir, "PRAGMA integrity_check");
+	assert.equal(String(integrity[0]?.integrity_check), "ok", "store integrity after concurrent writes");
+	await db.close();
+	await rm(agentDir, { recursive: true, force: true });
+});
+
+function deterministicVector(text: string, dims: number): Float32Array {
+	let hash = 2166136261;
+	const out = new Float32Array(dims);
+	for (let i = 0; i < dims; i += 1) {
+		for (const char of text) hash = Math.imul(hash ^ char.charCodeAt(0), 16777619) >>> 0;
+		hash = Math.imul(hash ^ (i + 1), 16777619) >>> 0;
+		out[i] = ((hash % 2000) - 1000) / 1000;
+	}
+	return truncateAndNormalize(out, dims);
+}
+
+function cosine(a: Float32Array, b: Float32Array): number {
+	let dot = 0;
+	let normA = 0;
+	let normB = 0;
+	for (let i = 0; i < a.length; i += 1) {
+		dot += a[i] * b[i];
+		normA += a[i] * a[i];
+		normB += b[i] * b[i];
+	}
+	return dot / (Math.sqrt(normA) * Math.sqrt(normB));
+}
+
+async function rawRows(dataDir: string, sql = "SELECT wiki, path, key, fingerprint, dim, embedding FROM chunks"): Promise<Array<Record<string, unknown>>> {
+	const { DatabaseSync } = await import("node:sqlite");
+	const db = new DatabaseSync(storePath(dataDir));
+	try {
+		return db.prepare(sql).all() as Array<Record<string, unknown>>;
+	} finally {
+		db.close();
+	}
+}
 
 function page(title: string, claimId: string, claimText: string, body: string): string {
 	return `---\ntitle: ${title}\ntype: concept\nsummary: test\nclaims:\n  - id: ${claimId}\n    text: "${claimText}"\n    status: verified\n  - id: old\n    text: "Superseded claim."\n    status: superseded\n---\n\n# ${title}\n\n${body}\n`;
@@ -214,6 +391,7 @@ function page(title: string, claimId: string, claimText: string, body: string): 
 function fakeProvider(): EmbeddingProvider {
 	return {
 		id: "fake",
+		fingerprint: "fake@v1:test:4",
 		dimensions: 4,
 		async embed(inputs: EmbedInput[]): Promise<Float32Array[]> {
 			return inputs.map((input) => {

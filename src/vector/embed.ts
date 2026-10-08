@@ -12,6 +12,8 @@ export interface EmbedInput {
 
 export interface EmbeddingProvider {
 	id: string;
+	/** Embedder identity; stored on every row and compared before any vector is compared. */
+	fingerprint: string;
 	dimensions: number;
 	embed(inputs: EmbedInput[], kind: "query" | "document"): Promise<Float32Array[]>;
 }
@@ -20,6 +22,8 @@ export type Pooling = "sentence_embedding" | "mean" | "last_token";
 
 export interface ModelPreset {
 	id: string;
+	/** Bump when this preset's templates, pooling, repo or dtype change: every stored vector is re-embedded. */
+	version: number;
 	repo: string;
 	dtype: string;
 	dimensions: number;
@@ -34,6 +38,7 @@ const QWEN_TASK = "Given a wiki query, retrieve relevant claims and notes that a
 export const MODEL_PRESETS: Record<string, ModelPreset> = {
 	performance: {
 		id: "embeddinggemma-300m",
+		version: 1,
 		repo: "onnx-community/embeddinggemma-300m-ONNX",
 		dtype: "q8",
 		dimensions: 768,
@@ -44,6 +49,7 @@ export const MODEL_PRESETS: Record<string, ModelPreset> = {
 	},
 	quality: {
 		id: "qwen3-embedding-0.6b",
+		version: 1,
 		repo: "onnx-community/Qwen3-Embedding-0.6B-ONNX",
 		dtype: "q8",
 		dimensions: 1024,
@@ -65,6 +71,20 @@ export function resolvePreset(model: string): ModelPreset {
 }
 
 /** The exact text handed to the model for an input — pure, so tests can pin templates. */
+/**
+ * Embedder identity written to every stored row. Vectors may only be compared when this matches, and
+ * `preset.version` is what forces a rebuild when a template, pooling mode, repo or dtype moves.
+ */
+export function fingerprintOf(preset: ModelPreset, dtype: string, dimensions: number): string {
+	return `${preset.id}@v${preset.version}:${dtype}:${dimensions}`;
+}
+
+/** Fingerprint for a configured preset without loading a model (status and the query path use this). */
+export function fingerprintFor(model: string, options: { dtype?: string | null; dimensions?: number | null } = {}): string {
+	const preset = resolvePreset(model);
+	return fingerprintOf(preset, options.dtype ?? preset.dtype, options.dimensions ?? preset.dimensions);
+}
+
 export function previewEmbedText(preset: ModelPreset, input: EmbedInput, kind: "query" | "document"): string {
 	return kind === "query" ? preset.queryPrefix(input.text) : preset.documentText(input);
 }
@@ -83,7 +103,7 @@ interface ModelLike {
 }
 
 interface TransformersModule {
-	env: { cacheDir?: string };
+	env: { cacheDir?: string; allowRemoteModels?: boolean };
 	AutoTokenizer: {
 		from_pretrained(repo: string, options?: { progress_callback?: ProgressCallback }): Promise<TokenizerLike>;
 	};
@@ -125,6 +145,8 @@ export interface LocalProviderOptions {
 	dtype?: string;
 	cacheDir?: string;
 	batchSize?: number;
+	/** Default true. A warm-up or a query must never set this false-less: false forbids hub downloads. */
+	allowDownload?: boolean;
 	/** Optional progress sink for the first-run model download. */
 	onProgress?: (message: string) => void;
 }
@@ -144,6 +166,7 @@ export async function createLocalProvider(options: LocalProviderOptions): Promis
 
 	const transformers = await loadTransformers();
 	if (options.cacheDir) transformers.env.cacheDir = options.cacheDir;
+	if (options.allowDownload === false) transformers.env.allowRemoteModels = false;
 
 	const progress_callback: ProgressCallback | undefined = options.onProgress
 		? (info) => {
@@ -159,6 +182,7 @@ export async function createLocalProvider(options: LocalProviderOptions): Promis
 
 	return {
 		id: `${preset.id}:${dtype}`,
+		fingerprint: fingerprintOf(preset, dtype, dimensions),
 		dimensions,
 		async embed(inputs: EmbedInput[], kind: "query" | "document"): Promise<Float32Array[]> {
 			const out: Float32Array[] = [];

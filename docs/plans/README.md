@@ -10,6 +10,7 @@ Plans and evolving design documents for jev-wiki.
 | [../CRITIQUE.md](../CRITIQUE.md) | Pre-implementation critique, efficiency evaluation, and resolution log |
 | [EFFICACY.md](EFFICACY.md) | Measuring whether the wiki makes agents better: instruments, task design, experiments, statistics |
 | [AUTO-RETRIEVAL.md](AUTO-RETRIEVAL.md) | Proposal: automatic wiki search on every prompt — hook mechanism, query construction, relevance gate, display/inject ladder, measurement |
+| [INDEX-SERVICE.md](INDEX-SERVICE.md) | Decision + build plan (2026-10-08): the index store moves from PGlite to SQLite and one shared embedder process owns the model, making embedder parity structural |
 
 Historical sources gathered during design live in [`../../research/`](../../research/README.md); the
 project's own knowledge wiki lives in [`../wiki/`](../wiki/index.md).

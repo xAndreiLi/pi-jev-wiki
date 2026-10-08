@@ -5,26 +5,32 @@
 import type { ResolvedConfig } from "../config.ts";
 import type { SearchResult } from "../wiki/search.ts";
 import { vectorDbFor } from "./db.ts";
-import { createLocalProvider, modelsDir, resolvePreset, type EmbeddingProvider } from "./embed.ts";
+import { fingerprintFor, type EmbeddingProvider } from "./embed.ts";
+import { DEFAULT_IDLE_EXIT_MS, sharedEmbedderFor, type EmbedderOptions } from "./embedder/client.ts";
 import { vectorDataDir } from "./registry.ts";
-
-const providers = new Map<string, Promise<EmbeddingProvider>>();
 
 export function vectorEnabled(config: ResolvedConfig): boolean {
 	return config.search.vector.enabled;
 }
 
+/** The single mapping from config to embedder identity — every caller shares it, so none can drift. */
+export function embedderOptionsFor(agentDir: string, config: ResolvedConfig): EmbedderOptions {
+	return {
+		agentDir,
+		model: config.search.vector.model,
+		dtype: config.search.vector.dtype ?? null,
+		dimensions: config.search.vector.dimensions ?? null,
+		idleExitMs: config.search.vector.embedder?.idleExitMs ?? DEFAULT_IDLE_EXIT_MS,
+		...(config.search.vector.embedder?.logMaxBytes !== undefined ? { logMaxBytes: config.search.vector.embedder.logMaxBytes } : {}),
+	};
+}
+
+/**
+ * The embedder, which now lives in a shared process. Sessions never load the model themselves and
+ * there is deliberately no inline mode: a second embedder is exactly what parity cannot survive.
+ */
 export function providerFor(agentDir: string, config: ResolvedConfig): Promise<EmbeddingProvider> {
-	const preset = resolvePreset(config.search.vector.model);
-	const dimensions = config.search.vector.dimensions ?? preset.dimensions;
-	const dtype = config.search.vector.dtype ?? preset.dtype;
-	const key = `${agentDir}|${preset.id}|${dtype}|${dimensions}`;
-	let provider = providers.get(key);
-	if (!provider) {
-		provider = createLocalProvider({ preset, dimensions, dtype, cacheDir: modelsDir(agentDir) });
-		providers.set(key, provider);
-	}
-	return provider;
+	return Promise.resolve(sharedEmbedderFor(embedderOptionsFor(agentDir, config)));
 }
 
 export interface VectorQueryOptions {
@@ -43,18 +49,25 @@ export async function vectorSearch(
 	await db.init();
 	// Queries never download a model: a cold or mismatched index degrades to keyword search.
 	const model = config.search.vector.model;
+	// Identity is decided by config alone, so a cold index can be recognised without loading anything.
+	const fingerprint = fingerprintFor(model, {
+		dtype: config.search.vector.dtype ?? null,
+		dimensions: config.search.vector.dimensions ?? null,
+	});
 	const counts = await db.counts();
 	const warm = counts.some(
 		(entry) =>
-			entry.model === model &&
+			entry.fingerprint === fingerprint &&
 			entry.chunks > 0 &&
 			(!options.wikis || options.wikis.length === 0 || options.wikis.includes(entry.wiki)),
 	);
 	if (!warm) return [];
 	const provider = await providerFor(agentDir, config);
+	// Refuse to compare vectors from two identities, whatever the source of the provider is.
+	if (provider.fingerprint !== fingerprint) return [];
 	const [embedding] = await provider.embed([{ text: query }], "query");
 	const hits = await db.knn(embedding, {
-		model,
+		fingerprint,
 		dim: provider.dimensions,
 		limit: options.limit,
 		...(options.wikis && options.wikis.length > 0 ? { wikis: options.wikis } : {}),

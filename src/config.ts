@@ -68,11 +68,11 @@ export interface JevWikiConfig {
 		qmdCollection?: string;
 		vector: {
 			enabled: boolean;
-			db: "embedded";
-			url?: string | null;
 			model: string;
 			dtype?: string | null;
 			dimensions?: number | null;
+			/** The shared embedder process: one model for the whole machine. */
+			embedder: { idleExitMs: number; logMaxBytes: number };
 			chunk: { pageSections: boolean; maxTokens: number; overlap: number };
 			sync: { onFinalize: boolean };
 			fusion: { rrfK: number; candidateMultiplier: number };
@@ -107,8 +107,8 @@ export const DEFAULT_CONFIG: JevWikiConfig = {
 		engine: "auto",
 		vector: {
 			enabled: true,
-			db: "embedded",
 			model: "performance",
+			embedder: { idleExitMs: 1_800_000, logMaxBytes: 1_048_576 },
 			chunk: { pageSections: true, maxTokens: 1200, overlap: 160 },
 			sync: { onFinalize: true },
 			fusion: { rrfK: 60, candidateMultiplier: 3 },
