@@ -30,6 +30,18 @@ jobs:
           fi
           npm whoami
       - run: npm run test:all
+      - name: Cache embedding model
+        uses: actions/cache@v4
+        with:
+          path: ${{ runner.temp }}/jev-models
+          key: jev-models-embeddinggemma-300m-q8
+      # A tag must not publish an artifact that cannot run where it lands: `test:all` runs from the
+      # checkout, and a checkout is never under node_modules. This installs the packed tarball into a
+      # throwaway project and drives it (see scripts/install-test.ts).
+      - name: Installed-copy test
+        env:
+          JEV_WIKI_MODELS_DIR: ${{ runner.temp }}/jev-models
+        run: npm run test:install
       - name: Check published version
         id: published
         env:

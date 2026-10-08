@@ -37,9 +37,13 @@ try {
 	);
 	writeFileSync(join(agent, "jev-wiki", "wikis.json"), JSON.stringify({ wikis: [{ name: "tiny", root: wiki, enabled: true }] }));
 
-	// The real model cache, or the daemon would download one.
+	// The model cache the installed copy should reuse, or its daemon would download one. On this
+	// machine that is the real cache; CI points JEV_WIKI_MODELS_DIR at a directory it caches between
+	// runs, and the first run there downloads once.
+	const cache = process.env.JEV_WIKI_MODELS_DIR ?? join(homedir(), ".pi", "agent", "jev-wiki", "models");
+	mkdirSync(cache, { recursive: true });
 	const models = join(agent, "jev-wiki", "models");
-	symlinkSync(join(homedir(), ".pi", "agent", "jev-wiki", "models"), models, "junction");
+	symlinkSync(cache, models, process.platform === "win32" ? "junction" : "dir");
 
 	const packed = runNpm(["pack", "--pack-destination", work], root).trim().split("\n").pop() ?? "";
 	const tarball = join(work, packed);

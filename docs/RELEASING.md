@@ -11,9 +11,11 @@
   `.ts` file under `node_modules`, where Node refuses to strip types, so semantic search never started
   — do not recommend it. Deprecate with `npm deprecate pi-jev-wiki@1.0.0 "<reason>"`; that call needs
   an interactive `npm login` (a granular token is not enough) or the npm website's version page.
-- **Before a release, run `npm run test:install`.** The published tarball installs into a throwaway
-  project and must index a wiki and answer a semantic query from *that* layout. 1.0.0 shipped a
-  daemon that spawned `server.ts` under `node_modules`, where Node refuses to strip TypeScript
+- **`npm run test:install` is a CI gate, not a habit.** CI runs it on every push and pull request
+  (`ci.yml`) and again before publishing a tag (`publish.yml`), with the embedding model cached
+  between runs so it downloads once. It packs the package, installs the tarball into a throwaway
+  project and requires that copy to index a wiki and answer a semantic query. 1.0.0 shipped a daemon
+  spawned as `server.ts` under `node_modules`, where Node refuses to strip TypeScript
   (`ERR_UNSUPPORTED_NODE_MODULES_TYPE_STRIPPING`) — every checkout test passed while every installed
   copy had no semantic search. `npm run test:all` runs from the checkout and cannot catch that class.
 - **Push protection blocks the branch, not the release.** The 1.0.0 push was rejected with `GH013 …

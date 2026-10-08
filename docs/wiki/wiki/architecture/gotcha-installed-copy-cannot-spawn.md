@@ -2,7 +2,7 @@
 title: The installed copy could not start the embedder
 type: gotcha
 topic: architecture
-summary: "1.0.0 shipped a shared embedder whose daemon only started from a checkout: Node refuses to strip TypeScript under node_modules, so the shipped `server.ts` entry died with ERR_UNSUPPORTED_NODE_MODULES_TYPE_STRIPPING and every npm install had no semantic search while the whole suite stayed green. The daemon now launches through a plain-JavaScript shim, and `npm run test:install` drives the packed tarball in a throwaway project."
+summary: "1.0.0 shipped a shared embedder whose daemon only started from a checkout: Node refuses to strip TypeScript under node_modules, so the shipped `server.ts` entry died with ERR_UNSUPPORTED_NODE_MODULES_TYPE_STRIPPING and every npm install had no semantic search while the whole suite stayed green. The daemon now launches through a plain-JavaScript shim, and CI runs `npm run test:install` — the packed tarball, installed and driven in a throwaway project — on every push and before publishing."
 tags: [index, embeddings, packaging, node, gotcha]
 updated: 2026-10-08
 sources: [raw/sessions/2026-10-08-session-2026-10-08-080652.md]
@@ -58,9 +58,10 @@ CI was green, the artifact was verified (right files, right manifest, attested p
 feature was still dead for every installer.
 
 The gate that closes the class: **`npm run test:install`** packs the package, installs the tarball
-into a throwaway project, indexes a two-page wiki with *that* copy and requires a semantic hit. It is
-a pre-release step rather than part of `test:all` because it needs the model cache, and it is recorded
-in `docs/RELEASING.md` next to the release procedure.
+into a throwaway project, indexes a two-page wiki with *that* copy and requires a semantic hit. CI
+runs it on every push and pull request, and again before publishing a tag, with the model directory
+cached between runs — the check no longer depends on anyone remembering it. `test:all` stays
+checkout-only; this gate lives beside it.
 
 ## Worth generalising
 

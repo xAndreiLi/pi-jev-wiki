@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- CI enforces the suites that used to be manual. `ci.yml` now runs the integration, vector and
+  installed-copy tests on every push and pull request (it previously ran typecheck, unit and scale
+  only), and `publish.yml` runs the installed-copy test before publishing, so a tag cannot ship an
+  artifact that fails to run where it lands. The embedding model is cached between runs.
+
 ## 1.0.2 — 2026-10-08
 
 ### Fixed

@@ -41,3 +41,50 @@ jobs:
             done
           fi
           exit $code
+      - name: Integration test
+        run: |
+          set +e
+          npm run test:integration > integration.log 2>&1
+          code=$?
+          cat integration.log
+          if [ $code -ne 0 ]; then
+            tail -20 integration.log | while IFS= read -r line; do
+              echo "::error::integration: ${line}"
+            done
+          fi
+          exit $code
+      - name: Vector test
+        run: |
+          set +e
+          npm run test:vector > vector.log 2>&1
+          code=$?
+          cat vector.log
+          if [ $code -ne 0 ]; then
+            tail -20 vector.log | while IFS= read -r line; do
+              echo "::error::vector: ${line}"
+            done
+          fi
+          exit $code
+      - name: Cache embedding model
+        uses: actions/cache@v4
+        with:
+          path: ${{ runner.temp }}/jev-models
+          key: jev-models-embeddinggemma-300m-q8
+      # The checkout the steps above test is not the layout users get: only an installed package sits
+      # under node_modules, and 1.0.0 shipped a daemon that could not start there while every
+      # checkout test passed. This step packs the tarball, installs it into a throwaway project and
+      # drives that copy. It downloads the embedding model once; the cache keeps later runs cheap.
+      - name: Installed-copy test
+        env:
+          JEV_WIKI_MODELS_DIR: ${{ runner.temp }}/jev-models
+        run: |
+          set +e
+          npm run test:install > install.log 2>&1
+          code=$?
+          cat install.log
+          if [ $code -ne 0 ]; then
+            tail -20 install.log | while IFS= read -r line; do
+              echo "::error::install: ${line}"
+            done
+          fi
+          exit $code
