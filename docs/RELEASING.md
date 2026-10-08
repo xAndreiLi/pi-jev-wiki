@@ -1,9 +1,18 @@
 # Releasing
 
-## Current state (2026-09-26)
+## Current state (2026-10-08)
 
-- **Published:** `pi-jev-wiki@0.8.1` by CI with **SLSA provenance** (2026-09-26). `0.2.0` was the
-  manual first release and has no attestation; `0.3.0`–`0.8.0` were CI-published.
+- **Published:** `pi-jev-wiki@1.0.0` by CI with **SLSA provenance** (2026-10-08) — the SQLite index
+  store and the shared embedder process. `0.2.0` was the manual first release; `0.3.0`–`0.8.1` were
+  CI-published. At 1.x the npm store's `^1.0.0` range covers later minors, so
+  `pi update --extension npm:pi-jev-wiki@latest` works again (the 0.x pinning caveat below no longer
+  applies).
+- **Push protection blocks the branch, not the release.** The 1.0.0 push was rejected with `GH013 …
+  Push cannot contain secrets` for the synthetic Discord fixture in `eval/graders/ds-007-audit.test.ts`
+  (`FAKE_TOKEN`), introduced ~25 commits earlier. Push protection scans every commit in the push, so a
+  fix commit does not help: allow the pattern once at
+  `github.com/xAndreiLi/pi-jev-wiki/security/secret-scanning/unblock-secret/<id>` (the error prints the
+  URL) and push again. Rewriting history is the expensive alternative.
 - **Installed copies do not cross minor versions by themselves.** pi's npm store pins a `^<minor>`
   range, and for 0.x releases that excludes the next minor (`^0.7.1` does not match `0.8.0`), so
   `pi update --extension npm:pi-jev-wiki@latest` can report success while staying on the old
