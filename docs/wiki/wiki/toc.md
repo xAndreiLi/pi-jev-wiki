@@ -1,10 +1,10 @@
 # Wiki TOC
 
-> 53 pages across 4 topics. Per-topic tables: `toc/<topic>.md`. Full machine index: `index.md`.
+> 54 pages across 4 topics. Per-topic tables: `toc/<topic>.md`. Full machine index: `index.md`.
 
 | Topic | Pages | Table |
 |-------|-------|-------|
-| architecture | 22 | [toc/architecture.md](toc/architecture.md) |
+| architecture | 23 | [toc/architecture.md](toc/architecture.md) |
 | decisions | 16 | [toc/decisions.md](toc/decisions.md) |
 | invariants | 11 | [toc/invariants.md](toc/invariants.md) |
 | pi | 4 | [toc/pi.md](toc/pi.md) |

@@ -166,6 +166,15 @@ class SharedEmbedder implements EmbeddingProvider {
 	}
 
 	async stop(): Promise<boolean> {
+		// Connect first, without spawning: a fresh session has no socket yet, and stopping a running
+		// daemon must not depend on having already talked to it.
+		if (!this.socket || this.socket.destroyed) {
+			try {
+				await this.attach(1000);
+			} catch {
+				return false;
+			}
+		}
 		try {
 			await this.request({ op: "shutdown" }, 5000);
 			this.drop();

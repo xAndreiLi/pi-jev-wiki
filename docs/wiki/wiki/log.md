@@ -704,3 +704,10 @@
 ## [2026-10-08] finalize | Post-release doc fix: the user-facing text pointed installers at `npm run rebuild`, which is not shipped (scripts/ is outside package `files`), so it now names `wiki_index action=rebuild all=true` and keeps the script as the checkout equivalent. Also verified the published 1.0.0 artifact: tarball contains src/vector/sqlite.ts and src/vector/embedder/*, engines >=22.13, no pglite anywhere in the manifest.
 - Updated: architecture/gotcha-corrupt-vector-store-recovery.md
 
+## [2026-10-08] capture | 2 insights (tool)
+- Raw: raw/sessions/2026-10-08-session-2026-10-08-080652.md
+- Filed 0 · reinforced 0 · review 1 · rejected 1
+
+## [2026-10-08] finalize | Recorded the 1.0.0 installed-copy failure: the daemon entry was TypeScript under node_modules, where Node refuses to strip types (ERR_UNSUPPORTED_NODE_MODULES_TYPE_STRIPPING), so every npm install had no semantic search while the suite stayed green. Page documents the symptom, the cause, the jiti shim fix, and the new npm run test:install gate. Jev scored the "checkout-green proves nothing about an installed package" claim below the auto-accept threshold and called the type-stripping fact derivable; the first is filed as the page's claim at its real support, the second is kept as prose with the literal error as evidence, since the restriction is Node behaviour rather than something the code reveals.
+- Updated: architecture/gotcha-installed-copy-cannot-spawn.md
+
