@@ -8,6 +8,29 @@
   installed-copy tests on every push and pull request (it previously ran typecheck, unit and scale
   only), and `publish.yml` runs the installed-copy test before publishing, so a tag cannot ship an
   artifact that fails to run where it lands. The embedding model is cached between runs.
+- `wiki_triage` accepts `wiki: "<registered name>"`, so rejections from a cross-wiki ingest can be
+  triaged in the wiki whose ledger recorded them.
+
+### Fixed
+
+- **Ingest judged claims on their quote alone.** When the extractor attached a quote, that quote was
+  also sent as the whole `evidence`, so a claim summarising several sentences of one paragraph was
+  graded against a single sentence and rejected as unsupported even when the source states it
+  verbatim. Evidence is now always the `excerptAroundTerms` context; the quote still travels in
+  `claim.quote`. On a 17-case probe, 12 claims rejected this way (grounded 0.22–0.60) scored
+  0.91–0.98 with context, four falsified controls stayed at 0.02–0.12, and an accepted claim was
+  unchanged. Cost: adjudication input grows by up to the 6,000-character excerpt per claim.
+- Per-topic tables (`toc/<topic>.md`) linked pages relative to `wiki/`, so every link resolved under
+  `toc/` and was broken. They now link with `../`; `index.md` is unchanged.
+- `wiki_ask` with explicit `wikis` (or `scope: "all"`) and no vector engine — keyword mode or an
+  unbuilt index — silently searched only the session wiki and reported "No wiki pages match". It now
+  searches each named wiki lexically, tags results with their wiki, and reports unknown names.
+- The `closest passage` shown with an unsupported verdict was the first 320 characters of the best
+  paragraph, which for a dense paragraph is often unrelated text; it is now centred on the sentence
+  that best matches the claim.
+- `.jev-wiki/` is now actually gitignored, as documented: `ensureLayout` writes a self-ignoring
+  `.gitignore` into the state directory (an existing file is left alone) instead of relying on the
+  project's own `.gitignore`.
 
 ## 1.0.2 — 2026-10-08
 

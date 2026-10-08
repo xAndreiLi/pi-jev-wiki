@@ -142,7 +142,7 @@ exists, keyword otherwise) and can search every registered wiki:
 | `keyword` | TOC/index or BM25 over page text; zero dependencies |
 | `semantic` | cosine KNN over claim- and section-level embeddings |
 | `hybrid` | **RRF fusion** of BM25 and vector ranks — the default once indexed |
-| `scope: "all"` | searches every registered wiki (life wiki, project wikis, WSL projects), tagging results `[wiki-name]` with page, claim id, kind, and status |
+| `scope: "all"` | searches every registered wiki (life wiki, project wikis, WSL projects), tagging results `[wiki-name]` with page, claim id, kind, and status; without an index, `scope: "all"` and explicit `wikis` fall back to keyword search over each named wiki |
 
 Choosing the embedding model happens once, before the first build; the agent asks and persists the
 answer with `wiki_index action=model`:
@@ -191,7 +191,7 @@ Optional overrides in `~/.pi/agent/jev-wiki.json` or project `.pi/jev-wiki.json`
 ```
 
 **Cross-wiki writes.** `wiki_ingest`, `wiki_insights`, `wiki_finalize`, `wiki_sync`, `wiki_review`,
-`wiki_remove`, and `wiki_lint` accept `wiki: "<registered name>"` and then operate on that wiki's
+`wiki_remove`, `wiki_lint`, and `wiki_triage` accept `wiki: "<registered name>"` and then operate on that wiki's
 pages, raw sources, TOC/log, ledger, and review queue — one wiki per call, with the session's wiki
 as the default. Relative page paths and ingest sources resolve against the target project (never
 the session workspace), and `wiki_sync wiki=<name>` diffs the target project's repository.
