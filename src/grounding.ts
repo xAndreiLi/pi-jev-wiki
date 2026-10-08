@@ -105,7 +105,40 @@ export function closestPassage(source: string, claim: string, maxChars = 320): C
 	}
 	if (!best || best.overlap === 0) return undefined;
 	return {
-		excerpt: best.excerpt.length > maxChars ? `${best.excerpt.slice(0, maxChars)}…` : best.excerpt,
+		excerpt: best.excerpt.length > maxChars ? windowAroundBestSentence(best.excerpt, claimTokens, maxChars) : best.excerpt,
 		overlap: Number(best.overlap.toFixed(2)),
 	};
+}
+
+/**
+ * Excerpt of a long paragraph centred on the sentence sharing the most tokens
+ * with the claim, so the explanation shows the matching text rather than the
+ * paragraph's opening (which, for a dense paragraph, is often unrelated).
+ */
+function windowAroundBestSentence(paragraph: string, claimTokens: Set<string>, maxChars: number): string {
+	const sentences = paragraph.split(/(?<=[.!?])\s+/);
+	let bestIndex = 0;
+	let bestShared = -1;
+	for (const [index, sentence] of sentences.entries()) {
+		let shared = 0;
+		for (const token of tokens(sentence)) if (claimTokens.has(token)) shared++;
+		if (shared > bestShared) {
+			bestShared = shared;
+			bestIndex = index;
+		}
+	}
+	let start = bestIndex;
+	let end = bestIndex + 1;
+	let text = sentences[bestIndex];
+	while (text.length < maxChars) {
+		const next = end < sentences.length ? `${text} ${sentences[end]}` : undefined;
+		const previous = start > 0 ? `${sentences[start - 1]} ${text}` : undefined;
+		const grown = next && next.length <= maxChars ? next : previous && previous.length <= maxChars ? previous : undefined;
+		if (!grown) break;
+		if (grown === next) end++;
+		else start--;
+		text = grown;
+	}
+	if (text.length > maxChars) text = text.slice(0, maxChars);
+	return `${start > 0 ? "…" : ""}${text}${end < sentences.length || text.length === maxChars ? "…" : ""}`;
 }

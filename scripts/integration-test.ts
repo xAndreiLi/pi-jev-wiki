@@ -170,6 +170,41 @@ try {
 		assert.ok(!existsSync(join(wikiB, "wiki", "decisions", "gone.md")), "target page removed");
 		assert.ok(existsSync(join(wikiA, "wiki", "decisions", "gone.md")), "session decoy survives");
 	});
+
+	const ask = tools.get("wiki_ask");
+	const triage = tools.get("wiki_triage");
+	assert.ok(ask && triage, "wiki_ask and wiki_triage are registered");
+	const runAsk = (params: Record<string, unknown>) => ask!.execute("test", params, undefined, undefined, ctx);
+	const runTriage = (params: Record<string, unknown>) => triage!.execute("test", params, undefined, undefined, ctx);
+
+	await check("keyword ask honors explicit wikis without a vector index", async () => {
+		const hit = await runAsk({ query: "Target smoke", wikis: ["beta"], search: "keyword" });
+		assert.match(hit.content[0].text, /decisions\/smoke\.md/);
+		assert.match(hit.content[0].text, /\[beta\]/, "results are tagged with their wiki");
+		const miss = await runAsk({ query: "Session decoy", wikis: ["beta"], search: "keyword" });
+		assert.doesNotMatch(miss.content[0].text, /decoy\.md/, "the session wiki must not answer for an explicit target");
+	});
+
+	await check("keyword ask reports an unknown wiki instead of failing", async () => {
+		const result = await runAsk({ query: "Target smoke", wikis: ["beta", "nope"], search: "keyword" });
+		assert.match(result.content[0].text, /decisions\/smoke\.md/);
+		const missing = await runAsk({ query: "zzz-no-such-term", wikis: ["nope"], search: "keyword" });
+		assert.match(missing.content[0].text, /"nope" is not registered/);
+	});
+
+	await check("triage reads the target wiki ledger", async () => {
+		const entry = (subject: string) =>
+			`${JSON.stringify({ ts: new Date().toISOString(), actor: "jev", op: "ingest.adjudicate", subject, action: "reject_unsupported", verdict: { grounded: 0.2, derivable: 0.3 } })}\n`;
+		const betaLayout = resolveLayout(wikiB, ".", ".jev-wiki");
+		const alphaLayout = resolveLayout(wikiA, "docs/wiki", ".jev-wiki");
+		await mkdir(betaLayout.stateDir, { recursive: true });
+		await mkdir(alphaLayout.stateDir, { recursive: true });
+		await writeFile(betaLayout.ledgerPath, entry("beta-only rejection"), { flag: "a" });
+		await writeFile(alphaLayout.ledgerPath, entry("alpha-only rejection"), { flag: "a" });
+		const result = await runTriage({ wiki: "beta" });
+		assert.match(result.content[0].text, /beta-only rejection/);
+		assert.doesNotMatch(result.content[0].text, /alpha-only rejection/);
+	});
 } finally {
 	await rm(root, { recursive: true, force: true });
 	delete process.env.PI_CODING_AGENT_DIR;

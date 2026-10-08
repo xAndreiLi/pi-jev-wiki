@@ -58,7 +58,7 @@ import {
 import { extractMarkdownLinks } from "./wiki/links.ts";
 import { matchRegisteredWikis, projectRootFor, registeredProjectRoots, resolvePageFile, resolveSourceFile, resolveWriteTarget } from "./wiki/target.ts";
 import { appendLog, entryFromPage, isWikiMetaFile, parseIndex, readIndex, readRecentLog, renderCompactToc, renderIndex, topicSlug, updateIndex, upsertEntries, writeIndex, type TocEntry } from "./wiki/toc.ts";
-import { createSearchEngine, VectorSearchEngine, type SearchResult } from "./wiki/search.ts";
+import { createSearchEngine, VectorSearchEngine, type SearchEngine, type SearchResult } from "./wiki/search.ts";
 import { forgetWikiIndex, hasWarmIndex, indexExists, indexWiki, vectorStatus } from "./vector/index.ts";
 import { MODEL_PRESETS, fingerprintFor, resolvePreset } from "./vector/embed.ts";
 import { resetStore, storePath } from "./vector/sqlite.ts";
@@ -324,6 +324,36 @@ function renderTocLines(entries: TocEntry[], maxChars: number): string {
 }
 
 /** Resolve a wiki by registered name, or auto-register the current wiki root. */
+/**
+ * Lexical search across named registered wikis, for wiki_ask without a vector
+ * engine. Each wiki is searched on its own layout and tagged with its name;
+ * unknown names are reported in `notes` rather than failing the whole query.
+ */
+async function crossWikiLexicalEngine(
+	ctx: ExtensionContext,
+	config: LoadedConfig["config"],
+	wikiNames: string[],
+	notes: string[],
+): Promise<SearchEngine> {
+	const engines: SearchEngine[] = [];
+	for (const name of wikiNames) {
+		try {
+			const { layout } = await runtimeForTarget(ctx, name);
+			engines.push(createSearchEngine(config, layout, undefined, undefined, { wiki: name }));
+		} catch (error) {
+			notes.push((error as Error).message);
+		}
+	}
+	return {
+		name: `${engines[0]?.name ?? "index"} (${wikiNames.length} wikis, no vector index)`,
+		async search(options) {
+			const results: SearchResult[] = [];
+			for (const engine of engines) results.push(...(await engine.search(options)));
+			return results.sort((a, b) => b.score - a.score).slice(0, options.limit ?? 5);
+		},
+	};
+}
+
 async function resolveTargetWiki(agentDir: string, currentRoot: string, name?: string): Promise<{ name: string; root: string }> {
 	if (name) {
 		const registry = await readRegistry(agentDir);
@@ -473,7 +503,10 @@ async function ingestSource(
 	const topics = await existingTopics(layout);
 
 	const perClaim = await mapLimitLocal(extraction.claims, 4, async (claim) => {
-		const evidenceText = claim.quote ?? excerptAroundTerms(safeText, claim.text, 6000);
+		// The quote travels separately in `claim.quote`; evidence is always the
+		// surrounding excerpt, so a claim that summarises several sentences is not
+		// judged on its one-sentence quote alone (which reads as "unsupported").
+		const evidenceText = excerptAroundTerms(safeText, claim.text, 6000);
 		const adjudication = await adjudicateClaim(
 			client,
 			{ text: claim.text, kind: claim.kind, quote: claim.quote, files: claim.files, evidenceText },
@@ -1102,13 +1135,19 @@ export default function (pi: ExtensionAPI) {
 			const mode = params.search;
 			const engineName = mode === "keyword" ? "index" : mode === "semantic" ? "vector" : mode === "hybrid" ? "hybrid" : loaded.config.search.engine;
 			const names = { wiki: currentWiki, globalWiki };
-			const engine = createSearchEngine(
-				{ ...loaded.config, search: { ...loaded.config.search, engine: engineName } },
-				layout,
-				globalLayout,
-				vectorEngine,
-				names,
-			);
+			const searchConfig = { ...loaded.config, search: { ...loaded.config.search, engine: engineName } };
+			// Without a vector engine, explicit `wikis` / scope=all would otherwise fall back to
+			// the session wiki alone and report "no match"; search each named wiki lexically.
+			const lexicalTargets =
+				!vectorEngine && (params.wikis?.length || params.scope === "all")
+					? params.wikis?.length
+						? params.wikis
+						: enabledWikiNames(registry)
+					: undefined;
+			const engine = lexicalTargets
+				? await crossWikiLexicalEngine(ctx, searchConfig, lexicalTargets, notes)
+				: createSearchEngine(searchConfig, layout, globalLayout, vectorEngine, names);
+			if (lexicalTargets) scopeWikis = lexicalTargets;
 			let results: SearchResult[];
 			try {
 				results = await engine.search({ query: params.query, limit });
@@ -1128,7 +1167,7 @@ export default function (pi: ExtensionAPI) {
 			}
 			if (results.length === 0) {
 				const hints = [...notes];
-				if (vectorEnabled(loaded.config) && scopeWikis && scopeWikis.length > 0) {
+				if (vectorEngine && scopeWikis && scopeWikis.length > 0) {
 					try {
 						const counts = await vectorDbFor(vectorDataDir(loaded.agentDir)).counts();
 						const empty = scopeWikis.filter((name) => !counts.some((entry) => entry.wiki === name && entry.chunks > 0));
@@ -2160,9 +2199,10 @@ export default function (pi: ExtensionAPI) {
 		parameters: Type.Object({
 			limit: Type.Optional(Type.Number({ description: "Max rejections to list (default 20)" })),
 			sinceDays: Type.Optional(Type.Number({ description: "Only consider rejections from the last N days" })),
+			wiki: wikiParam(),
 		}),
 		async execute(_id, params, _signal, _onUpdate, ctx) {
-			const { layout } = runtimeFor(ctx);
+			const { layout } = await runtimeForTarget(ctx, params.wiki);
 			const ledger = await readLedger(layout);
 			const report = buildTriageReport(ledger, { limit: params.limit ?? 20, sinceDays: params.sinceDays });
 			return { content: [{ type: "text", text: renderTriage(report) }], details: report };

@@ -36,6 +36,10 @@ export async function ensureLayout(layout: WikiLayout): Promise<void> {
 	for (const dir of [layout.rawDir, layout.wikiDir, layout.stateDir]) {
 		await mkdir(dir, { recursive: true });
 	}
+	// Runtime state (ledger, review queue, session log) is local; a self-ignoring
+	// .gitignore keeps it out of commits without editing the project's .gitignore.
+	const stateIgnore = join(layout.stateDir, ".gitignore");
+	if (!existsSync(stateIgnore)) await writeFile(stateIgnore, "# jev-wiki runtime state; pages and raw sources are tracked\n*\n", { flag: "wx" }).catch(() => undefined);
 }
 
 export function slugify(input: string, maxLength = 60): string {

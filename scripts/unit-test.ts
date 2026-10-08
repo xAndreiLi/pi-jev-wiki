@@ -332,6 +332,22 @@ console.log("\ntoc shards");
 			await updateIndex(shardLayout, () => []);
 			assert.ok(!existsSync(shardPath), "shard is pruned when the topic empties");
 		});
+		await check("topic shard links resolve from toc/<topic>.md", async () => {
+			await updateIndex(shardLayout, () => entries);
+			const shardDir = join(shardLayout.wikiDir, "toc");
+			const shard = await readFile(join(shardDir, "pi.md"), "utf8");
+			const links = [...shard.matchAll(/\]\(([^)]+\.md)\)/g)].map((match) => match[1]);
+			assert.deepEqual(links, ["../pi/one.md", "../pi/two.md"]);
+			const index = await readFile(join(shardLayout.wikiDir, "index.md"), "utf8");
+			assert.match(index, /\]\(pi\/one\.md\)/, "index.md links stay relative to the wiki dir");
+		});
+		await check("ensureLayout makes runtime state self-ignoring", async () => {
+			const ignore = await readFile(join(shardLayout.stateDir, ".gitignore"), "utf8");
+			assert.match(ignore, /^\*$/m);
+			await writeFile(join(shardLayout.stateDir, ".gitignore"), "custom\n");
+			await ensureLayout(shardLayout);
+			assert.equal(await readFile(join(shardLayout.stateDir, ".gitignore"), "utf8"), "custom\n", "an existing file is kept");
+		});
 	} finally {
 		await rm(shardRoot, { recursive: true, force: true });
 	}
@@ -479,6 +495,15 @@ await check("closestPassage finds the panel a synthesised claim came from", () =
 	assert.ok(passage);
 	assert.match(passage!.excerpt, /First Pair/);
 	assert.ok(passage!.overlap > 0);
+});
+await check("closestPassage centres a long paragraph on the matching sentence", () => {
+	const filler = Array.from({ length: 12 }, (_, i) => `Unrelated opening sentence number ${i} about something else entirely.`).join(" ");
+	const source = `${filler} The replay accepts at most 10,000 cells and refuses an over-limit fixture. Trailing words close the paragraph.`;
+	const passage = closestPassage(source, "Replay accepts at most 10,000 cells and refuses over-limit fixtures");
+	assert.ok(passage);
+	assert.match(passage!.excerpt, /replay accepts at most 10,000 cells/);
+	assert.ok(passage!.excerpt.startsWith("…"), "a mid-paragraph window is marked as elided");
+	assert.ok(passage!.excerpt.length <= 322);
 });
 await check("near-identical claims are not contradiction candidates", () => {
 	const a = "Progressions replace external load for the pull-up.";

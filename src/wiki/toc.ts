@@ -77,11 +77,12 @@ function groupEntries(entries: TocEntry[]): Map<string, TocEntry[]> {
 	return groups;
 }
 
-function renderTable(entries: TocEntry[]): string[] {
+/** `linkBase` is the path from the rendered file back to the wiki directory ("../" for toc/<topic>.md). */
+function renderTable(entries: TocEntry[], linkBase = ""): string[] {
 	const lines = ["| Page | Type | Tags | Summary | Updated |", "|------|------|------|---------|---------|"];
 	for (const entry of entries) {
 		lines.push(
-			`| [${escapeCell(entry.title)}](${entry.path}) | ${escapeCell(entry.type)} | ${escapeCell(entry.tags.join(" "))} | ${escapeCell(entry.summary)} | ${escapeCell(entry.updated)} |`,
+			`| [${escapeCell(entry.title)}](${linkBase}${entry.path}) | ${escapeCell(entry.type)} | ${escapeCell(entry.tags.join(" "))} | ${escapeCell(entry.summary)} | ${escapeCell(entry.updated)} |`,
 		);
 	}
 	return lines;
@@ -127,7 +128,7 @@ export function renderCompactToc(entries: TocEntry[]): string {
 /** Full table for a single topic. */
 export function renderTopicToc(entries: TocEntry[], topic: string): string {
 	const list = entries.filter((entry) => topicOf(entry.path) === topic).sort((a, b) => a.title.localeCompare(b.title));
-	return [`# ${topic}`, "", ...renderTable(list)].join("\n") + "\n";
+	return [`# ${topic}`, "", ...renderTable(list, "../")].join("\n") + "\n";
 }
 
 export function upsertEntries(existing: TocEntry[], updates: TocEntry[]): TocEntry[] {
