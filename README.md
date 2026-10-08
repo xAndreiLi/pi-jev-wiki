@@ -159,8 +159,8 @@ ends it, `action=restart` replaces it, and it exits after 30 minutes idle), so s
 ~70 MB instead of ~800 MB each. Every stored vector carries the embedder's fingerprint, and a query
 only compares vectors with a matching fingerprint — change the preset, dtype or dimensions and
 `wiki_index status` reports that a rebuild is required. The store is disposable:
-`wiki_index action=reset` deletes it while pi keeps running, and `npm run rebuild` re-embeds every
-registered wiki. Model loads report
+`wiki_index action=reset` deletes it while pi keeps running, and `wiki_index action=rebuild all=true`
+re-embeds every registered wiki (`npm run rebuild` does the same from a checkout). Model loads report
 progress as a single footer status line in interactive sessions (one stable line in print/JSON
 runs), not as per-file console output. Existing wikis are
 found with `wiki_index action=discover` (scans the home directory and WSL distros), adopted with

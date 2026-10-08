@@ -2,7 +2,7 @@
 title: A vector store that will not open is rebuilt, not repaired
 type: gotcha
 topic: architecture
-summary: "Historical (PGlite, removed 2026-10-08): a corrupt PGlite store aborted every open and wiki_ask quietly fell back to lexical search. The store is SQLite now — reset with wiki_index action=reset while pi runs, then npm run rebuild — but the lesson stands: a degraded index that does not say why is indistinguishable from an empty wiki."
+summary: "Historical (PGlite, removed 2026-10-08): a corrupt PGlite store aborted every open and wiki_ask quietly fell back to lexical search. The store is SQLite now — reset with wiki_index action=reset while pi runs, then rebuild with wiki_index action=rebuild all=true — but the lesson stands: a degraded index that does not say why is indistinguishable from an empty wiki."
 tags: [index, pglite, vector, recovery, rebuild, gotcha]
 updated: 2026-10-08
 sources: [raw/sessions/2026-10-02-session-2026-10-02-002535.md, raw/sessions/2026-10-02-session-2026-10-02-002551.md]
@@ -22,7 +22,9 @@ files: [src/vector/db.ts, src/vector/registry.ts]
 > **Historical, 2026-10-08.** Written for the PGlite store, which was deleted on 2026-10-08
 > (`PANIC: failed to add new item` during WAL redo of a Btree insert — the multi-writer corruption
 > class). The index is SQLite now: `wiki_index action=reset` deletes it while pi runs and
-> `npm run rebuild [wiki...]` re-embeds every registered wiki. The reusable lesson is the second half
+> `wiki_index action=reset` deletes it while pi runs; `wiki_index action=rebuild all=true` re-embeds
+> every registered wiki (`npm run rebuild` does the same from a checkout). The reusable lesson is the
+> second half
 > of the page: a degraded index must say why it is degraded, and preserved evidence must be marked
 > where status is read, not only in a page.
 

@@ -11,7 +11,7 @@ lives in one shared local process.
 - The optional dependencies `@electric-sql/pglite` and `@electric-sql/pglite-pgvector` are gone, along
   with the never-read `search.vector.db` and `search.vector.url` config fields. An existing index
   built with PGlite is not migrated: run `wiki_index action=reset` (or delete
-  `<agent dir>/jev-wiki/vector`) and `npm run rebuild`.
+  `<agent dir>/jev-wiki/vector`) and `wiki_index action=rebuild all=true`.
 - A project-level preset that differs from the global one is refused with a warning naming both,
   instead of being indexed under a second embedder identity.
 - `wiki_index status` no longer reports a `database:` line; it reports the store path, the embedder
@@ -46,7 +46,8 @@ lives in one shared local process.
 
 - `wiki_index` actions `reset` (delete the store), `stop` and `restart` (the shared embedder), and
   `search.vector.embedder` (`idleExitMs`, `logMaxBytes`).
-- `npm run rebuild [wiki...]` re-embeds every registered wiki — the migration and recovery path.
+- `wiki_index action=rebuild all=true` re-embeds every registered wiki — the migration and recovery
+  path. From a checkout, `npm run rebuild [wiki...]` does the same and prints per-wiki progress.
 - Tests: the store's ranking against an independent cosine scan, byte-exact vector round-trip,
   identity isolation, a reset under a live handle, and two processes writing one store at once.
 
