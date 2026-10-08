@@ -7,6 +7,11 @@
   CI-published. At 1.x the npm store's `^1.0.0` range covers later minors, so
   `pi update --extension npm:pi-jev-wiki@latest` works again (the 0.x pinning caveat below no longer
   applies).
+- **Before a release, run `npm run test:install`.** The published tarball installs into a throwaway
+  project and must index a wiki and answer a semantic query from *that* layout. 1.0.0 shipped a
+  daemon that spawned `server.ts` under `node_modules`, where Node refuses to strip TypeScript
+  (`ERR_UNSUPPORTED_NODE_MODULES_TYPE_STRIPPING`) — every checkout test passed while every installed
+  copy had no semantic search. `npm run test:all` runs from the checkout and cannot catch that class.
 - **Push protection blocks the branch, not the release.** The 1.0.0 push was rejected with `GH013 …
   Push cannot contain secrets` for the synthetic Discord fixture in `eval/graders/ds-007-audit.test.ts`
   (`FAKE_TOKEN`), introduced ~25 commits earlier. Push protection scans every commit in the push, so a

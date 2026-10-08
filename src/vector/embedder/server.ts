@@ -250,8 +250,8 @@ export async function startEmbedderService(options: EmbedderServiceOptions): Pro
 	return { pid: process.pid, startedAt, stop };
 }
 
-/** Daemon entry point: `node server.ts <pipePath> <agentDir> <model> <dtype> <dimensions> <idleExitMs> <logPath> <allowDownload>`. */
-async function main(): Promise<void> {
+/** Daemon entry point: `daemon.mjs` (jiti) or `node --experimental-strip-types server.ts <args>` in a checkout. */
+export async function startFromCli(): Promise<void> {
 	const [pipePath, agentDir, model, dtype, dimensions, idleExitMs, logPath, allowDownload] = process.argv.slice(2);
 	if (!pipePath || !agentDir || !model) {
 		console.error("usage: server.ts <pipePath> <agentDir> <model> <dtype> <dimensions> <idleExitMs> <logPath> <allowDownload>");
@@ -286,7 +286,7 @@ const invoked = (() => {
 	}
 })();
 if (invoked) {
-	main().catch((error: unknown) => {
+	startFromCli().catch((error: unknown) => {
 		// stdio is ignored by the spawning client, so a startup failure must land in the log file.
 		const logPath = process.argv[8];
 		const line = `${new Date().toISOString()} failed to start: ${(error as Error).message}\n`;

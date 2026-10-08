@@ -53,8 +53,12 @@ export function embedderLogPath(agentDir: string): string {
 	return join(agentDir, "jev-wiki", "embedder.log");
 }
 
+/**
+ * The launcher, not `server.ts`: Node will not strip types for files under node_modules, so an
+ * installed copy must be started through the jiti shim. See daemon.mjs.
+ */
 export function embedderServerPath(): string {
-	return fileURLToPath(new URL("./server.ts", import.meta.url));
+	return fileURLToPath(new URL("./daemon.mjs", import.meta.url));
 }
 
 /** Node runs TypeScript by default from 22.18; below that the flag is required. */

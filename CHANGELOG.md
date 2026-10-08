@@ -1,5 +1,21 @@
 # Changelog
 
+## 1.0.1 — 2026-10-08
+
+### Fixed
+
+- **The shared embedder could not start from an installed copy.** Node refuses to strip TypeScript
+  for files under `node_modules`, so spawning `.../src/vector/embedder/server.ts` failed with
+  `ERR_UNSUPPORTED_NODE_MODULES_TYPE_STRIPPING`: on any npm install of 1.0.0 the daemon never came up
+  and semantic search was unavailable, while a checkout worked fine (which is why the suite never saw
+  it). The daemon now starts through `src/vector/embedder/daemon.mjs`, a plain-JavaScript shim that
+  loads the TypeScript daemon with jiti — the loader pi itself uses — so the spawn works from any
+  location. `jiti` moved from `devDependencies` to `dependencies`.
+- `npm run test:install` is the gate for this class of defect: it packs the package, installs the
+  tarball into a throwaway project, indexes a two-page wiki with *that* copy, and requires a
+  semantic hit. Run it before a release; `npm run test:all` runs from the checkout and cannot see an
+  installed-package failure.
+
 ## 1.0.0 — 2026-10-08
 
 First stable release. The index is no longer embedded Postgres: it is SQLite, and the embedding model

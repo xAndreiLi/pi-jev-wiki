@@ -701,3 +701,6 @@
 - Updated: architecture/vector-store-swap-constraints.md
 - Updated: decisions/shared-embedder-parity.md
 
+## [2026-10-08] finalize | Post-release doc fix: the user-facing text pointed installers at `npm run rebuild`, which is not shipped (scripts/ is outside package `files`), so it now names `wiki_index action=rebuild all=true` and keeps the script as the checkout equivalent. Also verified the published 1.0.0 artifact: tarball contains src/vector/sqlite.ts and src/vector/embedder/*, engines >=22.13, no pglite anywhere in the manifest.
+- Updated: architecture/gotcha-corrupt-vector-store-recovery.md
+
