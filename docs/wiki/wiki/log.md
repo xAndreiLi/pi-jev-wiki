@@ -746,3 +746,7 @@
 ## [2026-10-09] finalize | Correction and update: the page claimed the repository has no .gitattributes, which stopped being true when eee2ff5 added one. The reproduction is now recorded exactly (the 'LF will be replaced by CRLF' warning, the .M with equal blob hashes), along with the residual case — a file cached as CRLF before the attribute change still trips once — and the fix is attributed to the commit that landed it.
 - Updated: architecture/gotcha-toc-shards-lf-crlf.md
 
+## [2026-10-09] capture | 1 insights (tool)
+- Raw: raw/sessions/2026-10-09-session-2026-10-09-052959.md
+- Filed 0 · reinforced 0 · review 0 · rejected 1
+
