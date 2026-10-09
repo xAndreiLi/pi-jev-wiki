@@ -24,6 +24,12 @@
   embedder.log" about a file that did not exist. The shim now appends the same `failed to start:`
   line to the log.
 
+- A daemon that died without shutting down (SIGKILL, OOM, a crash) left its Unix socket file behind,
+  and every later start failed with `EADDRINUSE` until someone deleted it by hand, so semantic
+  search stayed unavailable. On `EADDRINUSE` the daemon now probes the socket: if the connection is
+  refused, it replaces the stale file and listens. A socket that still answers is left alone, so a
+  live daemon keeps its pipe. Windows named pipes leave no file and are unchanged.
+
 ## 1.0.2 — 2026-10-08
 
 ### Fixed

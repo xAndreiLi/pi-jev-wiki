@@ -9,7 +9,9 @@ import { mkdtemp, readFile, rm, utimes, writeFile, mkdir } from "node:fs/promise
 import { existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
+import { connect } from "node:net";
 import { fileURLToPath } from "node:url";
+import { startEmbedderService } from "../src/vector/embedder/server.ts";
 import { chunkPage, hashChunk, splitSections } from "../src/vector/chunks.ts";
 import { MODEL_PRESETS, previewEmbedText, truncateAndNormalize, type EmbedInput, type EmbeddingProvider } from "../src/vector/embed.ts";
 import { forgetWikiIndex, hasWarmIndex, indexWiki } from "../src/vector/index.ts";
@@ -229,6 +231,41 @@ const [queryVector] = await provider.embed([{ text: "alpha" }], "query");
 });
 
 console.log("index store (SQLite)");
+await check("the embedder replaces a stale socket file but never a live one", async () => {
+	if (process.platform === "win32") return; // named pipes leave no file behind
+	const dir = await mkdtemp(join(tmpdir(), "jev-sock-"));
+	const pipePath = join(dir, "e.sock");
+	try {
+		// A daemon killed hard (SIGKILL, OOM, a crash) never unlinks its socket.
+		const holder = spawn(process.execPath, ["-e", `require("node:net").createServer().listen(${JSON.stringify(pipePath)}, () => console.log("up"))`]);
+		await new Promise<void>((resolve) => holder.stdout.once("data", () => resolve()));
+		const exited = new Promise((resolve) => holder.once("exit", resolve));
+		holder.kill("SIGKILL");
+		await exited;
+		assert.ok(existsSync(pipePath), "the killed holder left its socket file behind");
+
+		const service = await startEmbedderService({ pipePath, provider: fakeProvider(), model: "fake" });
+		try {
+			await new Promise<void>((resolve, reject) => {
+				const socket = connect(pipePath, () => {
+					socket.destroy();
+					resolve();
+				});
+				socket.once("error", reject);
+			});
+			await assert.rejects(
+				startEmbedderService({ pipePath, provider: fakeProvider(), model: "fake" }),
+				/EADDRINUSE/,
+				"a second daemon must not take over a socket that is still answering",
+			);
+		} finally {
+			await service.stop();
+		}
+	} finally {
+		await rm(dir, { recursive: true, force: true });
+	}
+});
+
 await check("a reset is a file delete that a live session handle does not block", async () => {
 	const agentDir = await mkdtemp(join(tmpdir(), "jev-reset-"));
 	await mkdir(join(agentDir, "wiki", "notes"), { recursive: true });

@@ -4,8 +4,8 @@ type: decision
 topic: decisions
 summary: "Review work is agent-managed. The user is only escalated for critical items such as security, breaking API changes, or data loss."
 tags: [review, escalation, workflow]
-updated: 2026-09-26
-sources: [raw/jev-wiki-architecture-notes/2026-09-19-jev-wiki-architecture-notes.md, raw/sessions/2026-09-19-session-2026-09-19-1734.md, raw/sessions/2026-09-26-session-2026-09-26-2247.md]
+updated: 2026-10-08
+sources: [raw/jev-wiki-architecture-notes/2026-09-19-jev-wiki-architecture-notes.md, raw/sessions/2026-09-19-session-2026-09-19-1734.md, raw/sessions/2026-09-26-session-2026-09-26-2247.md, raw/sessions/2026-10-08-session-2026-10-08-092138.md]
 claims:
   - id: c1
     text: "Review work is agent-managed. The user is only escalated for critical items such as security, breaking API changes, or data loss."
@@ -20,6 +20,13 @@ claims:
     evidence: [raw/sessions/2026-09-26-session-2026-09-26-2247.md, I want the user to not have to be involved in the process of upkeeping the wiki for the most part.]
     reviewed: 2026-09-26
     last_checked: 2026-09-28
+  - id: c3
+    text: "Routine wiki upkeep — capture, page writing, sync invalidations, lint backstops and routine review dispositions — belongs to the agent; only critical items and the one-time embedding-preset choice reach the user."
+    status: user-stated
+    support: 0.7
+    evidence: [raw/sessions/2026-10-08-session-2026-10-08-092138.md, The human user should not need to manually touch any part of the wiki unless it is very critical.]
+    reviewed: 2026-10-08
+    last_checked: 2026-10-08
 files: [src/extension.ts, src/review.ts]
 ---
 
@@ -46,6 +53,17 @@ files: [src/extension.ts, src/review.ts]
 
 - Routine wiki updates (architecture, decisions, invariants) are agent-managed.
 - Escalate to the user only for security-sensitive content, breaking API changes, or potential data loss.
+
+## What counts as routine
+
+The agent owns the whole maintenance loop: capturing insights, composing and promoting pages,
+resolving sync invalidations, running the lint backstop, and disposing of ordinary review items. Two
+things reach the user — a review item at or above the criticality escalation threshold, and the
+one-time embedding-preset choice before the first index build.
+
+The list is short on purpose. The failure it guards against is a queue that grows faster than it is
+worked, until a human is quietly doing the routine upkeep that agent-managed review was meant to
+absorb — best detected by item *age* rather than queue length.
 
 ## Consequences
 
