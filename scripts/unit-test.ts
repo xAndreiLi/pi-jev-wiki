@@ -6,7 +6,7 @@ import assert from "node:assert/strict";
 import { existsSync } from "node:fs";
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join, relative } from "node:path";
+import { dirname, join, relative, resolve } from "node:path";
 import type { JevAnswer, JevClient, JevQuestion } from "../src/jev.ts";
 import { decideClaim, chooseTarget, suggestTopic, type ClaimVerdicts } from "../src/pipeline/adjudicate.ts";
 import { resolveWriterMode } from "../src/pipeline/write.ts";
@@ -331,6 +331,15 @@ console.log("\ntoc shards");
 			assert.ok(existsSync(shardPath), "shard stays while the topic still has a page");
 			await updateIndex(shardLayout, () => []);
 			assert.ok(!existsSync(shardPath), "shard is pruned when the topic empties");
+		});
+		await check("topic shard links resolve from toc/", async () => {
+			const shardPath = join(shardLayout.wikiDir, "toc", "pi.md");
+			await updateIndex(shardLayout, () => entries);
+			const links = [...(await readFile(shardPath, "utf8")).matchAll(/\]\(([^)]+)\)/g)].map((match) => match[1]);
+			assert.deepEqual(links, ["../pi/one.md", "../pi/two.md"]);
+			for (const link of links) {
+				assert.ok(resolve(dirname(shardPath), link).startsWith(join(shardLayout.wikiDir, "pi")), `${link} resolves into the wiki`);
+			}
 		});
 	} finally {
 		await rm(shardRoot, { recursive: true, force: true });

@@ -57,7 +57,7 @@ import {
 } from "./wiki/layout.ts";
 import { extractMarkdownLinks } from "./wiki/links.ts";
 import { matchRegisteredWikis, projectRootFor, registeredProjectRoots, resolvePageFile, resolveSourceFile, resolveWriteTarget } from "./wiki/target.ts";
-import { appendLog, entryFromPage, isWikiMetaFile, parseIndex, readIndex, readRecentLog, renderCompactToc, renderIndex, topicSlug, updateIndex, upsertEntries, writeIndex, type TocEntry } from "./wiki/toc.ts";
+import { appendLog, entryFromPage, isWikiMetaFile, parseIndex, readIndex, readRecentLog, renderCompactToc, renderIndex, renderTopicToc, topicSlug, updateIndex, upsertEntries, writeIndex, type TocEntry } from "./wiki/toc.ts";
 import { createSearchEngine, VectorSearchEngine, type SearchResult } from "./wiki/search.ts";
 import { forgetWikiIndex, hasWarmIndex, indexExists, indexWiki, vectorStatus } from "./vector/index.ts";
 import { MODEL_PRESETS, fingerprintFor, resolvePreset } from "./vector/embed.ts";
@@ -1037,8 +1037,10 @@ export default function (pi: ExtensionAPI) {
 			if (params.topic && !params.tag && !params.query) {
 				const topicPath = join(layout.wikiDir, "toc", `${topicSlug(params.topic)}.md`);
 				if (existsSync(topicPath)) {
+					// Same table as the shard, but rendered with wiki-root paths: the shard's
+					// own links are relative to toc/, and callers resolve from the wiki root.
 					return {
-						content: [{ type: "text", text: truncate(await readFile(topicPath, "utf8"), maxChars) }],
+						content: [{ type: "text", text: truncate(renderTopicToc(entries, params.topic, ""), maxChars) }],
 						details: { entries: entries.length, filtered: filtered.length, topic: params.topic },
 					};
 				}
