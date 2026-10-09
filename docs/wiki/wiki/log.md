@@ -736,3 +736,10 @@
 ## [2026-10-09] finalize | npm is the supported install; a clone is a development tree, not an install path. Merged into the install-source page as c3 (grounded 0.97), replacing the three-equal-sources framing of the Fix section.
 - Updated: pi/one-install-source.md
 
+## [2026-10-09] capture | 1 insights (tool)
+- Raw: raw/sessions/2026-10-09-session-2026-10-09-045702.md
+- Filed 1 · reinforced 0 · review 0 · rejected 0
+
+## [2026-10-09] finalize | New gotcha: the TOC shards the wiki writer creates carry LF, so under core.autocrlf=true with no .gitattributes an unchanged shard stays reported as modified while git diff is empty. Placed in architecture/ following the gotcha- prefix convention rather than Jev's suggested new `gotchas` topic, which would have been a one-page topic duplicating the page type; anchored to src/wiki/toc.ts, the writer, so a change to it triggers a recheck.
+- Updated: architecture/gotcha-toc-shards-lf-crlf.md
+
