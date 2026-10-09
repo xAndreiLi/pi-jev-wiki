@@ -9,6 +9,15 @@
   only), and `publish.yml` runs the installed-copy test before publishing, so a tag cannot ship an
   artifact that fails to run where it lands. The embedding model is cached between runs.
 
+### Fixed
+
+- Every page link in a per-topic table (`toc/<topic>.md`) was broken: the table reused the
+  wiki-root-relative paths written into `index.md`, so from inside `toc/` a link to
+  `decisions/x.md` pointed at `toc/decisions/x.md`. Shard links now carry the `../` prefix and
+  resolve. `wiki_toc topic=<t>` used to return the shard verbatim; it now renders the same table
+  with wiki-root paths, so tool output is unchanged. Existing shards are rewritten by the next
+  TOC update (`wiki_finalize`, `wiki_remove`, or `npm run toc:refresh` from a checkout).
+
 ## 1.0.2 — 2026-10-08
 
 ### Fixed

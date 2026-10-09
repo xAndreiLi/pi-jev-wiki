@@ -140,6 +140,15 @@ try {
 		assert.ok(existsSync(join(wikiA, ".jev-wiki", "decisions.jsonl")), "session ledger written");
 	});
 
+	await check("topic TOC shard links resolve and wiki_toc keeps wiki-root paths", async () => {
+		const shard = await readFile(join(wikiA, "wiki", "toc", "decisions.md"), "utf8");
+		assert.match(shard, /\]\(\.\.\/decisions\/decoy\.md\)/);
+		assert.ok(existsSync(join(wikiA, "wiki", "toc", "..", "decisions", "decoy.md")), "shard link resolves from toc/");
+		const result = await tools.get("wiki_toc")!.execute("test", { topic: "decisions" }, undefined, undefined, ctx);
+		assert.match(result.content[0].text, /\]\(decisions\/decoy\.md\)/);
+		assert.doesNotMatch(result.content[0].text, /\.\.\//, "tool output stays wiki-root relative");
+	});
+
 	await check("unknown target lists the registered wikis", async () => {
 		await assert.rejects(() => run({ pages: ["decisions/decoy.md"], wiki: "nope" }), /alpha, beta/);
 	});
