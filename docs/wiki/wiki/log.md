@@ -743,3 +743,6 @@
 ## [2026-10-09] finalize | New gotcha: the TOC shards the wiki writer creates carry LF, so under core.autocrlf=true with no .gitattributes an unchanged shard stays reported as modified while git diff is empty. Placed in architecture/ following the gotcha- prefix convention rather than Jev's suggested new `gotchas` topic, which would have been a one-page topic duplicating the page type; anchored to src/wiki/toc.ts, the writer, so a change to it triggers a recheck.
 - Updated: architecture/gotcha-toc-shards-lf-crlf.md
 
+## [2026-10-09] finalize | Correction and update: the page claimed the repository has no .gitattributes, which stopped being true when eee2ff5 added one. The reproduction is now recorded exactly (the 'LF will be replaced by CRLF' warning, the .M with equal blob hashes), along with the residual case — a file cached as CRLF before the attribute change still trips once — and the fix is attributed to the commit that landed it.
+- Updated: architecture/gotcha-toc-shards-lf-crlf.md
+
