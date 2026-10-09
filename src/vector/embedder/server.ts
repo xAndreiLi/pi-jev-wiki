@@ -9,7 +9,7 @@
  * library function the tests host in-process.
  */
 import { appendFileSync, mkdirSync, readFileSync, renameSync, rmSync, statSync, unlinkSync, writeFileSync } from "node:fs";
-import { createServer, type Socket } from "node:net";
+import { connect, createServer, type Socket } from "node:net";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createLocalProvider, modelsDir, resolvePreset, type EmbedInput, type EmbeddingProvider } from "../embed.ts";
@@ -71,6 +71,18 @@ function claimSingleInstance(lockPath: string): boolean {
 	} catch {
 		return false;
 	}
+}
+
+/** True when a socket file exists but nothing accepts connections on it. */
+function isStaleSocket(pipePath: string): Promise<boolean> {
+	return new Promise((resolve) => {
+		const probe = connect(pipePath);
+		probe.once("connect", () => {
+			probe.destroy();
+			resolve(false);
+		});
+		probe.once("error", (error: NodeJS.ErrnoException) => resolve(error.code === "ECONNREFUSED"));
+	});
 }
 
 export async function startEmbedderService(options: EmbedderServiceOptions): Promise<EmbedderService> {
@@ -238,13 +250,27 @@ export async function startEmbedderService(options: EmbedderServiceOptions): Pro
 		socket.on("close", forget);
 	});
 
-	await new Promise<void>((resolve, reject) => {
-		server.once("error", reject);
-		server.listen(options.pipePath, () => {
-			server.removeListener("error", reject);
-			resolve();
+	const listen = () =>
+		new Promise<void>((resolve, reject) => {
+			server.once("error", reject);
+			server.listen(options.pipePath, () => {
+				server.removeListener("error", reject);
+				resolve();
+			});
 		});
-	});
+	try {
+		await listen();
+	} catch (error) {
+		// A daemon that died without stop() (SIGKILL, OOM, a crash) leaves its socket file behind, and
+		// every later start would fail here until someone deleted it by hand. Replace the file only
+		// when nothing answers on it; a live daemon keeps its pipe.
+		if ((error as NodeJS.ErrnoException).code !== "EADDRINUSE" || process.platform === "win32" || !(await isStaleSocket(options.pipePath))) {
+			throw error;
+		}
+		unlinkSync(options.pipePath);
+		log(`replaced a stale socket at ${options.pipePath}`);
+		await listen();
+	}
 	log(`listening on ${options.pipePath} (pid ${process.pid}, ${options.provider.fingerprint})`);
 	touch();
 	return { pid: process.pid, startedAt, stop };
