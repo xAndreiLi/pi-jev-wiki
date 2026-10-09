@@ -2,10 +2,10 @@
 title: One install source only
 type: gotcha
 topic: pi
-summary: "pi-jev-wiki must be installed from exactly one source (npm package, local folder, or git); a second registered copy makes pi refuse to load the extension with tool-conflict errors."
+summary: "npm is the supported install for pi-jev-wiki; a repository clone is a development tree, not an install path. Whichever source you use, register exactly one — a second copy makes pi refuse to load the extension with tool-conflict errors."
 tags: [install, pi-package, tool-conflict, pi, npm]
-updated: 2026-09-26
-sources: [raw/sessions/2026-09-26-session-2026-09-26-2307.md]
+updated: 2026-10-09
+sources: [raw/sessions/2026-09-26-session-2026-09-26-2307.md, raw/sessions/2026-10-09-session-2026-10-09-045526.md]
 claims:
   - id: c1
     text: "pi-jev-wiki must be installed from exactly one source at a time — npm package, local folder, or git — because registering two copies makes pi refuse to load the extension with 'Tool \"wiki_*\" conflicts with …': every tool name is registered twice."
@@ -25,6 +25,13 @@ claims:
     last_checked: 2026-09-28
     corroborations: 3
     last_confirmed: 2026-09-26
+  - id: c3
+    text: "The supported way to use pi-jev-wiki is the published npm package (`pi install npm:pi-jev-wiki`); a repository clone is a development tree and never an install path for consumers, so an agent handed the repository installs from npm instead of cloning it."
+    status: verified
+    support: 0.97
+    evidence: [README.md, raw/sessions/2026-10-09-session-2026-10-09-045526.md]
+    reviewed: 2026-10-09
+    last_checked: 2026-10-09
 files: [README.md]
 ---
 
@@ -45,13 +52,16 @@ missing.
 every tool twice, so loading fails with `Tool "wiki_*" conflicts with …`.
 
 **Fix.** Keep one source: `pi list` shows the registered extensions, and `pi remove <source>` drops
-the duplicate. The supported sources are exactly one of:
+the duplicate. Use the published package:
 
 ```bash
-pi install npm:pi-jev-wiki                        # published release
-pi install /path/to/pi-jev-wiki                   # local folder
-pi install git:github.com/xAndreiLi/pi-jev-wiki@v0.8.0
+pi install npm:pi-jev-wiki
 ```
+
+A repository clone is a development tree, not an install path: an agent handed the repository
+installs from npm rather than cloning it. Pinning a branch or a commit is the one reason to reach
+for another source (`pi install git:github.com/xAndreiLi/pi-jev-wiki@<ref>`), and it still counts as
+the one source.
 
 **Packed-artifact smoke tests.** Verifying a packed release while the npm install is registered
 would register two copies and hit the same conflict. Run it with discovery disabled and the packed

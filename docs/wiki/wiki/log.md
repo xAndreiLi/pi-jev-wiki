@@ -729,3 +729,10 @@
 - Raw: raw/sessions/2026-10-09-session-2026-10-09-044802.md
 - Filed 0 · reinforced 0 · review 0 · rejected 2
 
+## [2026-10-09] capture | 2 insights (tool)
+- Raw: raw/sessions/2026-10-09-session-2026-10-09-045526.md
+- Filed 1 · reinforced 0 · review 0 · rejected 1
+
+## [2026-10-09] finalize | npm is the supported install; a clone is a development tree, not an install path. Merged into the install-source page as c3 (grounded 0.97), replacing the three-equal-sources framing of the Fix section.
+- Updated: pi/one-install-source.md
+
