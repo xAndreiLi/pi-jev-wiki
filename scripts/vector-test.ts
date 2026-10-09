@@ -99,6 +99,23 @@ await check("chunk hashes change with text", () => {
 });
 
 console.log("RRF fusion");
+await check("a daemon that fails to start through the shim says why in the log", async () => {
+	// The client spawns daemon.mjs with stdio ignored, so the log is the only place a startup
+	// failure can surface.
+	const dir = await mkdtemp(join(tmpdir(), "jev-shim-"));
+	try {
+		const logPath = join(dir, "embedder.log");
+		const shim = fileURLToPath(new URL("../src/vector/embedder/daemon.mjs", import.meta.url));
+		const child = spawn(process.execPath, [shim, join(dir, "embed.sock"), dir, "no-such-preset", "", "0", "0", logPath, "false"], { stdio: "ignore" });
+		const code = await new Promise<number | null>((resolve) => child.once("exit", resolve));
+		assert.equal(code, 1);
+		assert.ok(existsSync(logPath), "the startup failure was not written to the log");
+		assert.match(await readFile(logPath, "utf8"), /failed to start: Unknown search\.vector\.model "no-such-preset"/);
+	} finally {
+		await rm(dir, { recursive: true, force: true });
+	}
+});
+
 await check("rank fusion favors results ranked highly by both engines", () => {
 	const result = (path: string, score = 1): SearchResult => ({ path, title: path, score, excerpt: "" });
 	const fused = rrfFuse([[result("a"), result("b")], [result("b"), result("c")]], 60);

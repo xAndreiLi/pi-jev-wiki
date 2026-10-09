@@ -18,6 +18,12 @@
   with wiki-root paths, so tool output is unchanged. Existing shards are rewritten by the next
   TOC update (`wiki_finalize`, `wiki_remove`, or `npm run toc:refresh` from a checkout).
 
+- A daemon that failed to start left no trace: the client spawns it through the `daemon.mjs` shim
+  with stdio ignored, and the shim reported a startup failure only on stderr (the log-file fallback
+  lives in `server.ts`'s own entry guard, which the shim bypasses). The tools then said "See
+  embedder.log" about a file that did not exist. The shim now appends the same `failed to start:`
+  line to the log.
+
 ## 1.0.2 — 2026-10-08
 
 ### Fixed
