@@ -1,0 +1,11 @@
+# Line endings are LF in the repository and LF in the working tree, on every platform and for
+# every checkout.
+#
+# Why explicit: with `core.autocrlf=true` (the default on Windows) git expects CRLF in the working
+# tree. Any file written directly by a tool rather than by a checkout — the wiki writer rewriting a
+# table-of-contents shard — then sits at LF, and git reports it as modified although its content
+# never changed. See docs/wiki/wiki/architecture/gotcha-toc-shards-lf-crlf.md.
+#
+# Every blob in the repository is already LF, so this changes no committed content; it only pins
+# the behaviour so it is identical on Windows, macOS and Linux, and in CI.
+* text=auto eol=lf
