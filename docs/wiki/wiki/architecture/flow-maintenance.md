@@ -9,10 +9,10 @@ sources: [docs/plans/AUTONOMY.md, raw/sessions/2026-10-08-session-2026-10-08-092
 claims:
   - id: c1
     text: Every wiki artefact the human sees is either a critical review escalation or the one-time embedding-preset choice; the rest of maintenance belongs to the agent.
-    status: needs_recheck
-    support: 0.7
+    status: verified
+    support: 0.8
     evidence: [raw/sessions/2026-10-08-session-2026-10-08-092138.md, The human user should not need to manually touch any part of the wiki unless it is very critical.]
-    reviewed: 2026-10-08
+    reviewed: 2026-10-09
     last_checked: 2026-10-09
   - id: c2
     text: "Maintenance is a closed loop of six stages: trigger, adjudication, placement, write, commit, and currency/health, where only the write stage requires an agent at all."
@@ -37,6 +37,7 @@ claims:
     last_checked: 2026-10-09
 files: [src/extension.ts, src/sync.ts, src/pipeline/write.ts, src/lint.ts]
 ---
+
 
 
 # The maintenance loop

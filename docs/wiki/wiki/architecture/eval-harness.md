@@ -4,15 +4,15 @@ type: architecture/flow
 topic: architecture
 summary: "The controlled wiki-on/wiki-off experiment: task cards run in throwaway clones under neutral temp paths, with the answer pruned, graders installed only after the agent, each arm's tool loadout verified, every session scanned for contamination, and fairness self-tested from the agent's side with a stub pi."
 tags: [evaluation, measurement, harness, benchmark, experiment]
-updated: 2026-10-02
+updated: 2026-10-09
 sources: [raw/sessions/2026-10-01-session-2026-10-01-021352.md, raw/sessions/2026-10-01-session-2026-10-01-032158.md, raw/sessions/2026-10-01-session-2026-10-01-070617.md]
 claims:
   - id: c1
     text: "The A/B harness refuses to measure an experiment it cannot verify: it clones the repository and prunes every ref so the target commit is unreachable (a worktree would expose the answer through the shared object database), reads the tool loadout pi persists in the session's first system message to prove each arm had the tools it should, and runs a preflight that aborts the whole run when the wiki arm would have no wiki tools."
-    status: needs_recheck
+    status: verified
     support: 0.85
     evidence: [raw/sessions/2026-10-01-session-2026-10-01-032158.md, eval/run.mjs, eval/README.md]
-    reviewed: 2026-10-01
+    reviewed: 2026-10-09
     last_checked: 2026-10-02
   - id: c2
     text: "Each eval run (one task, arm and repeat) gets a fresh agent directory and a fresh copy under neutral temp paths (%TEMP%/ag-*, %TEMP%/ws-*/<repo>). The agent directory has no wiki registry and, by default, no user-level AGENTS.md; --user-context real keeps the user's context. The reason is R1: the copy's path named the arm and sat inside the run directory, the inherited registry exposed the live testbed wiki and this repository's notes on the experiment, and the user's AGENTS.md told every arm to keep the wiki current and to consult a life wiki."
@@ -22,10 +22,10 @@ claims:
     last_checked: 2026-10-02
   - id: c3
     text: "The wiki-nocapture eval arm is a read-only wiki. Capture cadence is set to manual, and the arm runs with pi's --exclude-tools for every wiki write tool the treatment's preflight loadout shows. The cadence flag alone left agent-initiated capture in place: 4–10 wiki writes per run in R1."
-    status: needs_recheck
-    support: 0.41
+    status: verified
+    support: 0.8
     evidence: [eval/run.mjs, "pi docs/cli.md: --exclude-tools <list> disables comma-separated tool names after all other selection options", raw/sessions/2026-10-01-session-2026-10-01-070617.md]
-    reviewed: 2026-10-01
+    reviewed: 2026-10-09
     last_checked: 2026-10-02
   - id: c4
     text: "The eval quality judge sees only code-only diffs pasted inline under arbitrary labels: paths under the wiki root and .pi/ are stripped, and no file names or test results are shown. It runs with --no-tools --no-context-files in an empty temp directory, and is sampled several times with a fresh label order each time, so the spread between samples is reported next to the mean. R1's judge saw the arm in each patch's file name and read results.jsonl."
@@ -47,6 +47,8 @@ claims:
     last_checked: 2026-10-02
 files: [eval/run.mjs, eval/arms.mjs, eval/lib.mjs, eval/judge.mjs, eval/candidates.mjs, eval/report.mjs, eval/grade-check.mjs, eval/selftest.mjs, eval/stub-pi.mjs]
 ---
+
+
 
 
 # The A/B evaluation harness

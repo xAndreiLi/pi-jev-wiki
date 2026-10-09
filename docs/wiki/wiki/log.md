@@ -764,3 +764,6 @@
 - Applied: architecture/gotcha-toc-shards-lf-crlf.md#c1 → supersede
 - Applied: architecture/gotcha-vector-store-single-owner.md#c1 → supersede
 
+## [2026-10-09] finalize | Review pass: 25 queued items resolved — 16 superseded (the eval-harness defects, verified fixed in the current code, and the PGlite-era claims the SQLite swap removed), 7 confirmed still true after re-checking the code, 2 rejected as duplicates of claims already filed, 1 deferred as critical for the user. Also corrected architecture/flow-retrieval.md: its index step still described a PGlite + pgvector database and pointed at src/vector/db.ts as the store, when the store is SQLite in src/vector/sqlite.ts with an embedder fingerprint on every row.
+- Updated: architecture/flow-retrieval.md
+

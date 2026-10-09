@@ -9,13 +9,14 @@ sources: [raw/sessions/2026-10-01-session-2026-10-01-015135.md]
 claims:
   - id: c1
     text: "A wiki_ask that has silently degraded to lexical search is indistinguishable from an empty wiki: the tool returns local-wiki results, tags and scores them, and warns only in the explicit semantic path, so an agent reading a low-recall result set concludes the knowledge is absent and re-derives what the wiki already holds."
-    status: needs_recheck
+    status: verified
     support: 0.82
     evidence: [raw/sessions/2026-10-01-session-2026-10-01-015135.md, handoffs/2026-10-01-search-fallback-and-evidence-diagnostics.md]
-    reviewed: 2026-10-01
+    reviewed: 2026-10-09
     last_checked: 2026-10-09
 files: [src/wiki/search.ts, src/extension.ts]
 ---
+
 
 
 # Degraded search is indistinguishable from an empty wiki

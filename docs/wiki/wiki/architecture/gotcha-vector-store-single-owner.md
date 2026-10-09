@@ -12,7 +12,7 @@ claims:
     status: superseded
     support: 0.83
     evidence: ["command: two-process probe 2026-10-08 on a temp dataDir — process A opened and CREATE TABLE'd, then process B opened the same dir while A was still open → 'B: OPENED CONCURRENTLY, rows = 0', no error", "file: node_modules/@electric-sql/pglite/dist/fs/nodefs.d.ts — NodeFS declares only init() and closeFs(), no inter-process lock", "source: https://github.com/electric-sql/pglite/issues/323 — 'PGlite is Postgres in single user mode. There is no support for concurrent connections and you are like to corrupt the database if you open it multiple times at once.'"]
-    reviewed: 2026-10-08
+    reviewed: 2026-10-09
     last_checked: 2026-10-09
     superseded_by: commit 9a83aa1
   - id: c2
@@ -24,6 +24,7 @@ claims:
     last_checked: 2026-10-09
 files: [src/vector/db.ts, src/extension.ts, src/auto-retrieve.ts, src/config.ts]
 ---
+
 
 
 # The vector store tolerates one opener, and it stays open for the whole session

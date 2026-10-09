@@ -4,36 +4,36 @@ type: gotcha
 topic: architecture
 summary: "An audit of r1-run-2026-10-01T08-44-45 and the E1 pilot found that every arm could read its hidden grader. The task copy's path named the harness, the run and the arm, the judge could see which arm wrote each diff, the brief arm got almost no knowledge, and wiki-nocapture still captured. E1 and R1 numbers therefore do not support conclusions about the wiki."
 tags: [evaluation, harness, validity, leak, blinding, gotcha]
-updated: 2026-10-02
+updated: 2026-10-09
 sources: [raw/sessions/2026-10-01-session-2026-10-01-060004.md]
 claims:
   - id: c1
     text: "Since commit 6f2786e, eval/run.mjs calls protectGrader and installGraders before runArm starts the agent, although installGraders' own doc comment, the operator procedure and the 2026-10-01 handoff all say hidden graders are copied in after the agent finishes. Every session checked read its own grader file, usually within its first three turns: 9 of 9 in the E1 pilot and 16 of 16 in r1-run-2026-10-01T08-44-45. Pass rates from those runs therefore measure 'make the visible test pass', and E1's conclusion that the tasks were too easy is unsupported."
-    status: needs_recheck
+    status: superseded
     support: 0.39
     evidence: [eval/run.mjs, eval/arms.mjs, commit 6f2786e, raw/sessions/2026-10-01-session-2026-10-01-060004.md]
-    reviewed: 2026-10-01
+    reviewed: 2026-10-09
     last_checked: 2026-10-02
   - id: c2
     text: "The A/B harness creates each task copy inside its own run directory (eval/runs/<run>/copies/<task>-<arm>-rep<n>), so the agent's working directory names the harness, the run and its own arm, and two levels up are diffs/, results.jsonl, pipeline.log and the judge's files. In r1-run-2026-10-01T08-44-45 agents read the task cards (ds-003 off and wiki). One diffed eval/graders/ds-005-config-consistency.test.ts against its copy and printed IDENTICAL, then parsed results.jsonl (ds-005 off). The clone also keeps its origin remote pointing at the live source repository, so a git fetch would bring back every ref the leak check pruned."
-    status: needs_recheck
+    status: superseded
     support: 0.62
     evidence: [eval/run.mjs, eval/arms.mjs, raw/sessions/2026-10-01-session-2026-10-01-060004.md]
-    reviewed: 2026-10-01
+    reviewed: 2026-10-09
     last_checked: 2026-10-02
   - id: c3
     text: "The quality judge in eval/judge.mjs is not blind. Each label's 'Patch file:' line is diffs/<task>-<arm>-rep<n>.patch, so the arm name is in the prompt. The judge runs with bash, with its working directory set to the run directory; in r1-run-2026-10-01T08-44-45 it read results.jsonl and entered task copies, including one from the in-flight pilot. And wiki-family patches carry docs/wiki/** and .pi/jev-wiki.json, which would identify the arm even under neutral file names."
-    status: needs_recheck
+    status: superseded
     support: 0.51
     evidence: [eval/judge.mjs, raw/sessions/2026-10-01-session-2026-10-01-060004.md]
-    reviewed: 2026-10-01
+    reviewed: 2026-10-09
     last_checked: 2026-10-02
   - id: c4
     text: "buildBrief in eval/arms.mjs lists every .md file under the wiki root, raw/sessions captures included. On discord-assistant's task bases, 21 of the 37 'pages' it counts are 'Session capture 2026-10-01 (...)' lines; they fill the 2000-character budget and cut the real pages off after the first one. The brief arm in both E1 and R1 therefore received almost no structured knowledge, so E1's brief-arm hypothesis rests on an arm that had nothing to use."
-    status: needs_recheck
+    status: superseded
     support: 0.7
     evidence: [eval/arms.mjs, docs/studies/E1-pilot-2026-10-01.md, raw/sessions/2026-10-01-session-2026-10-01-060004.md]
-    reviewed: 2026-10-01
+    reviewed: 2026-10-09
     last_checked: 2026-10-02
   - id: c5
     text: "The wiki-nocapture eval arm (capture.cadence set to manual in the task copy) does not remove upkeep. Agents still call wiki_insights, wiki_review and wiki_finalize on their own, so in r1-run-2026-10-01T08-44-45 the arm's runs made 4–10 wiki writes against 9–14 for the wiki arm, and its patches contain newly written wiki pages and ledger entries. What it measures is 'no automatic capture', not 'retrieval without upkeep'."
@@ -51,34 +51,42 @@ claims:
     last_checked: 2026-10-02
   - id: c7
     text: "The eval's per-run agent directory copies the user's real jev-wiki/wikis.json. The wiki arms can therefore list and query every registered wiki on the machine: the live discord-assistant wiki at its working tree (20 pages, against 16 at the task bases, while a concurrent session was editing it), the pi-jev-wiki wiki that documents the experiment, and the life wiki. Because wiki and wiki-nocapture share one agent directory per pipeline run, the registry also gathers every earlier task's copy. In r1, ds-004's wiki arm called wiki_toc scope=all and saw all of it."
-    status: needs_recheck
+    status: superseded
     support: 0.69
     evidence: [eval/arms.mjs, eval/run.mjs, raw/sessions/2026-10-01-session-2026-10-01-060004.md]
-    reviewed: 2026-10-01
+    reviewed: 2026-10-09
     last_checked: 2026-10-02
   - id: c8
     text: "eval/run.mjs appends a run's row to results.jsonl before checking that the arm loaded the expected tools, and --resume skips every recorded row, so an invalid run outlives a resume. In r1-run-2026-10-01T08-44-45 the ds-001 wiki-nocapture row has expectedWikiTools true, observedWikiTools false and 10 tools. It was skipped on resume, and its 17/18 quality score is quoted in the 2026-10-01 handoff as the wiki-nocapture result."
-    status: needs_recheck
+    status: superseded
     support: 0.71
     evidence: [eval/run.mjs, handoffs/2026-10-01-wiki-efficacy-test.md, raw/sessions/2026-10-01-session-2026-10-01-060004.md]
-    reviewed: 2026-10-01
+    reviewed: 2026-10-09
     last_checked: 2026-10-02
   - id: c9
     text: "discord-assistant's eval task copies include handoffs/2026-10-01-next-agent-implementation.md, which at the task bases lists the eval cards and roughly what each grader checks. 14 of 17 sessions in r1-run-2026-10-01T08-44-45 touched it, the control arms as often as the wiki arms, so the no-wiki condition had a crib sheet on the tasks. Notes about the experiment must stay out of the testbed repository, or out of the copies."
-    status: needs_recheck
+    status: superseded
     support: 0.25
     evidence: ["git show ae2f59bc:handoffs/2026-10-01-next-agent-implementation.md (in C:/Coding/discord-assistant)", raw/sessions/2026-10-01-session-2026-10-01-060004.md]
-    reviewed: 2026-10-01
+    reviewed: 2026-10-09
     last_checked: 2026-10-02
   - id: c10
     text: "In r1-run-2026-10-01T08-44-45 every ds-004 and ds-005 run reported typecheck:FAIL, and the errors are in the hidden grader files themselves, not in the arms' code. The graders are already in tests/ when the quality commands run, and they do not satisfy the project's strict type-check. The collected type-check signal is therefore a harness artefact, and the judge is shown it as a failure for every diff."
-    status: needs_recheck
+    status: superseded
     support: 0.7
     evidence: [eval/judge.mjs, eval/arms.mjs, raw/sessions/2026-10-01-session-2026-10-01-060004.md]
-    reviewed: 2026-10-01
+    reviewed: 2026-10-09
     last_checked: 2026-10-02
 files: [eval/run.mjs, eval/arms.mjs, eval/judge.mjs, eval/report.mjs, eval/selftest.mjs, src/ledger.ts]
 ---
+
+
+
+
+
+
+
+
 
 
 # The A/B harness leaked the grader, the arm identity and the experiment

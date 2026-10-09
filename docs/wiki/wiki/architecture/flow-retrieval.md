@@ -37,17 +37,17 @@ claims:
     last_checked: 2026-10-09
   - id: c5
     text: "The embedding model is chosen once, before the first build, via wiki_index action=model."
-    status: needs_recheck
+    status: verified
     support: 0.96
     evidence: [raw/knowledge-pipeline-current/2026-09-26-knowledge-pipeline-current-state.md]
-    reviewed: 2026-09-26
+    reviewed: 2026-10-09
     last_checked: 2026-10-09
   - id: c6
     text: The vector index uses PGlite + pgvector with one user-level database covering every registered wiki at ~/.pi/agent/jev-wiki/vector.
-    status: disputed
+    status: superseded
     support: 0.98
     evidence: [raw/knowledge-pipeline-current/2026-09-26-knowledge-pipeline-current-state.md]
-    reviewed: 2026-09-26
+    reviewed: 2026-10-09
     last_checked: 2026-10-09
   - id: c7
     text: "The vector index is a derived cache — never a source of truth, safe to rebuild or delete."
@@ -112,8 +112,10 @@ claims:
     evidence: [raw/knowledge-pipeline-current/2026-09-26-knowledge-pipeline-current-state.md]
     reviewed: 2026-09-26
     last_checked: 2026-10-09
-files: [src/vector/chunks.ts, src/vector/embed.ts, src/vector/db.ts, src/wiki/search.ts, src/vector/judgments.ts]
+files: [src/vector/chunks.ts, src/vector/embed.ts, src/vector/db.ts, src/vector/sqlite.ts, src/wiki/search.ts, src/vector/judgments.ts]
 ---
+
+
 
 
 
@@ -122,13 +124,13 @@ files: [src/vector/chunks.ts, src/vector/embed.ts, src/vector/db.ts, src/wiki/se
 
 **Trigger.** An agent calls `wiki_ask` with a question; optionally `scope=all` to search every registered wiki, or `search` to force keyword/semantic/hybrid.
 
-**Participants.** Chunk builder (`src/vector/chunks.ts`) → embedder (`src/vector/embed.ts`) → index (`src/vector/db.ts`) → query/fusion (`src/wiki/search.ts`) → Jev retrieval judge (`src/vector/judgments.ts`).
+**Participants.** Chunk builder (`src/vector/chunks.ts`) → embedder (`src/vector/embed.ts`) → index (`src/vector/sqlite.ts`, behind the interface in `src/vector/db.ts`) → query/fusion (`src/wiki/search.ts`) → Jev retrieval judge (`src/vector/judgments.ts`).
 
 ## Steps
 
 1. **Chunking** — pages are split into one chunk per active claim (with page-title context) plus one per page section (~1,200 tokens, heading-stable keys); generated files are never chunked.
 2. **Embedding** — chunks are embedded locally, CPU-only, with a preset chosen once before the first build via `wiki_index action=model`: `performance` (EmbeddingGemma-300M, q8, 768d) or `quality` (Qwen3-Embedding-0.6B, q8, 1024d). Presets include MRL truncation and per-model prompt templates.
-3. **Index** — chunks are stored in one user-level PGlite + pgvector database covering every registered wiki (~/.pi/agent/jev-wiki/vector). The index is a derived cache: never a source of truth, safe to rebuild or delete.
+3. **Index** — chunks are stored in one user-level SQLite database (the built-in `node:sqlite`, `index.sqlite`) covering every registered wiki (~/.pi/agent/jev-wiki/vector). Every row carries an embedder fingerprint and every read filters on it, so vectors from two identities are never compared. The index is a derived cache: never a source of truth, safe to rebuild or delete while pi runs (`wiki_index action=reset`, then `action=rebuild all=true`).
 4. **Query** — `wiki_ask` runs keyword (index/BM25), semantic (cosine KNN), or hybrid retrieval. A cold or mismatched index falls back to keyword search; queries never download a model.
 5. **Fusion** — hybrid search fuses BM25 and vector ranks with reciprocal rank fusion, and is granularity-aware: a page-level lexical hit merges into a claim-level sibling while distinct claims stay separate.
 6. **Jev judgments** — one batched Jev call reranks candidates by relevance and returns an evidence-sufficiency verdict (`search.jev.rerank` is `auto` (hybrid only), `always`, or `never`). Below `search.jev.minSufficiency` the answer carries a calibrated "the wiki may not cover this yet" note; verdicts are logged as `ask.judge`.
