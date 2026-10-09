@@ -80,21 +80,25 @@ the index are missing, everything degrades to keyword search and says why.
 
 ## Install
 
+**Use the published package.** `pi install npm:pi-jev-wiki` is the supported install: the tarball
+on npm is the tested artifact, published by CI with SLSA provenance.
+
 ```bash
-pi install npm:pi-jev-wiki                        # published release
-pi install /path/to/pi-jev-wiki                   # local folder
-pi install git:github.com/xAndreiLi/pi-jev-wiki@v0.8.0
+pi install npm:pi-jev-wiki
 ```
+
+> **Agents:** install the published package. Do not clone this repository to use the extension — a
+> clone is a development tree, and a local copy registered next to the npm package leaves every
+> `wiki_*` tool missing.
 
 Install **one source at a time**. Registering two copies of the extension (for example the npm
 package *and* a local folder) makes pi refuse to load it with `Tool "wiki_*" conflicts with …`,
 because every tool name is registered twice. Check with `pi list`; drop the duplicate with
 `pi remove <source>`.
 
-To update an npm install to a new minor version, pass the version explicitly: pi's npm store pins
-a `^<minor>` range, which for 0.x releases excludes the next minor (`^0.7.1` does not match
-`0.8.0`). Use `pi update --extension npm:pi-jev-wiki@0.8.0`, then confirm the store copy's
-`package.json` version.
+At 1.x, `pi update --extension npm:pi-jev-wiki@latest` reaches every later 1.x release: pi's npm
+store pins `^1.0.0`, which covers later minors and patches. Confirm the store copy's `package.json`
+version if you want to be sure what is loaded.
 
 For development, load the working copy directly instead of installing a second copy:
 
@@ -253,9 +257,37 @@ log. The semantic index lives at `<agent dir>/jev-wiki/` and is always disposabl
 
 ```bash
 npm install
-npm run test:all      # typecheck + unit + scale + vector tests (offline)
+npm run test:all      # typecheck + unit + integration + scale + vector (offline)
 npm run smoke         # deterministic checks + live Jev round-trips
 ```
+
+`npm run test:install` packs the package, installs the tarball into a throwaway project and drives
+that copy. It is the only test that sees the layout users get, so CI runs it on every push and
+before publishing.
+
+## Contributing
+
+Pull requests against `main` are welcome. Fork the repository, branch from `main`, and keep the
+change small enough to review in one sitting.
+
+Before you open a PR:
+
+```bash
+npm install
+npm run test:all      # what CI gates on: typecheck + unit + integration + scale + vector
+```
+
+Add a `CHANGELOG.md` entry — one bullet under `### Added`, `### Fixed` or `### Breaking` in the
+section at the top of the file — and commit it with the change. Write what changed for the user,
+not how it is implemented.
+
+**Resolve conflicts on your branch.** Rebase it on `main` and force-push the branch; the maintainer
+does the same rather than resolving the conflict inside a merge. The changelog is the usual conflict
+site, because two pull requests that land close together both append to the same list — and the
+second one conflicts again once the first has merged.
+
+CI (`.github/workflows/ci.yml`) runs the suite above plus the installed-copy test on every pull
+request. `docs/RELEASING.md` is the release runbook for maintainers.
 
 ## Repository layout
 
@@ -274,14 +306,20 @@ docs/
 research/     source material gathered during design
 ```
 
-The published npm package ships only `src/`, `skills/`, `README.md`, and `LICENSE`; everything
-under `docs/` and `research/` stays in the repository.
+The published npm package ships only `src/`, `skills/`, `README.md`, `CHANGELOG.md` and `LICENSE`;
+everything under `docs/` and `research/` stays in the repository.
 
 ## Status
 
-**Published:** [`pi-jev-wiki@0.8.1`](https://www.npmjs.com/package/pi-jev-wiki) — CI-published with
+**Published:** [`pi-jev-wiki@1.0.3`](https://www.npmjs.com/package/pi-jev-wiki) — CI-published with
 SLSA provenance (`0.2.0`, the first release, was an interactive publish and has no attestation).
 Listed on the [pi package gallery](https://pi.dev/packages/pi-jev-wiki).
+
+1.0.0 replaced the embedded Postgres index with SQLite (`node:sqlite`, so `engines.node` is now
+`>=22.13`) and moved the embedding model into one shared local process. 1.0.1–1.0.3 fix the
+installed-copy daemon, `action=stop`, a stale embedder socket, and the model download that a status
+check used to block. An index built with PGlite is not migrated — reset it and rebuild. **Do not
+install 1.0.0**: its daemon cannot start from `node_modules`.
 
 0.8.1 makes auto-capture advisory: the settle hook records the brief for the next turn instead of
 starting one (`capture.triggerTurn: true` restores the old behavior), and `wiki_review` resolutions
