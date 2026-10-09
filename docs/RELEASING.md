@@ -2,14 +2,14 @@
 
 ## Current state (2026-10-09)
 
-- **Published:** `pi-jev-wiki@1.0.3` by CI with **SLSA provenance** (2026-10-09) — the embedder
-  replaces a socket left behind by a daemon that died without shutting down, downloads the model when
-  a rebuild follows a status check, appends its own startup failure to the log (1.0.2 added the SQLite
-  index store, the single shared embedder process, the installed-copy fix and `action=stop`; 1.0.3
-  also fixes every per-topic TOC link). `0.2.0` was the manual first release; `0.3.0`–`0.8.1` were
-  CI-published. At 1.x the npm store's `^1.0.0` range covers later minors, so
-  `pi update --extension npm:pi-jev-wiki@latest` works again (the 0.x pinning caveat below no longer
-  applies).
+- **Published:** `pi-jev-wiki@1.0.4` by CI with **SLSA provenance** (2026-10-09) — documentation and
+  repository hardening: the README names npm as the supported install and gains a contribution
+  section, `main` gained a ruleset, and `.gitattributes` pins every checkout to LF. 1.0.3 fixed the
+  stale embedder socket, the rebuild download that a status check blocked, and every per-topic TOC
+  link; 1.0.2 added the SQLite index store, the shared embedder process, the installed-copy fix and
+  `action=stop`. `0.2.0` was the manual first release; `0.3.0`–`0.8.1` were CI-published. At 1.x the
+  npm store's `^1.0.0` range covers later minors, so `pi update --extension npm:pi-jev-wiki@latest`
+  works again (the 0.x pinning caveat below no longer applies).
 - **`main` is write-protected** (ruleset, 2026-10-09): changes land through a pull request with the
   `test` check green, and force-pushes and deletions are refused. Repository admins bypass the
   pull-request rule, which is how the release commits and tag pushes below work — so cutting a
