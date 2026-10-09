@@ -725,3 +725,7 @@
 - Updated: decisions/scope-boundary.md
 - Updated: decisions/review-escalation.md
 
+## [2026-10-09] capture | 2 insights (tool)
+- Raw: raw/sessions/2026-10-09-session-2026-10-09-044802.md
+- Filed 0 · reinforced 0 · review 0 · rejected 2
+
