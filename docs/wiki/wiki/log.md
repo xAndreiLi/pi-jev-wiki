@@ -714,3 +714,14 @@
 ## [2026-10-08] finalize | CI now enforces what used to depend on remembering: ci.yml runs the integration, vector and installed-copy suites on every push and pull request (it ran typecheck, unit and scale only), and publish.yml runs the installed-copy test before publishing a tag. The embedding model is cached between runs; install-test.ts takes JEV_WIKI_MODELS_DIR so CI can point it at that cache and use a plain symlink off Windows. RELEASING.md records the gate as CI-enforced rather than a pre-release habit.
 - Updated: architecture/gotcha-installed-copy-cannot-spawn.md
 
+## [2026-10-08] capture | 5 insights (tool)
+- Raw: raw/sessions/2026-10-08-session-2026-10-08-092138.md
+- Filed 2 · reinforced 0 · review 2 · rejected 1
+
+## [2026-10-08] finalize | Autonomy realization. New: architecture/flow-maintenance.md (the maintenance loop as six stages — only the write stage needs an agent — bounded by the escalation and failure boundaries), decisions/writer-default-mode.md (draft as the writer default; auto is verified, not assumed), invariants/failure-loop-safety.md (persisted guards, timestamps advanced on failure, circuit breaker on non-retryable errors, incremental sync progress). Merged rather than duplicated: scope-boundary.md gains the positive half of the scope policy (the wiki is a conceptual state space and a decisioning history) alongside its existing exclusion, and review-escalation.md gains the explicit list of agent-owned upkeep next to its existing escalation rule. The detailed work items, the live capture retry-storm defect, and the draft-vs-auto verification protocol live in docs/plans/AUTONOMY.md — deliberately not in the wiki, since implementation status is a snapshot rather than conceptual knowledge.
+- Updated: architecture/flow-maintenance.md
+- Updated: decisions/writer-default-mode.md
+- Updated: invariants/failure-loop-safety.md
+- Updated: decisions/scope-boundary.md
+- Updated: decisions/review-escalation.md
+
