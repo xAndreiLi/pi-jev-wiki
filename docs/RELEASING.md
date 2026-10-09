@@ -17,10 +17,6 @@
   `remote: - Required status check "test" is expected.` and then lands: that is a notice about the
   ruleset, not a failure, and it can be ignored. The line endings are pinned to LF by
   `.gitattributes` for the same reason: a contributor on Windows and CI must see identical bytes.
-- **`1.0.0` is broken for installers and should be deprecated.** Its embedder daemon was spawned as a
-  `.ts` file under `node_modules`, where Node refuses to strip types, so semantic search never started
-  — do not recommend it. Deprecate with `npm deprecate pi-jev-wiki@1.0.0 "<reason>"`; that call needs
-  an interactive `npm login` (a granular token is not enough) or the npm website's version page.
 - **`npm run test:install` is a CI gate, not a habit.** CI runs it on every push and pull request
   (`ci.yml`) and again before publishing a tag (`publish.yml`), with the embedding model cached
   between runs so it downloads once. It packs the package, installs the tarball into a throwaway
