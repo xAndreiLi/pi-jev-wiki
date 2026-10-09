@@ -317,15 +317,15 @@ everything under `docs/` and `research/` stays in the repository.
 
 ## Status
 
-**Published:** [`pi-jev-wiki@1.0.3`](https://www.npmjs.com/package/pi-jev-wiki) — CI-published with
+**Published:** [`pi-jev-wiki@1.0.4`](https://www.npmjs.com/package/pi-jev-wiki) — CI-published with
 SLSA provenance (`0.2.0`, the first release, was an interactive publish and has no attestation).
 Listed on the [pi package gallery](https://pi.dev/packages/pi-jev-wiki).
 
 1.0.0 replaced the embedded Postgres index with SQLite (`node:sqlite`, so `engines.node` is now
 `>=22.13`) and moved the embedding model into one shared local process. 1.0.1–1.0.3 fix the
 installed-copy daemon, `action=stop`, a stale embedder socket, and the model download that a status
-check used to block. An index built with PGlite is not migrated — reset it and rebuild. **Do not
-install 1.0.0**: its daemon cannot start from `node_modules`.
+check used to block; 1.0.4 is documentation. An index built with PGlite is not migrated — reset it
+and rebuild. **Do not install 1.0.0**: its daemon cannot start from `node_modules`.
 
 0.8.1 makes auto-capture advisory: the settle hook records the brief for the next turn instead of
 starting one (`capture.triggerTurn: true` restores the old behavior), and `wiki_review` resolutions

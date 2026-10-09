@@ -1,5 +1,23 @@
 # Changelog
 
+## 1.0.4 — 2026-10-09
+
+### Added
+
+- Repository infrastructure for a second contributor: `main` now takes changes through a pull
+  request with the `test` check green and refuses force-pushes and deletions, while admins bypass
+  the pull-request rule so release commits still work. `.gitattributes` pins every checkout to LF,
+  so a contributor on Windows, macOS or Linux sees the same bytes as CI.
+
+### Changed
+
+- The README names the published package as the supported install — `pi install npm:pi-jev-wiki` —
+  and no longer offers a repository clone as an equal option, because a clone is a development tree;
+  agents are told the same where they read it. The update note now describes 1.x: pi's npm store
+  pins `^1.0.0`, so `pi update --extension npm:pi-jev-wiki@latest` reaches later minors and patches.
+- The README gains a Contributing section and a Status section that names the current release; it
+  had been advertising 0.8.1 as the published version since that release.
+
 ## 1.0.3 — 2026-10-09
 
 ### Added
