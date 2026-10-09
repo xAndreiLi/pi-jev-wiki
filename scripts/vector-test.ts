@@ -15,6 +15,7 @@ import { startEmbedderService } from "../src/vector/embedder/server.ts";
 import { chunkPage, hashChunk, splitSections } from "../src/vector/chunks.ts";
 import { MODEL_PRESETS, previewEmbedText, truncateAndNormalize, type EmbedInput, type EmbeddingProvider } from "../src/vector/embed.ts";
 import { forgetWikiIndex, hasWarmIndex, indexWiki } from "../src/vector/index.ts";
+import { sharedEmbedderFor } from "../src/vector/embedder/client.ts";
 import { enabledWikiNames, readRegistry, registerWiki, setWikiEnabled, unregisterWiki } from "../src/vector/registry.ts";
 import { vectorDbFor } from "../src/vector/db.ts";
 import { resetStore, storePath } from "../src/vector/sqlite.ts";
@@ -61,6 +62,17 @@ await check("quality preset pins Qwen3 instruction template", () => {
 	assert.equal(quality.dimensions, 1024);
 	assert.match(previewEmbedText(quality, { text: "who is Andrei" }, "query"), /^Instruct: .+\nQuery:who is Andrei$/);
 	assert.equal(previewEmbedText(quality, { title: "Profile", text: "fact" }, "document"), "Profile — fact");
+});
+await check("a rebuild may download even after a status check created the shared client", () => {
+	// `wiki_index status` creates the per-identity client without download permission; the rebuild
+	// that follows in the same session must still be allowed to fetch the model.
+	const options = { agentDir: join(tmpdir(), "jev-download-permission"), model: "performance", dtype: null, dimensions: null };
+	const query = sharedEmbedderFor(options);
+	const rebuild = sharedEmbedderFor({ ...options, allowDownload: true });
+	assert.equal(rebuild.allowsDownload, true, "the rebuild inherited the status check's no-download client");
+	assert.equal(query.allowsDownload, false, "query paths must never download");
+	assert.equal(sharedEmbedderFor(options), query, "one client per identity and permission");
+	assert.equal(sharedEmbedderFor({ ...options, allowDownload: true }), rebuild);
 });
 await check("truncateAndNormalize applies MRL dimensions and unit length", () => {
 	const out = truncateAndNormalize([3, 4, 99, 99], 2);

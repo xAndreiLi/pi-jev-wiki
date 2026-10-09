@@ -113,6 +113,11 @@ class SharedEmbedder implements EmbeddingProvider {
 		this.pipe = embedderPipePath(options.agentDir);
 	}
 
+	/** Whether a daemon this client starts may fetch the model from the hub. */
+	get allowsDownload(): boolean {
+		return this.options.allowDownload === true;
+	}
+
 	async embed(inputs: EmbedInput[], kind: "query" | "document"): Promise<Float32Array[]> {
 		if (inputs.length === 0) return [];
 		const timeout = kind === "query" ? QUERY_TIMEOUT_MS : BATCH_TIMEOUT_MS;
@@ -331,9 +336,14 @@ class SharedEmbedder implements EmbeddingProvider {
 
 const instances = new Map<string, SharedEmbedder>();
 
-/** One client per embedder identity in this process. */
+/**
+ * One client per embedder identity and download permission in this process. Permission is part of
+ * the key because the client decides how its daemon is spawned: without it, a status check or query
+ * that created the no-download client first would make a later rebuild start a daemon that may not
+ * fetch the model. Both clients still attach to the same daemon.
+ */
 export function sharedEmbedderFor(options: EmbedderOptions): SharedEmbedder {
-	const key = `${canonicalAgentDir(options.agentDir)}|${fingerprintFor(options.model, { dtype: options.dtype ?? null, dimensions: options.dimensions ?? null })}`;
+	const key = `${canonicalAgentDir(options.agentDir)}|${fingerprintFor(options.model, { dtype: options.dtype ?? null, dimensions: options.dimensions ?? null })}|${options.allowDownload === true ? "download" : "cached"}`;
 	let embedder = instances.get(key);
 	if (!embedder) {
 		embedder = new SharedEmbedder(options);
