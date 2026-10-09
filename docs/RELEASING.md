@@ -13,8 +13,10 @@
 - **`main` is write-protected** (ruleset, 2026-10-09): changes land through a pull request with the
   `test` check green, and force-pushes and deletions are refused. Repository admins bypass the
   pull-request rule, which is how the release commits and tag pushes below work — so cutting a
-  release needs admin rights. The line endings are pinned to LF by `.gitattributes` for the same
-  reason: a contributor on Windows and CI must see identical bytes.
+  release needs admin rights. A direct admin push still prints
+  `remote: - Required status check "test" is expected.` and then lands: that is a notice about the
+  ruleset, not a failure, and it can be ignored. The line endings are pinned to LF by
+  `.gitattributes` for the same reason: a contributor on Windows and CI must see identical bytes.
 - **`1.0.0` is broken for installers and should be deprecated.** Its embedder daemon was spawned as a
   `.ts` file under `node_modules`, where Node refuses to strip types, so semantic search never started
   — do not recommend it. Deprecate with `npm deprecate pi-jev-wiki@1.0.0 "<reason>"`; that call needs
