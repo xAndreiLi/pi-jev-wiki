@@ -10,6 +10,11 @@
   CI-published. At 1.x the npm store's `^1.0.0` range covers later minors, so
   `pi update --extension npm:pi-jev-wiki@latest` works again (the 0.x pinning caveat below no longer
   applies).
+- **`main` is write-protected** (ruleset, 2026-10-09): changes land through a pull request with the
+  `test` check green, and force-pushes and deletions are refused. Repository admins bypass the
+  pull-request rule, which is how the release commits and tag pushes below work — so cutting a
+  release needs admin rights. The line endings are pinned to LF by `.gitattributes` for the same
+  reason: a contributor on Windows and CI must see identical bytes.
 - **`1.0.0` is broken for installers and should be deprecated.** Its embedder daemon was spawned as a
   `.ts` file under `node_modules`, where Node refuses to strip types, so semantic search never started
   — do not recommend it. Deprecate with `npm deprecate pi-jev-wiki@1.0.0 "<reason>"`; that call needs

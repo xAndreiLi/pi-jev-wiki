@@ -267,8 +267,13 @@ before publishing.
 
 ## Contributing
 
-Pull requests against `main` are welcome. Fork the repository, branch from `main`, and keep the
-change small enough to review in one sitting.
+Open a pull request against `main`. Collaborators — who have write access to this repository —
+branch here; outside contributors fork it. Branch from `main` rather than stacking work on another
+branch, and keep the change small enough to review in one sitting.
+
+Branch protection enforces the rest of it: `main` takes changes through a pull request, the `test`
+check has to pass, and force-pushes and deletions are refused. Repository admins bypass the
+pull-request rule, which is how release commits and tag pushes work.
 
 Before you open a PR:
 
@@ -281,10 +286,11 @@ Add a `CHANGELOG.md` entry — one bullet under `### Added`, `### Fixed` or `###
 section at the top of the file — and commit it with the change. Write what changed for the user,
 not how it is implemented.
 
-**Resolve conflicts on your branch.** Rebase it on `main` and force-push the branch; the maintainer
-does the same rather than resolving the conflict inside a merge. The changelog is the usual conflict
-site, because two pull requests that land close together both append to the same list — and the
-second one conflicts again once the first has merged.
+**Resolve conflicts on your branch.** Rebase it on `main` and force-push your own branch; the
+maintainer does the same rather than resolving the conflict inside a merge. (Force-pushing `main`
+itself is blocked, and rebasing a branch under review is expected.) The changelog is the usual
+conflict site, because two pull requests that land close together both append to the same list —
+and the second one conflicts again once the first has merged.
 
 CI (`.github/workflows/ci.yml`) runs the suite above plus the installed-copy test on every pull
 request. `docs/RELEASING.md` is the release runbook for maintainers.
