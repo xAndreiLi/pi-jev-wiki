@@ -1,12 +1,15 @@
 # Releasing
 
-## Current state (2026-10-08)
+## Current state (2026-10-09)
 
-- **Published:** `pi-jev-wiki@1.0.2` by CI with **SLSA provenance** (2026-10-08) — the SQLite index
-  store, the single shared embedder process, the installed-copy fix (1.0.1) and `action=stop` (1.0.2).
-  `0.2.0` was the manual first release; `0.3.0`–`0.8.1` were CI-published. At 1.x the npm store's
-  `^1.0.0` range covers later minors, so `pi update --extension npm:pi-jev-wiki@latest` works again
-  (the 0.x pinning caveat below no longer applies).
+- **Published:** `pi-jev-wiki@1.0.3` by CI with **SLSA provenance** (2026-10-09) — the embedder
+  replaces a socket left behind by a daemon that died without shutting down, downloads the model when
+  a rebuild follows a status check, appends its own startup failure to the log (1.0.2 added the SQLite
+  index store, the single shared embedder process, the installed-copy fix and `action=stop`; 1.0.3
+  also fixes every per-topic TOC link). `0.2.0` was the manual first release; `0.3.0`–`0.8.1` were
+  CI-published. At 1.x the npm store's `^1.0.0` range covers later minors, so
+  `pi update --extension npm:pi-jev-wiki@latest` works again (the 0.x pinning caveat below no longer
+  applies).
 - **`1.0.0` is broken for installers and should be deprecated.** Its embedder daemon was spawned as a
   `.ts` file under `node_modules`, where Node refuses to strip types, so semantic search never started
   — do not recommend it. Deprecate with `npm deprecate pi-jev-wiki@1.0.0 "<reason>"`; that call needs
