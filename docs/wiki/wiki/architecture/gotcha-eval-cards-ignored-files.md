@@ -13,9 +13,10 @@ claims:
     support: 0.65
     evidence: [eval/arms.mjs, "C:/Coding/discord-assistant/.gitignore", "commit 0b9df48 (discord-assistant): the .gitignore rule that ignores AGENTS.md"]
     reviewed: 2026-10-02
-    last_checked: 2026-10-02
+    last_checked: 2026-10-09
 files: [eval/arms.mjs, eval/tasks/ds-009.json, eval/graders/ds-009-screenshot.test.ts]
 ---
+
 
 
 # Eval cards must target committed files

@@ -13,16 +13,17 @@ claims:
     support: 0.9
     evidence: [raw/sessions/2026-09-26-session-2026-09-26-2308.md, docs/notes/handoff-2026-09-26.md, src/extension.ts]
     reviewed: 2026-09-26
-    last_checked: 2026-09-28
+    last_checked: 2026-10-09
   - id: c2
     text: "Capture loses file evidence twice when a ref cannot be resolved: buildInsightEvidence ignores a file-kind evidence item's own quote when the file cannot be read, and the extraction transcript drops tool results (sessionTextFromEntries keeps only user/assistant roles), so the extractor usually has no quoted passage to fall back on."
     status: verified
     support: 0.85
     evidence: [raw/sessions/2026-09-26-session-2026-09-26-2308.md, src/extension.ts, src/pipeline/capture.ts]
     reviewed: 2026-09-26
-    last_checked: 2026-09-28
+    last_checked: 2026-10-09
 files: [src/extension.ts, src/pipeline/capture.ts]
 ---
+
 
 
 

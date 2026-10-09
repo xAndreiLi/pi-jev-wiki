@@ -1,21 +1,22 @@
 ---
-title: The shared embedder: one process, and the two ways to end up with three
+title: "The shared embedder: one process, and the two ways to end up with three"
 type: gotcha
 topic: architecture
 summary: "One local process owns the embedding model, started on demand over a pipe derived from the agent dir. Two traps cost real CPU when it was first run: Windows lets several processes bind the same pipe name (so a pipe name is not a single instance — the daemon takes a pid lock file), and the pipe hash must come from a canonicalised agent dir or the same directory spelled two ways yields two daemons and two model copies. A batch lost to a dying daemon now retries once instead of failing a whole wiki."
 tags: [embeddings, index, pipes, single-instance, gotcha]
-updated: 2026-10-08
+updated: 2026-10-09
 sources: [raw/sessions/2026-10-08-session-2026-10-08-074620.md]
 claims:
   - id: c1
     text: "A batch in flight when the embedder dies fails the whole index run for that wiki, because a wiki's chunks are embedded before any of them are written; the client now retries one batch after reconnecting, so a daemon that idle-exited or was replaced between batches is invisible to callers."
-    status: verified
+    status: disputed
     support: 0.67
     evidence: ["command: duplicate rebuild log 2026-10-08 — `FAIL pi-jev-wiki: The shared embedder connection closed.` after the daemon was killed mid-batch; the wiki had to be re-run", "file: src/vector/embedder/client.ts — embedBatch() drops the connection, ensures a daemon, and sends the same batch once more before reporting the error"]
     reviewed: 2026-10-08
-    last_checked: 2026-10-08
+    last_checked: 2026-10-09
 files: [src/vector/embedder/server.ts, src/vector/embedder/client.ts]
 ---
+
 
 # The shared embedder: one process, and the two ways to end up with three
 

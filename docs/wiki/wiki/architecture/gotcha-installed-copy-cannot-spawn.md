@@ -14,9 +14,10 @@ claims:
     support: 0.55
     evidence: ["command: publish run 37772751156 — every step green (npm ci, test:all, publish) for the commit whose installed copy failed with ERR_UNSUPPORTED_NODE_MODULES_TYPE_STRIPPING", "command: npm run test:install against the fixed tree — 'installed copy indexed 2 chunk(s) and returned 2 semantic hit(s)'", "file: scripts/install-test.ts — packs, installs into a throwaway project, indexes a two-page wiki with that copy and requires a semantic hit"]
     reviewed: 2026-10-08
-    last_checked: 2026-10-08
+    last_checked: 2026-10-09
 files: [src/vector/embedder/daemon.mjs, src/vector/embedder/client.ts, scripts/install-test.ts, docs/RELEASING.md]
 ---
+
 
 # The installed copy could not start the embedder
 

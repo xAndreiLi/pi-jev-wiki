@@ -4,39 +4,40 @@ type: architecture/flow
 topic: architecture
 summary: "Wiki maintenance is a closed loop of six stages — trigger, adjudication, placement, write, commit, and currency/health — in which only the write stage needs an agent, and every stage is bounded by an escalation boundary and the failure-loop rules."
 tags: [autonomy, maintenance, workflow, capture, sync, review]
-updated: 2026-10-08
+updated: 2026-10-09
 sources: [docs/plans/AUTONOMY.md, raw/sessions/2026-10-08-session-2026-10-08-092138.md]
 claims:
   - id: c1
-    text: "Every wiki artefact the human sees is either a critical review escalation or the one-time embedding-preset choice; the rest of maintenance belongs to the agent."
-    status: user-stated
+    text: Every wiki artefact the human sees is either a critical review escalation or the one-time embedding-preset choice; the rest of maintenance belongs to the agent.
+    status: needs_recheck
     support: 0.7
     evidence: [raw/sessions/2026-10-08-session-2026-10-08-092138.md, The human user should not need to manually touch any part of the wiki unless it is very critical.]
     reviewed: 2026-10-08
-    last_checked: 2026-10-08
+    last_checked: 2026-10-09
   - id: c2
     text: "Maintenance is a closed loop of six stages: trigger, adjudication, placement, write, commit, and currency/health, where only the write stage requires an agent at all."
     status: verified
     support: 0.9
     evidence: [docs/plans/AUTONOMY.md]
     reviewed: 2026-10-08
-    last_checked: 2026-10-08
+    last_checked: 2026-10-09
   - id: c3
-    text: Currency and health are triggers in their own right, not side effects of capture — a wiki that is only maintained when work is captured goes stale between captures.
+    text: "Currency and health are triggers in their own right, not side effects of capture — a wiki that is only maintained when work is captured goes stale between captures."
     status: verified
     support: 0.85
     evidence: [docs/plans/AUTONOMY.md, src/sync.ts]
     reviewed: 2026-10-08
-    last_checked: 2026-10-08
+    last_checked: 2026-10-09
   - id: c4
-    text: The escalations that reach a human are the exceptions that are unsafe to decide automatically, so the loop is defined by its escalation boundary rather than by what it automates.
+    text: "The escalations that reach a human are the exceptions that are unsafe to decide automatically, so the loop is defined by its escalation boundary rather than by what it automates."
     status: verified
     support: 0.85
     evidence: [docs/plans/AUTONOMY.md, docs/wiki/wiki/decisions/review-escalation.md]
     reviewed: 2026-10-08
-    last_checked: 2026-10-08
+    last_checked: 2026-10-09
 files: [src/extension.ts, src/sync.ts, src/pipeline/write.ts, src/lint.ts]
 ---
+
 
 # The maintenance loop
 

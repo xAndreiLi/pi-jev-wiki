@@ -4,7 +4,7 @@ type: gotcha
 topic: architecture
 summary: "Historical: session extraction could label an assistant recommendation as `user:` evidence with no code check that the words came from a user turn, and Jev then scored trustTier user_stated; 0.8.0 closes the pathway by validating user evidence against actual user turns."
 tags: [capture, adjudication, trust-tier, proposals, gotcha]
-updated: 2026-09-26
+updated: 2026-10-09
 sources: [raw/sessions/2026-09-26-session-2026-09-26-0010.md, raw/sessions/2026-09-26-session-2026-09-26-0008.md]
 claims:
   - id: c1
@@ -13,11 +13,12 @@ claims:
     support: 0.79
     evidence: [raw/sessions/2026-09-26-session-2026-09-26-0010.md, raw/sessions/2026-09-26-session-2026-09-26-0008.md, .jev-wiki/decisions.jsonl, c5e5f62]
     reviewed: 2026-09-26
-    last_checked: 2026-09-28
-    superseded_by: "0.8.0 validates user-kind evidence against actual user turns and renders unsupported items as agent-stated (unverified), closing the user_stated pathway (see Mitigation below)."
+    last_checked: 2026-10-09
+    superseded_by: commit 9a83aa1
     superseded_at: 2026-09-26
 files: [src/pipeline/capture.ts, src/extension.ts]
 ---
+
 
 
 

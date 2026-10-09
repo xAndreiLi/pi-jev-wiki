@@ -4,7 +4,7 @@ type: architecture/flow
 topic: architecture
 summary: "wiki_ask retrieves knowledge from a derived vector index: claim and section chunks, local embedding presets, hybrid BM25+vector rank fusion (RRF), and batched Jev rerank and sufficiency judgments, with keyword fallback when the index is cold."
 tags: [retrieval, search, embeddings, index, fusion, jev]
-updated: 2026-09-26
+updated: 2026-10-09
 sources: [raw/knowledge-pipeline-current/2026-09-26-knowledge-pipeline-current-state.md]
 claims:
   - id: c1
@@ -13,107 +13,108 @@ claims:
     support: 0.96
     evidence: [raw/knowledge-pipeline-current/2026-09-26-knowledge-pipeline-current-state.md]
     reviewed: 2026-09-26
-    last_checked: 2026-09-26
+    last_checked: 2026-10-09
   - id: c2
     text: "Generated files (index.md, log.md, toc.md, toc/) are never chunked."
     status: verified
     support: 0.98
     evidence: [raw/knowledge-pipeline-current/2026-09-26-knowledge-pipeline-current-state.md]
     reviewed: 2026-09-26
-    last_checked: 2026-09-26
+    last_checked: 2026-10-09
   - id: c3
     text: "Embeddings are local, CPU-only ONNX via @huggingface/transformers with two presets: performance (EmbeddingGemma-300M, q8, 768d) and quality (Qwen3-Embedding-0.6B, q8, 1024d)."
     status: verified
     support: 0.98
     evidence: [raw/knowledge-pipeline-current/2026-09-26-knowledge-pipeline-current-state.md]
     reviewed: 2026-09-26
-    last_checked: 2026-09-26
+    last_checked: 2026-10-09
   - id: c4
     text: Embedding presets include MRL truncation and per-model prompt templates.
     status: verified
     support: 0.81
     evidence: [raw/knowledge-pipeline-current/2026-09-26-knowledge-pipeline-current-state.md]
     reviewed: 2026-09-26
-    last_checked: 2026-09-26
+    last_checked: 2026-10-09
   - id: c5
     text: "The embedding model is chosen once, before the first build, via wiki_index action=model."
-    status: verified
+    status: needs_recheck
     support: 0.96
     evidence: [raw/knowledge-pipeline-current/2026-09-26-knowledge-pipeline-current-state.md]
     reviewed: 2026-09-26
-    last_checked: 2026-09-26
+    last_checked: 2026-10-09
   - id: c6
     text: The vector index uses PGlite + pgvector with one user-level database covering every registered wiki at ~/.pi/agent/jev-wiki/vector.
-    status: verified
+    status: disputed
     support: 0.98
     evidence: [raw/knowledge-pipeline-current/2026-09-26-knowledge-pipeline-current-state.md]
     reviewed: 2026-09-26
-    last_checked: 2026-09-26
+    last_checked: 2026-10-09
   - id: c7
     text: "The vector index is a derived cache — never a source of truth, safe to rebuild or delete."
     status: verified
     support: 0.98
     evidence: [raw/knowledge-pipeline-current/2026-09-26-knowledge-pipeline-current-state.md]
     reviewed: 2026-09-26
-    last_checked: 2026-09-26
+    last_checked: 2026-10-09
   - id: c8
     text: Queries never download a model; a cold or mismatched index falls back to keyword search.
     status: verified
     support: 0.98
     evidence: [raw/knowledge-pipeline-current/2026-09-26-knowledge-pipeline-current-state.md]
     reviewed: 2026-09-26
-    last_checked: 2026-09-26
+    last_checked: 2026-10-09
   - id: c9
     text: "wiki_ask selects keyword (index/BM25), semantic (cosine KNN), or hybrid search modes."
     status: verified
     support: 0.97
     evidence: [raw/knowledge-pipeline-current/2026-09-26-knowledge-pipeline-current-state.md]
     reviewed: 2026-09-26
-    last_checked: 2026-09-26
+    last_checked: 2026-10-09
   - id: c10
     text: Hybrid search fuses BM25 and vector ranks with reciprocal rank fusion.
     status: verified
     support: 0.99
     evidence: [raw/knowledge-pipeline-current/2026-09-26-knowledge-pipeline-current-state.md]
     reviewed: 2026-09-26
-    last_checked: 2026-09-26
+    last_checked: 2026-10-09
   - id: c11
     text: "Fusion is granularity-aware: a page-level lexical hit merges into a claim-level sibling, while distinct claims stay separate."
     status: verified
     support: 0.98
     evidence: [raw/knowledge-pipeline-current/2026-09-26-knowledge-pipeline-current-state.md]
     reviewed: 2026-09-26
-    last_checked: 2026-09-26
+    last_checked: 2026-10-09
   - id: c12
     text: "One batched Jev call scores each candidate's relevance to the query (rerank) and returns an evidence-sufficiency verdict."
     status: verified
     support: 0.97
     evidence: [raw/knowledge-pipeline-current/2026-09-26-knowledge-pipeline-current-state.md]
     reviewed: 2026-09-26
-    last_checked: 2026-09-26
+    last_checked: 2026-10-09
   - id: c13
     text: "search.jev.rerank can be auto (hybrid only), always, or never."
     status: verified
     support: 0.97
     evidence: [raw/knowledge-pipeline-current/2026-09-26-knowledge-pipeline-current-state.md]
     reviewed: 2026-09-26
-    last_checked: 2026-09-26
+    last_checked: 2026-10-09
   - id: c14
     text: "Below search.jev.minSufficiency, the answer carries a calibrated note that the wiki may not cover this yet."
     status: verified
     support: 0.89
     evidence: [raw/knowledge-pipeline-current/2026-09-26-knowledge-pipeline-current-state.md]
     reviewed: 2026-09-26
-    last_checked: 2026-09-26
+    last_checked: 2026-10-09
   - id: c15
     text: Rerank verdicts are logged as ask.judge.
     status: verified
     support: 0.77
     evidence: [raw/knowledge-pipeline-current/2026-09-26-knowledge-pipeline-current-state.md]
     reviewed: 2026-09-26
-    last_checked: 2026-09-26
+    last_checked: 2026-10-09
 files: [src/vector/chunks.ts, src/vector/embed.ts, src/vector/db.ts, src/wiki/search.ts, src/vector/judgments.ts]
 ---
+
 
 
 

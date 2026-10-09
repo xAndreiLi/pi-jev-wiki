@@ -4,7 +4,7 @@ type: gotcha
 topic: architecture
 summary: "Historical: the llm-wiki skill was the only documentation of the page-claim schema and its status list had drifted from the code; SKILL.md now documents needs_recheck, reviewed, last_checked, needs_review, the YAML subset, and the rule to update it alongside the code."
 tags: [skill, schema, claims, lifecycle, frontmatter]
-updated: 2026-09-28
+updated: 2026-10-09
 sources: [raw/sessions/2026-09-20-session-2026-09-20-2115.md]
 claims:
   - id: c1
@@ -13,11 +13,12 @@ claims:
     support: 0.35
     evidence: [src/sync.ts, src/review.ts, src/pipeline/write.ts, skills/llm-wiki/SKILL.md]
     reviewed: 2026-09-28
-    last_checked: 2026-09-28
-    superseded_by: commit fd88e40
+    last_checked: 2026-10-09
+    superseded_by: commit 9a83aa1
     superseded_at: 2026-09-20
 files: [skills/llm-wiki/SKILL.md, src/sync.ts, src/review.ts, src/pipeline/write.ts]
 ---
+
 
 
 

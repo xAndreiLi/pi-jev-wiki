@@ -1,21 +1,23 @@
 ---
-title: A vector store that will not open is rebuilt, not repaired
+title: "A vector store that will not open is rebuilt, not repaired"
 type: gotcha
 topic: architecture
 summary: "Historical (PGlite, removed 2026-10-08): a corrupt PGlite store aborted every open and wiki_ask quietly fell back to lexical search. The store is SQLite now — reset with wiki_index action=reset while pi runs, then rebuild with wiki_index action=rebuild all=true — but the lesson stands: a degraded index that does not say why is indistinguishable from an empty wiki."
 tags: [index, pglite, vector, recovery, rebuild, gotcha]
-updated: 2026-10-08
+updated: 2026-10-09
 sources: [raw/sessions/2026-10-02-session-2026-10-02-002535.md, raw/sessions/2026-10-02-session-2026-10-02-002551.md]
 claims:
   - id: c1
     text: "A PGlite semantic index that cannot open is repaired by deleting and rebuilding, not by fixing the store: on 2026-10-02 every open of `~/.pi/agent/jev-wiki/vector` aborted with `PANIC: could not locate a valid checkpoint record at 0/246FC18` after an unclean shutdown, and `wiki_ask` silently degraded to lexical search; deleting the directory and re-embedding all seven registered wikis (1,385 chunks) restored semantic retrieval."
-    status: verified
+    status: superseded
     support: 0.85
-    evidence: ["command: node -e \"new PGlite('C:/Users/liand/.pi/agent/jev-wiki/vector', { debug: 5 })\" → LOG: database system was interrupted; last known up at 2026-10-01 07:28:17 -05 / LOG: invalid resource manager ID in checkpoint record / PANIC: could not locate a valid checkpoint record at 0/246FC18 / Aborted()", "command: wiki_index action=rebuild per wiki, 2026-10-02 → database: ok; home 126, calisthenics 150, cultivation-game 245, card-sorter 101, memory 196, discord-assistant 319, pi-jev-wiki 248 chunks", "command: shell → mv vector vector.corrupt-2026-10-02 denied while the live session held the cached handle; rm -rf vector succeeded", "file: src/vector/db.ts (handle() sets this.db only after CREATE EXTENSION succeeds) — a retry after deletion constructs a fresh PGlite, which is why the fix works in the running session", "invariant: architecture/flow-retrieval.md c7 — the vector index is a derived cache, never a source of truth, safe to rebuild or delete"]
+    evidence: ["\"command: node -e \\\"new PGlite('C:/Users/liand/.pi/agent/jev-wiki/vector'", "{ debug: 5 })\\\" → LOG: database system was interrupted; last known up at 2026-10-01 07:28:17 -05 / LOG: invalid resource manager ID in checkpoint record / PANIC: could not locate a valid checkpoint record at 0/246FC18 / Aborted()\"", "command: wiki_index action=rebuild per wiki, 2026-10-02 → database: ok; home 126, calisthenics 150, cultivation-game 245, card-sorter 101, memory 196, discord-assistant 319, pi-jev-wiki 248 chunks", "command: shell → mv vector vector.corrupt-2026-10-02 denied while the live session held the cached handle; rm -rf vector succeeded", "file: src/vector/db.ts (handle() sets this.db only after CREATE EXTENSION succeeds) — a retry after deletion constructs a fresh PGlite, which is why the fix works in the running session", "invariant: architecture/flow-retrieval.md c7 — the vector index is a derived cache, never a source of truth, safe to rebuild or delete"]
     reviewed: 2026-10-02
-    last_checked: 2026-10-02
+    last_checked: 2026-10-09
+    superseded_by: commit 9a83aa1
 files: [src/vector/db.ts, src/vector/registry.ts]
 ---
+
 
 # A vector store that will not open is rebuilt, not repaired
 

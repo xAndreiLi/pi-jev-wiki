@@ -1,28 +1,30 @@
 ---
-title: The vector store tolerates one opener, and it stays open for the whole session
+title: "The vector store tolerates one opener, and it stays open for the whole session"
 type: gotcha
 topic: architecture
 summary: "Historical (PGlite, removed 2026-10-08): PGlite 0.5.8 locks nothing and the store was opened at session_start and released only at session_shutdown, so two concurrent pi sessions were unguarded openers of one store — the corruption precondition. The store is SQLite now: no single owner is needed, and a reset is a file delete."
 tags: [index, pglite, vector, concurrency, lifecycle, gotcha]
-updated: 2026-10-08
+updated: 2026-10-09
 sources: [raw/sessions/2026-10-08-session-2026-10-08-065213.md, raw/sessions/2026-10-08-session-2026-10-08-065227.md]
 claims:
   - id: c1
     text: "PGlite 0.5.8 does not lock its data directory: a second process that opens ~/.pi/agent/jev-wiki/vector while another holds it is not refused and reads its own snapshot, so nothing at the storage layer prevents two openers of the shared vector store."
-    status: verified
+    status: superseded
     support: 0.83
     evidence: ["command: two-process probe 2026-10-08 on a temp dataDir — process A opened and CREATE TABLE'd, then process B opened the same dir while A was still open → 'B: OPENED CONCURRENTLY, rows = 0', no error", "file: node_modules/@electric-sql/pglite/dist/fs/nodefs.d.ts — NodeFS declares only init() and closeFs(), no inter-process lock", "source: https://github.com/electric-sql/pglite/issues/323 — 'PGlite is Postgres in single user mode. There is no support for concurrent connections and you are like to corrupt the database if you open it multiple times at once.'"]
     reviewed: 2026-10-08
-    last_checked: 2026-10-08
+    last_checked: 2026-10-09
+    superseded_by: commit 9a83aa1
   - id: c2
     text: "The embedded vector store has session-grained lifetime: it is opened during session_start by the default-on warmEmbeddingProvider and closed only by closeVectorDbs() on session_shutdown, with no per-query or idle release point (the handle is cached process-wide in vectorDbFor)."
     status: verified
     support: 0.53
     evidence: ["file: src/extension.ts — pi.on(\"session_start\") calls `void warmEmbeddingProvider(loaded, warmLayout.wikiDir).catch(() => undefined);`, and pi.on(\"session_shutdown\") calls `await closeVectorDbs()`", "file: src/auto-retrieve.ts — warmEmbeddingProvider guards on `hooks.autoRetrieve.mode === \"off\" || !vectorEnabled(...)` and then calls `vectorDbFor(vectorDataDir(loaded.agentDir)).counts()`, which constructs the PGlite instance", "file: src/config.ts — DEFAULT_CONFIG sets `hooks: { autoRetrieve: { mode: \"inject\", ... } }` and `search: { vector: { enabled: true, db: \"embedded\", ... } }`, so both guards pass out of the box", "file: src/vector/db.ts — `const instances = new Map<string, PGliteVectorDb>()` with 'Process-wide shared handle per data directory', and close() is the only release"]
     reviewed: 2026-10-08
-    last_checked: 2026-10-08
+    last_checked: 2026-10-09
 files: [src/vector/db.ts, src/extension.ts, src/auto-retrieve.ts, src/config.ts]
 ---
+
 
 # The vector store tolerates one opener, and it stays open for the whole session
 

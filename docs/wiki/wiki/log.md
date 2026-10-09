@@ -750,3 +750,17 @@
 - Raw: raw/sessions/2026-10-09-session-2026-10-09-052959.md
 - Filed 0 · reinforced 0 · review 0 · rejected 1
 
+## [2026-10-09] sync | 40 claim(s) checked
+- Baseline: 12a88a3 → 9a83aa1
+- Changed files: 92
+- Applied: architecture/flow-maintenance.md#c1 → needs_recheck
+- Applied: architecture/flow-retrieval.md#c5 → needs_recheck
+- Applied: architecture/flow-retrieval.md#c6 → contradict
+- Applied: architecture/gotcha-capture-proposals.md#c1 → supersede
+- Applied: architecture/gotcha-corrupt-vector-store-recovery.md#c1 → supersede
+- Applied: architecture/gotcha-embedder-restarts.md#c1 → contradict
+- Applied: architecture/gotcha-silent-search-degradation.md#c1 → needs_recheck
+- Applied: architecture/gotcha-skill-schema-drift.md#c1 → supersede
+- Applied: architecture/gotcha-toc-shards-lf-crlf.md#c1 → supersede
+- Applied: architecture/gotcha-vector-store-single-owner.md#c1 → supersede
+
