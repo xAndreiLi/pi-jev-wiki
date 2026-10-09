@@ -30,6 +30,13 @@
   refused, it replaces the stale file and listens. A socket that still answers is left alone, so a
   live daemon keeps its pipe. Windows named pipes leave no file and are unchanged.
 
+- `wiki_index action=rebuild` could not download the model if anything in the same session had
+  touched the embedder first, for example `wiki_index action=status`. Shared clients were cached per
+  embedder identity only, so the rebuild got the earlier client, which spawns its daemon with
+  downloads disabled. On a machine without the model, that daemon failed and the rebuild reported
+  that the embedder did not start. Download permission is now part of the client key; both clients
+  attach to the same daemon.
+
 ## 1.0.2 — 2026-10-08
 
 ### Fixed
