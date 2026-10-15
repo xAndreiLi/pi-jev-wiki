@@ -57,6 +57,17 @@ export function buildAutoQuery(prompt: string, previousUser?: string, maxChars =
 	return `${base.slice(0, head)} … ${base.slice(-tail)}`.trim();
 }
 
+/**
+ * The prompt of a run a user started, or undefined. Since pi 1.2, `before_agent_start` also fires for a run that
+ * an idle custom message starts (`pi.sendMessage(..., { triggerTurn: true })`: a finished background job, a
+ * subagent's result); that event has `messageType: "custom"` and no prompt, so there is nothing to search for.
+ * Older pi has no `messageType`, and every run is a user's.
+ */
+export function userPromptOf(event: { messageType?: string; prompt?: unknown }): string | undefined {
+	if (event.messageType !== undefined && event.messageType !== "user") return undefined;
+	return typeof event.prompt === "string" ? event.prompt : undefined;
+}
+
 /** The most recent user-authored prompt in a session branch. Injected messages are `custom`, not `user`. */
 export function lastUserPrompt(entries: unknown[]): string | undefined {
 	for (let index = entries.length - 1; index >= 0; index -= 1) {

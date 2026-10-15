@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+
+- With pi 1.2, every run started by a message rather than a prompt (a finished background job, a
+  subagent's result, another extension's follow-up) logged `Cannot read properties of undefined
+  (reading 'trim')` from this extension. pi 1.2 fires `before_agent_start` for those runs too, without
+  a prompt; automatic retrieval now searches only for runs a user started.
+
 ## 1.0.4 — 2026-10-09
 
 ### Added

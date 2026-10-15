@@ -25,7 +25,7 @@ import { verifyRawSources } from "../src/doctor.ts";
 import { isLocked, withWikiLock } from "../src/wiki/lock.ts";
 import { matchRegisteredWikis, projectRootFor, registeredProjectRoots, resolvePageFile, resolveSourceFile, resolveWriteTarget } from "../src/wiki/target.ts";
 import { registerWiki } from "../src/vector/registry.ts";
-import { buildAutoQuery, dedupeByPage, lastUserPrompt, renderBrief } from "../src/auto-retrieve.ts";
+import { buildAutoQuery, dedupeByPage, lastUserPrompt, renderBrief, userPromptOf } from "../src/auto-retrieve.ts";
 
 let failures = 0;
 async function check(name: string, fn: () => Promise<void> | void): Promise<void> {
@@ -556,6 +556,14 @@ await check("caps a long prompt at both ends", () => {
 	const query = buildAutoQuery(`${"a".repeat(2000)}END`);
 	assert.ok(query.length <= 1200, `query was ${query.length} chars`);
 	assert.ok(query.endsWith("END"), "lost the trailing restatement");
+});
+await check("searches only for runs a user started", () => {
+	assert.equal(userPromptOf({ messageType: "user", prompt: "how does sync work?" }), "how does sync work?");
+	// pi before 1.2 has no messageType: every run is a user's.
+	assert.equal(userPromptOf({ prompt: "how does sync work?" }), "how does sync work?");
+	// pi 1.2+: a run an idle custom message starts (a finished job, a subagent's result) carries no prompt.
+	assert.equal(userPromptOf({ messageType: "custom" }), undefined);
+	assert.equal(userPromptOf({ messageType: "custom", prompt: "stray" }), undefined);
 });
 await check("reads the last user prompt, never injected content", () => {
 	const entries = [
