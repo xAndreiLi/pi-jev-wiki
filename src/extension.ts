@@ -13,7 +13,7 @@ import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-a
 import { StringEnum } from "@earendil-works/pi-ai";
 import { Type } from "typebox";
 import { loadConfig, resolveCaptureTriggers, type LoadedConfig, type JevWikiConfig, type WriterMode } from "./config.ts";
-import { buildAutoQuery, lastUserPrompt, retrieveForPrompt, warmEmbeddingProvider } from "./auto-retrieve.ts";
+import { buildAutoQuery, lastUserPrompt, retrieveForPrompt, userPromptOf, warmEmbeddingProvider } from "./auto-retrieve.ts";
 import { git, headCommit, isGitRepo } from "./git.ts";
 import { appendLedger, readLedger, summarizeLedger } from "./ledger.ts";
 import { lintWiki } from "./lint.ts";
@@ -2278,13 +2278,15 @@ export default function (pi: ExtensionAPI) {
 	let autoRetrieveWarned = false;
 
 	pi.on("before_agent_start", async (event, ctx) => {
+		const prompt = userPromptOf(event); // none for a run an idle custom message starts (pi 1.2+)
+		if (prompt === undefined) return;
 		const loaded = loadConfig(ctx.cwd);
 		const settings = loaded.config.hooks.autoRetrieve;
 		if (settings.mode === "off" || !loaded.apiKey) return;
 		const layout = resolveLayout(ctx.cwd, loaded.config.wikiRoot, loaded.config.stateRoot);
 		if (!existsSync(layout.wikiDir)) return;
 		const previousUser = lastUserPrompt(ctx.sessionManager.getBranch());
-		const query = buildAutoQuery(event.prompt, previousUser);
+		const query = buildAutoQuery(prompt, previousUser);
 		if (!query) return;
 		const sessionId = ctx.sessionManager.getSessionId();
 		if (autoQuerySession === sessionId && autoQueryText === query) return;
@@ -2294,7 +2296,7 @@ export default function (pi: ExtensionAPI) {
 		try {
 			const client = await requireClient(loaded, ctx);
 			const signal = AbortSignal.any([AbortSignal.timeout(settings.budgetMs), ...(ctx.signal ? [ctx.signal] : [])]);
-			const outcome = await retrieveForPrompt({ loaded, layout, client, prompt: event.prompt, previousUser, signal });
+			const outcome = await retrieveForPrompt({ loaded, layout, client, prompt, previousUser, signal });
 			await recordMetric(layout, {
 				op: "auto",
 				query: outcome.query,
